@@ -1,45 +1,83 @@
-# Genie Space Configuration Generator
+# Genie Lamp Agent 🧞
 
-This project generates Databricks Genie space configurations using LLMs via Databricks serving endpoints.
+An intelligent agent that generates Databricks Genie space configurations using LLMs via Databricks serving endpoints.
+
+[![GitHub Repository](https://img.shields.io/badge/GitHub-genie--lamp--agent-blue?style=flat&logo=github)](https://github.com/Aiden-Jeon/genie-lamp-agent)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Databricks](https://img.shields.io/badge/Databricks-Genie-FF3621?logo=databricks)](https://www.databricks.com/)
+
+## 📚 Table of Contents
+
+- [Overview](#overview)
+- [Recent Updates](#recent-updates-january-2026)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Key Components](#key-components)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [Support](#support)
 
 ## Overview
 
-The system takes documentation and requirements as input and generates a complete, production-ready Genie space configuration that can be used to create a Genie space via the API.
+The Genie Lamp Agent automates the creation of Databricks Genie spaces by intelligently generating production-ready configurations from natural language requirements. Simply provide your business requirements and documentation, and let the agent handle the complex configuration process.
 
-### Workflow
+**Key Benefits:**
+- 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
+- ✅ **100% Test Coverage**: Direct benchmark extraction ensures complete FAQ coverage
+- 🔍 **Smart Validation**: Pre-flight checks for tables, columns, and Unity Catalog access
+- 🎯 **Best Practices Built-in**: Leverages Databricks Genie best practices automatically
+- 🤖 **LLM-Powered**: Uses Databricks foundation models for intelligent configuration generation
+
+### How It Works
 
 ```
-docs/curate_effective_genie.md  ──┐
-                                  │
-docs/genie_api.md               ──┤──> Prompt Builder ──> LLM (Databricks) ──> Pydantic Model ──> JSON Config
-                                  │
-data/demo_requirements.md       ──┘
+📄 Best Practices Doc          ──┐
+                                 │
+📄 Genie API Specification     ──┤──> 🔨 Prompt Builder ──> 🤖 LLM (Databricks) ──> ✅ Validation ──> 📦 JSON Config
+                                 │
+📄 Your Requirements           ──┘
 ```
 
-## Recent Updates (January 2026)
+The agent follows a structured pipeline:
+1. **Input**: Combines Genie best practices, API specs, and your requirements
+2. **Generation**: Uses Databricks foundation models to generate intelligent configurations
+3. **Extraction**: Directly extracts 100% of FAQ questions as benchmarks
+4. **Validation**: Verifies tables, columns, and Unity Catalog permissions
+5. **Output**: Produces a production-ready Genie space configuration
 
-### 🆕 Direct Benchmark Extraction
+## 🎉 Recent Updates (January 2026)
+
+### 🆕 Direct Benchmark Extraction (v1.1.0)
 **Problem Solved:** LLMs were only extracting 26% of FAQ questions as benchmarks, missing 74% of important test scenarios.
 
 **Solution:** New direct extraction system ensures 100% FAQ coverage:
 - ✅ `scripts/generate_config_with_direct_benchmarks.py` - Generate config with complete benchmarks
 - ✅ `scripts/update_benchmarks.py` - Fix benchmarks in existing configs
 - ✅ Preserves exact question phrasing from requirements
-- ✅ See [docs/BENCHMARK_EXTRACTION.md](docs/BENCHMARK_EXTRACTION.md) for details
+- ✅ Deterministic and fast (milliseconds vs seconds)
 
-### 🔍 Enhanced Table & Column Validation
+**Impact:**
+```
+Before: 7 benchmarks  (26% coverage) ❌
+After:  27 benchmarks (100% coverage) ✅
+```
+
+### 🔍 Enhanced Table & Column Validation (v1.0.0)
 Comprehensive validation system that checks Unity Catalog before space creation:
 - ✅ Validates all table references exist
 - ✅ Validates column references in SQL expressions
 - ✅ Detailed error reporting with actionable fixes
-- ✅ See [docs/TABLE_VALIDATION.md](docs/TABLE_VALIDATION.md) for details
+- ✅ Pre-flight checks prevent runtime errors
+- ✅ Prevents costly deployment failures
 
-### 🚀 2026 Databricks Genie API Features
-- Pagination support for large space lists
-- Partial updates (update title/description without full config)
-- Serialized space export (requires CAN EDIT permission)
-- Parent path support for workspace organization
-- Trash (recoverable) vs permanent delete
+### 🚀 2026 Databricks Genie API Support
+Full support for latest Genie API features:
+- 📄 Pagination support for large space lists
+- ⚡ Partial updates (update title/description without full config)
+- 📦 Serialized space export (requires CAN EDIT permission)
+- 📁 Parent path support for workspace organization
+- 🗑️ Trash (recoverable) vs permanent delete
 
 ## Features
 
@@ -51,7 +89,38 @@ Comprehensive validation system that checks Unity Catalog before space creation:
 - **Direct Benchmark Extraction**: Extract 100% of FAQ questions as benchmarks (no LLM filtering)
 - **Reasoning**: Optional reasoning output to understand configuration choices
 
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- ✅ **Python 3.8+** installed
+- ✅ **Databricks workspace** with access to:
+  - Unity Catalog tables
+  - Genie Spaces API
+  - Foundation models (e.g., `databricks-gpt-5-2`)
+- ✅ **Personal Access Token** with appropriate permissions
+- ✅ **SQL Warehouse** ID for Genie space execution
+
 ## Installation
+
+### Option 1: Clone from GitHub (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/Aiden-Jeon/genie-lamp-agent.git
+cd genie-lamp-agent
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Option 2: Existing Project
+
+If you already have the project:
 
 ```bash
 # Create virtual environment
@@ -235,8 +304,8 @@ python main.py \
 ```bash
 python main.py \
   --endpoint my-llm-endpoint \
-  --context-doc docs/curate_effective_genie.md \
-  --output-doc docs/genie_api.md \
+  --context-doc src/prompt/templates/curate_effective_genie.md \
+  --output-doc src/prompt/templates/genie_api.md \
   --input-data data/demo_requirements.md \
   --output output/genie_space_config.json \
   --max-tokens 4000 \
@@ -287,7 +356,7 @@ Real-world analysis shows LLMs select only "representative" questions:
 ✓ Configuration saved to: output/genie_space_config.json
 ```
 
-See [docs/BENCHMARK_EXTRACTION.md](docs/BENCHMARK_EXTRACTION.md) for complete details and analysis.
+The direct extraction process uses regex patterns to identify and extract FAQ sections from your requirements document, ensuring no questions are missed or modified by LLM interpretation.
 
 ### Step 2: Validate Tables and Columns (Recommended)
 
@@ -327,9 +396,7 @@ Issues:
 
 If validation fails, fix the issues in your configuration before proceeding to create the space.
 
-**See [docs/TABLE_VALIDATION.md](docs/TABLE_VALIDATION.md) for detailed documentation.**
-
-**See [docs/BENCHMARK_EXTRACTION.md](docs/BENCHMARK_EXTRACTION.md) for benchmark extraction details.**
+**Tip:** The validator checks both table existence and column references in SQL expressions, joins, and metric definitions. Always run this before creating a Genie space to avoid runtime errors.
 
 ### Step 3: Create the Genie Space
 
@@ -399,29 +466,25 @@ You can now access your Genie space at the URL above.
 │       ├── benchmark_extractor.py   # Extract benchmarks from requirements
 │       ├── config_transformer.py    # Transform to Databricks format
 │       └── table_validator.py       # Table & column validator
-├── docs/
-│   ├── TABLE_VALIDATION.md           # Validation guide
-│   ├── BENCHMARK_EXTRACTION.md       # Benchmark extraction guide
-│   ├── VALIDATION_QUICK_REFERENCE.md # Validation quick reference
-│   └── VALIDATION_IMPLEMENTATION_SUMMARY.md # Implementation details
 ├── data/
 │   └── demo_requirements.md     # Input requirements
-├── output/
-│   ├── genie_space_config.json  # Generated configuration
-│   └── genie_space_result.json  # Creation result (space ID and URL)
-├── examples/
-│   ├── create_genie_space_example.py  # Python API examples
-│   └── validate_tables_example.py     # Table validation examples
-├── scripts/
 │   ├── create_genie_space.py                      # Create Genie space
 │   ├── validate_tables.py                         # Validate tables and columns
 │   ├── create_genie_space_workflow.sh             # Automated workflow script
 │   ├── validate_setup.py                          # Setup validation tool
 │   ├── generate_config_with_direct_benchmarks.py  # Generate with full benchmarks
-│   └── update_benchmarks.py                       # Update existing config benchmarks
+│   ├── update_benchmarks.py                       # Update existing config benchmarks
+│   └── fix_benchmarks.sh                          # Legacy benchmark fix script
+├── tests/
+│   ├── __init__.py
+│   ├── test_example_usage.py    # API usage examples
+│   ├── test_generation.py       # Configuration generation tests
+│   ├── test_join_specs.py       # Join specification tests
+│   └── test_table_validator.py  # Validation tests
 ├── main.py                      # Generate configuration
 ├── requirements.txt             # Python dependencies
 ├── .env.example                 # Example environment file
+├── .gitignore                   # Git ignore patterns
 ├── README.md                    # This file
 └── ARCHITECTURE.md              # System architecture documentation
 ```
@@ -555,7 +618,7 @@ Transforms user-friendly configuration to Databricks `serialized_space` format:
 }
 ```
 
-See `GENIE_CONFIG_GUIDE.md` for detailed transformation documentation.
+See `src/utils/config_transformer.py` for transformation implementation details.
 
 ### 5. Genie Space Client (`src/api/genie_space_client.py`)
 
@@ -783,14 +846,15 @@ For foundation models, ensure the model name is correct and available in your wo
 databricks serving-endpoints list
 ```
 
-## Documentation
+## 📖 Documentation
 
-### Quick Reference
-- **README.md** (this file): Installation, quick start, and API reference
-- **ARCHITECTURE.md**: System architecture, component details, and integration flows
-- **docs/BENCHMARK_EXTRACTION.md**: Complete guide to benchmark extraction (NEW)
-- **docs/TABLE_VALIDATION.md**: Table and column validation guide
-- **docs/VALIDATION_QUICK_REFERENCE.md**: Quick validation reference
+### Available Documentation
+- **[README.md](README.md)** (this file): Installation, quick start, and complete usage guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture, component details, and integration flows
+
+### Template Documentation
+- **[src/prompt/templates/curate_effective_genie.md](src/prompt/templates/curate_effective_genie.md)**: Databricks Genie best practices
+- **[src/prompt/templates/genie_api.md](src/prompt/templates/genie_api.md)**: Genie Space API specification
 
 ### Configuration Format
 The system supports a user-friendly configuration format that includes:
@@ -801,9 +865,7 @@ The system supports a user-friendly configuration format that includes:
 - **SQL Expressions**: Reusable metric and dimension definitions
 - **Benchmarks**: Test questions for validation
 
-All configurations are automatically transformed to Databricks' internal `serialized_space` format when creating or updating Genie spaces.
-
-For detailed configuration format documentation, see `GENIE_CONFIG_GUIDE.md`.
+All configurations are automatically transformed to Databricks' internal `serialized_space` format when creating or updating Genie spaces. The transformation is handled transparently by `src/utils/config_transformer.py`.
 
 ## Key Scripts Reference
 
@@ -822,14 +884,12 @@ For detailed configuration format documentation, see `GENIE_CONFIG_GUIDE.md`.
 | `scripts/create_genie_space.py` | Create Genie space from config | After validation passes |
 | `scripts/create_genie_space_workflow.sh` | End-to-end automation | Quick demos (skip benchmarks) |
 
-### Documentation
+### Documentation Files
 | File | Description |
 |------|-------------|
-| [README.md](README.md) | This file - getting started guide |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and design |
-| [docs/BENCHMARK_EXTRACTION.md](docs/BENCHMARK_EXTRACTION.md) | Complete benchmark extraction guide |
-| [docs/TABLE_VALIDATION.md](docs/TABLE_VALIDATION.md) | Table and column validation guide |
-| [docs/VALIDATION_QUICK_REFERENCE.md](docs/VALIDATION_QUICK_REFERENCE.md) | Quick validation reference |
+| [README.md](README.md) | Complete getting started guide and API reference |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and design patterns |
+| [data/demo_requirements.md](data/demo_requirements.md) | Example requirements document |
 
 ## Best Practices
 
@@ -844,22 +904,61 @@ For detailed configuration format documentation, see `GENIE_CONFIG_GUIDE.md`.
 
 ## Contributing
 
-To extend this project:
+We welcome contributions to make Genie Lamp Agent better! Here's how you can help:
 
-1. Add new Pydantic models in `src/models.py`
-2. Enhance prompt templates in `src/prompt/prompt_builder.py`
-3. Add new LLM providers in `src/llm/databricks_llm.py`
-4. Add new API clients in `src/api/`
-5. Add new utilities in `src/utils/`
-6. Update the main script for new features
+### Development Setup
+
+```bash
+# Fork and clone the repository
+git clone https://github.com/YOUR_USERNAME/genie-lamp-agent.git
+cd genie-lamp-agent
+
+# Create a feature branch
+git checkout -b feature/your-feature-name
+
+# Make your changes and test
+python -m pytest tests/
+
+# Commit and push
+git add .
+git commit -m "Add your feature description"
+git push origin feature/your-feature-name
+```
+
+### Extension Points
+
+1. **Add new Pydantic models** in `src/models.py`
+2. **Enhance prompt templates** in `src/prompt/prompt_builder.py`
+3. **Add new LLM providers** in `src/llm/databricks_llm.py`
+4. **Add new API clients** in `src/api/`
+5. **Add new utilities** in `src/utils/`
+6. **Update the main script** for new features
+
+### Pull Request Process
+
+1. Ensure your code follows the existing style
+2. Add tests for new functionality
+3. Update documentation as needed
+4. Submit a pull request with a clear description
 
 ## License
 
-[Your License Here]
+MIT License - See LICENSE file for details
 
 ## Support
 
 For issues or questions:
-- Check Databricks Genie documentation
-- Review the generated reasoning output
-- Adjust prompt templates for your use case
+
+- 🐛 **Report bugs**: [GitHub Issues](https://github.com/Aiden-Jeon/genie-lamp-agent/issues)
+- 💡 **Request features**: [GitHub Issues](https://github.com/Aiden-Jeon/genie-lamp-agent/issues)
+- 📖 **Documentation**: Check Databricks Genie documentation
+- 🔍 **Debugging**: Review the generated reasoning output
+- ⚙️ **Customization**: Adjust prompt templates for your use case
+
+## Repository
+
+🔗 **GitHub**: [https://github.com/Aiden-Jeon/genie-lamp-agent](https://github.com/Aiden-Jeon/genie-lamp-agent)
+
+---
+
+Made with ❤️ for the Databricks community
