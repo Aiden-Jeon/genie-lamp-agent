@@ -9,7 +9,7 @@ import pytest
 import json
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
-from src.table_validator import (
+from src.utils.table_validator import (
     TableValidator,
     ValidationReport,
     ValidationIssue
@@ -236,7 +236,7 @@ class TestTableValidator:
         assert "a" in alias_map
         assert alias_map["a"] == "demo.retail.articles"
     
-    @patch('src.table_validator.requests.get')
+    @patch('src.utils.table_validator.requests.get')
     def test_get_table_schema_success(self, mock_get):
         """Test getting table schema successfully."""
         validator = TableValidator(
@@ -262,7 +262,7 @@ class TestTableValidator:
         assert schema["full_name"] == "catalog.schema.table"
         assert len(schema["columns"]) == 2
     
-    @patch('src.table_validator.requests.get')
+    @patch('src.utils.table_validator.requests.get')
     def test_get_table_schema_not_found(self, mock_get):
         """Test getting schema for non-existent table."""
         validator = TableValidator(
@@ -279,7 +279,7 @@ class TestTableValidator:
         
         assert schema is None
     
-    @patch('src.table_validator.requests.get')
+    @patch('src.utils.table_validator.requests.get')
     def test_validate_table(self, mock_get):
         """Test validating table existence."""
         validator = TableValidator(
@@ -295,7 +295,7 @@ class TestTableValidator:
         
         assert validator.validate_table("catalog", "schema", "table") is True
     
-    @patch('src.table_validator.requests.get')
+    @patch('src.utils.table_validator.requests.get')
     def test_validate_columns(self, mock_get):
         """Test validating columns in a table."""
         validator = TableValidator(
@@ -341,7 +341,7 @@ class TestTableValidator:
 class TestIntegration:
     """Integration tests (require mock environment setup)."""
     
-    @patch('src.table_validator.requests.get')
+    @patch('src.utils.table_validator.requests.get')
     def test_full_validation_workflow(self, mock_get):
         """Test complete validation workflow with mocked API."""
         # Create a temporary config file

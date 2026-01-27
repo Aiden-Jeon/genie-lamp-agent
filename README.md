@@ -382,17 +382,26 @@ You can now access your Genie space at the URL above.
 ├── src/
 │   ├── __init__.py              # Package initialization
 │   ├── models.py                # Pydantic models for Genie space config
-│   ├── prompt_builder.py        # Builds structured prompts
-│   ├── databricks_llm.py        # Databricks LLM client
-│   ├── genie_space_client.py    # Genie space API client
-│   ├── table_validator.py       # Table & column validator
-│   ├── benchmark_extractor.py   # Extract benchmarks from requirements (NEW)
-│   └── config_transformer.py    # Transform to Databricks format
+│   ├── api/                     # API clients
+│   │   ├── __init__.py
+│   │   └── genie_space_client.py    # Genie Space API client
+│   ├── llm/                     # LLM clients
+│   │   ├── __init__.py
+│   │   └── databricks_llm.py        # Databricks LLM client
+│   ├── prompt/                  # Prompt management
+│   │   ├── __init__.py
+│   │   ├── prompt_builder.py        # Builds structured prompts
+│   │   └── templates/               # Prompt templates
+│   │       ├── curate_effective_genie.md  # Best practices context
+│   │       └── genie_api.md               # API documentation
+│   └── utils/                   # Utility modules
+│       ├── __init__.py
+│       ├── benchmark_extractor.py   # Extract benchmarks from requirements
+│       ├── config_transformer.py    # Transform to Databricks format
+│       └── table_validator.py       # Table & column validator
 ├── docs/
-│   ├── curate_effective_genie.md     # Best practices context
-│   ├── genie_api.md                  # API documentation
 │   ├── TABLE_VALIDATION.md           # Validation guide
-│   ├── BENCHMARK_EXTRACTION.md       # Benchmark extraction guide (NEW)
+│   ├── BENCHMARK_EXTRACTION.md       # Benchmark extraction guide
 │   ├── VALIDATION_QUICK_REFERENCE.md # Validation quick reference
 │   └── VALIDATION_IMPLEMENTATION_SUMMARY.md # Implementation details
 ├── data/
@@ -408,8 +417,8 @@ You can now access your Genie space at the URL above.
 │   ├── validate_tables.py                         # Validate tables and columns
 │   ├── create_genie_space_workflow.sh             # Automated workflow script
 │   ├── validate_setup.py                          # Setup validation tool
-│   ├── generate_config_with_direct_benchmarks.py  # Generate with full benchmarks (NEW)
-│   └── update_benchmarks.py                       # Update existing config benchmarks (NEW)
+│   ├── generate_config_with_direct_benchmarks.py  # Generate with full benchmarks
+│   └── update_benchmarks.py                       # Update existing config benchmarks
 ├── main.py                      # Generate configuration
 ├── requirements.txt             # Python dependencies
 ├── .env.example                 # Example environment file
@@ -491,7 +500,7 @@ Defines Pydantic models that match the Genie API requirements:
 - `GenieSpaceConfig`: Complete configuration
 - `LLMResponse`: Wrapper with reasoning and confidence
 
-### 2. Prompt Builder (`src/prompt_builder.py`)
+### 2. Prompt Builder (`src/prompt/prompt_builder.py`)
 
 Constructs structured prompts with:
 
@@ -500,7 +509,7 @@ Constructs structured prompts with:
 - **Output**: API documentation from `genie_api.md`
 - **Input**: Requirements from `demo_requirements.md`
 
-### 3. LLM Client (`src/databricks_llm.py`)
+### 3. LLM Client (`src/llm/databricks_llm.py`)
 
 Two client classes:
 
@@ -512,7 +521,7 @@ Both support:
 - Error handling
 - Response formatting
 
-### 4. Config Transformer (`src/config_transformer.py`)
+### 4. Config Transformer (`src/utils/config_transformer.py`)
 
 Transforms user-friendly configuration to Databricks `serialized_space` format:
 
@@ -548,7 +557,7 @@ Transforms user-friendly configuration to Databricks `serialized_space` format:
 
 See `GENIE_CONFIG_GUIDE.md` for detailed transformation documentation.
 
-### 5. Genie Space Client (`src/genie_space_client.py`)
+### 5. Genie Space Client (`src/api/genie_space_client.py`)
 
 Client for managing Databricks Genie Spaces via API:
 
@@ -638,12 +647,13 @@ Done!
 #### Generating Configuration
 
 ```python
-from src import PromptBuilder, DatabricksFoundationModelClient
+from src.prompt.prompt_builder import PromptBuilder
+from src.llm.databricks_llm import DatabricksFoundationModelClient
 
 # Build prompt
 builder = PromptBuilder(
-    context_doc_path="docs/curate_effective_genie.md",
-    output_doc_path="docs/genie_api.md",
+    context_doc_path="src/prompt/templates/curate_effective_genie.md",
+    output_doc_path="src/prompt/templates/genie_api.md",
     input_data_path="data/demo_requirements.md"
 )
 prompt = builder.build_prompt_with_reasoning()
@@ -663,7 +673,7 @@ print(f"Tables: {len(config.tables)}")
 #### Creating Genie Space
 
 ```python
-from src.genie_space_client import GenieSpaceClient, create_genie_space_from_file
+from src.api.genie_space_client import GenieSpaceClient, create_genie_space_from_file
 
 # Method 1: Using convenience function
 result = create_genie_space_from_file("output/genie_space_config.json")
@@ -693,7 +703,7 @@ print(f"Access at: {space_url}")
 #### Managing Genie Spaces
 
 ```python
-from src.genie_space_client import GenieSpaceClient
+from src.api.genie_space_client import GenieSpaceClient
 
 client = GenieSpaceClient()
 
@@ -740,7 +750,7 @@ response = client.create_space(
 
 ### Customizing the Prompt
 
-You can modify `src/prompt_builder.py` to customize:
+You can modify `src/prompt/prompt_builder.py` to customize:
 
 - Instruction format
 - Additional context
@@ -837,9 +847,11 @@ For detailed configuration format documentation, see `GENIE_CONFIG_GUIDE.md`.
 To extend this project:
 
 1. Add new Pydantic models in `src/models.py`
-2. Enhance prompt templates in `src/prompt_builder.py`
-3. Add new LLM providers in `src/databricks_llm.py`
-4. Update the main script for new features
+2. Enhance prompt templates in `src/prompt/prompt_builder.py`
+3. Add new LLM providers in `src/llm/databricks_llm.py`
+4. Add new API clients in `src/api/`
+5. Add new utilities in `src/utils/`
+6. Update the main script for new features
 
 ## License
 

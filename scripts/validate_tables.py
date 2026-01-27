@@ -35,7 +35,7 @@ import argparse
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.table_validator import TableValidator, ValidationReport
+from src.utils.table_validator import TableValidator, ValidationReport
 from dotenv import load_dotenv
 
 

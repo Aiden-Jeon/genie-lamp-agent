@@ -44,24 +44,24 @@ def test_imports():
         return False
     
     try:
-        from src import prompt_builder
-        print("  ✓ src.prompt_builder")
+        from src.prompt import prompt_builder
+        print("  ✓ src.prompt.prompt_builder")
     except ImportError as e:
-        print(f"  ✗ src.prompt_builder: {e}")
+        print(f"  ✗ src.prompt.prompt_builder: {e}")
         return False
     
     try:
-        from src import databricks_llm
-        print("  ✓ src.databricks_llm")
+        from src.llm import databricks_llm
+        print("  ✓ src.llm.databricks_llm")
     except ImportError as e:
-        print(f"  ✗ src.databricks_llm: {e}")
+        print(f"  ✗ src.llm.databricks_llm: {e}")
         return False
     
     try:
-        from src import genie_space_client
-        print("  ✓ src.genie_space_client")
+        from src.api import genie_space_client
+        print("  ✓ src.api.genie_space_client")
     except ImportError as e:
-        print(f"  ✗ src.genie_space_client: {e}")
+        print(f"  ✗ src.api.genie_space_client: {e}")
         return False
     
     print()
@@ -79,8 +79,8 @@ def test_files():
         "scripts/validate_setup.py",
         "requirements.txt",
         ".env.example",
-        "src/docs/curate_effective_genie.md",
-        "src/docs/genie_api.md",
+        "src/prompt/templates/curate_effective_genie.md",
+        "src/prompt/templates/genie_api.md",
         "data/demo_requirements.md",
         "src/__init__.py",
         "src/models.py",
@@ -142,7 +142,7 @@ def test_client_initialization():
     print("Testing client initialization...")
     
     try:
-        from src.genie_space_client import GenieSpaceClient
+        from src.api.genie_space_client import GenieSpaceClient
         
         # Try to initialize with explicit credentials (won't make any API calls)
         try:

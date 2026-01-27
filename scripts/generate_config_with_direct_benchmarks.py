@@ -18,13 +18,14 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-from prompt_builder import PromptBuilder
-from databricks_llm import DatabricksFoundationModelClient, DatabricksLLMClient
-from models import LLMResponse
-from benchmark_extractor import (
+from src.prompt.prompt_builder import PromptBuilder
+from src.llm.databricks_llm import DatabricksFoundationModelClient, DatabricksLLMClient
+from src.models import LLMResponse
+from src.utils.benchmark_extractor import (
     extract_all_benchmarks,
     merge_benchmarks_into_config,
     validate_benchmarks
@@ -66,13 +67,13 @@ def parse_args():
     parser.add_argument(
         "--context-doc",
         type=str,
-        default="src/docs/curate_effective_genie.md",
+        default="src/prompt/templates/curate_effective_genie.md",
         help="Path to context document"
     )
     parser.add_argument(
         "--output-doc",
         type=str,
-        default="src/docs/genie_api.md",
+        default="src/prompt/templates/genie_api.md",
         help="Path to output format document"
     )
     
@@ -184,15 +185,15 @@ def main():
             print(f"  Using custom endpoint: {args.endpoint}")
             llm_client = DatabricksLLMClient(
                 endpoint_name=args.endpoint,
-                host=host,
-                token=token
+                databricks_host=host,
+                databricks_token=token
             )
         else:
             print(f"  Using foundation model: {args.model}")
             llm_client = DatabricksFoundationModelClient(
                 model_name=args.model,
-                host=host,
-                token=token
+                databricks_host=host,
+                databricks_token=token
             )
         
         # Generate configuration

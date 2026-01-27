@@ -22,10 +22,11 @@ import json
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-from benchmark_extractor import (
+from src.utils.benchmark_extractor import (
     extract_all_benchmarks,
     merge_benchmarks_into_config,
     validate_benchmarks

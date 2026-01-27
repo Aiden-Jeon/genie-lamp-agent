@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import requests
 from pydantic import ValidationError
 
-from .models import LLMResponse, GenieSpaceConfig
+from src.models import LLMResponse, GenieSpaceConfig
 
 
 class DatabricksLLMClient:

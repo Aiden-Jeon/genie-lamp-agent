@@ -6,8 +6,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from src.prompt_builder import PromptBuilder
-from src.databricks_llm import DatabricksLLMClient, DatabricksFoundationModelClient
+from src.prompt.prompt_builder import PromptBuilder
+from src.llm.databricks_llm import DatabricksLLMClient, DatabricksFoundationModelClient
 
 # Load environment variables from .env file
 load_dotenv()
@@ -32,13 +32,13 @@ def main():
     parser.add_argument(
         "--context-doc",
         type=str,
-        default="src/docs/curate_effective_genie.md",
+        default="src/prompt/templates/curate_effective_genie.md",
         help="Path to context document (best practices)",
     )
     parser.add_argument(
         "--output-doc",
         type=str,
-        default="src/docs/genie_api.md",
+        default="src/prompt/templates/genie_api.md",
         help="Path to output format document (API docs)",
     )
     parser.add_argument(

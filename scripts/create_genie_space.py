@@ -6,7 +6,11 @@ import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-from src.genie_space_client import create_genie_space_from_file, GenieSpaceClient
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.api.genie_space_client import create_genie_space_from_file, GenieSpaceClient
 
 # Load environment variables
 load_dotenv()

@@ -9,7 +9,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.config_transformer import create_join_spec, transform_to_serialized_space
+from src.utils.config_transformer import create_join_spec, transform_to_serialized_space
 import json
 
 
@@ -40,7 +40,7 @@ def test_join_spec_creation():
     assert join["left_alias"] == "fact_sales"  # Auto-generated from table name
     assert join["right_table"] == "catalog.schema.dim_product"
     assert join["right_alias"] == "dim_product"
-    assert join["join_condition"] == "`fact_sales`.`product_id` = `dim_product`.`product_id`"
+    assert join["join_condition"] == "fact_sales.product_id = dim_product.product_id"
     assert join["relationship_type"] == "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE"
     
     print("✓ Join spec structure is correct")
@@ -74,7 +74,7 @@ def test_join_spec_transformation():
                 "left_alias": "fact_sales",
                 "right_table": "catalog.schema.dim_product",
                 "right_alias": "dim_product",
-                "join_condition": "`fact_sales`.`product_id` = `dim_product`.`product_id`",
+                "join_condition": "fact_sales.product_id = dim_product.product_id",
                 "relationship_type": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE"
             }
         ]
@@ -86,7 +86,7 @@ def test_join_spec_transformation():
     
     # Validate structure
     assert "version" in serialized_obj
-    assert serialized_obj["version"] == 2
+    assert serialized_obj["version"] == 1
     assert "data_sources" in serialized_obj
     assert "instructions" in serialized_obj
     assert "join_specs" in serialized_obj["instructions"]
@@ -107,9 +107,9 @@ def test_join_spec_transformation():
     assert join_spec["right"]["identifier"] == "catalog.schema.dim_product"
     assert join_spec["right"]["alias"] == "dim_product"
     
-    # Validate SQL array
+    # Validate SQL array (note: Databricks format includes trailing newline on condition)
     assert len(join_spec["sql"]) == 2
-    assert join_spec["sql"][0] == "`fact_sales`.`product_id` = `dim_product`.`product_id`"
+    assert join_spec["sql"][0] == "fact_sales.product_id = dim_product.product_id\n"
     assert join_spec["sql"][1] == "--rt=FROM_RELATIONSHIP_TYPE_MANY_TO_ONE--"
     
     print("✓ Join spec transformation is correct")

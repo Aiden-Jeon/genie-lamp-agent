@@ -8,7 +8,7 @@ from pathlib import Path
 # Add parent directory to path to allow imports from src
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.prompt_builder import PromptBuilder
+from src.prompt.prompt_builder import PromptBuilder
 from src.models import GenieSpaceConfig
 
 
@@ -17,8 +17,8 @@ def test_prompt_builder():
     print("Testing Prompt Builder...")
     
     builder = PromptBuilder(
-        context_doc_path="src/docs/curate_effective_genie.md",
-        output_doc_path="src/docs/genie_api.md",
+        context_doc_path="src/prompt/templates/curate_effective_genie.md",
+        output_doc_path="src/prompt/templates/genie_api.md",
         input_data_path="data/demo_requirements.md"
     )
     
@@ -108,13 +108,18 @@ def test_file_structure():
     required_files = [
         "src/__init__.py",
         "src/models.py",
-        "src/prompt_builder.py",
-        "src/databricks_llm.py",
+        "src/prompt/__init__.py",
+        "src/prompt/prompt_builder.py",
+        "src/llm/__init__.py",
+        "src/llm/databricks_llm.py",
+        "src/api/__init__.py",
+        "src/api/genie_space_client.py",
+        "src/utils/__init__.py",
         "main.py",
         "requirements.txt",
         "README.md",
-        "src/docs/curate_effective_genie.md",
-        "src/docs/genie_api.md",
+        "src/prompt/templates/curate_effective_genie.md",
+        "src/prompt/templates/genie_api.md",
         "data/demo_requirements.md",
     ]
     

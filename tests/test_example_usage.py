@@ -25,8 +25,8 @@ def main():
     # Step 1: Build the prompt
     print("Step 1: Building prompt...")
     builder = PromptBuilder(
-        context_doc_path="src/docs/curate_effective_genie.md",
-        output_doc_path="src/docs/genie_api.md",
+        context_doc_path="src/prompt/templates/curate_effective_genie.md",
+        output_doc_path="src/prompt/templates/genie_api.md",
         input_data_path="data/demo_requirements.md"
     )
     

@@ -16,7 +16,7 @@ import os
 import json
 from typing import Optional, Dict, Any
 import requests
-from src.config_transformer import transform_to_serialized_space
+from src.utils.config_transformer import transform_to_serialized_space
 
 
 class GenieSpaceClient:

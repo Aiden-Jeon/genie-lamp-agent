@@ -227,15 +227,23 @@
 ├── src/                            # Core source code
 │   ├── __init__.py
 │   ├── models.py                   # Pydantic models
-│   ├── prompt_builder.py           # Prompt construction
-│   ├── databricks_llm.py           # LLM client
-│   ├── genie_space_client.py       # Genie Space API client
-│   ├── config_transformer.py       # Config transformation
-│   ├── table_validator.py          # Table & column validator
-│   ├── benchmark_extractor.py      # Benchmark extractor
-│   └── docs/                       # LLM context documents
-│       ├── curate_effective_genie.md  # Best practices
-│       └── genie_api.md               # API documentation
+│   ├── api/                        # API clients
+│   │   ├── __init__.py
+│   │   └── genie_space_client.py   # Genie Space API client
+│   ├── llm/                        # LLM clients
+│   │   ├── __init__.py
+│   │   └── databricks_llm.py       # Databricks LLM client
+│   ├── prompt/                     # Prompt management
+│   │   ├── __init__.py
+│   │   ├── prompt_builder.py       # Prompt construction
+│   │   └── templates/              # Prompt templates
+│   │       ├── curate_effective_genie.md  # Best practices
+│   │       └── genie_api.md               # API documentation
+│   └── utils/                      # Utility modules
+│       ├── __init__.py
+│       ├── benchmark_extractor.py  # Benchmark extractor
+│       ├── config_transformer.py   # Config transformation
+│       └── table_validator.py      # Table & column validator
 │
 ├── data/                           # Input requirements
 │   └── demo_requirements.md        # Example requirements
@@ -254,7 +262,9 @@
 │   ├── create_genie_space.py       # Space creation script
 │   ├── validate_tables.py          # Table & column validation
 │   ├── create_genie_space_workflow.sh  # End-to-end workflow
-│   └── validate_setup.py           # Setup validation
+│   ├── validate_setup.py           # Setup validation
+│   ├── generate_config_with_direct_benchmarks.py  # Generate with benchmarks
+│   └── update_benchmarks.py        # Update benchmarks
 │
 ├── examples/                       # Usage examples
 │   ├── create_genie_space_example.py  # Python API examples
@@ -264,6 +274,7 @@
     ├── __init__.py
     ├── test_generation.py          # Generation tests
     ├── test_example_usage.py       # Example usage tests
+    ├── test_join_specs.py          # Join specification tests
     └── test_table_validator.py     # Table validator tests
 ```
 
@@ -274,8 +285,8 @@
 **Purpose**: Provide comprehensive context for LLM generation
 
 **Components**:
-- `docs/curate_effective_genie.md`: Best practices and principles
-- `docs/genie_api.md`: API documentation and schema information
+- `src/prompt/templates/curate_effective_genie.md`: Best practices and principles
+- `src/prompt/templates/genie_api.md`: API documentation and schema information
 - `data/demo_requirements.md`: Actual business requirements
 
 **Format**: Markdown documents with structured information
@@ -480,10 +491,10 @@ main.py (CLI Entry Point)
 
 PromptBuilder.build_prompt_with_reasoning()
     │
-    ├─── Read src/docs/curate_effective_genie.md
+    ├─── Read src/prompt/templates/curate_effective_genie.md
     │        (Best practices, principles, guidelines)
     │
-    ├─── Read src/docs/genie_api.md
+    ├─── Read src/prompt/templates/genie_api.md
     │        (API schema, output format, examples)
     │
     ├─── Read data/demo_requirements.md
@@ -742,11 +753,11 @@ examples/create_genie_space_example.py
 ```
 main.py (Config Generation)
     │
-    ├── src.prompt_builder
+    ├── src.prompt.prompt_builder
     │       └── PromptBuilder
-    │               └── Reads: docs/*.md, data/*.md
+    │               └── Reads: src/prompt/templates/*.md, data/*.md
     │
-    ├── src.databricks_llm
+    ├── src.llm.databricks_llm
     │       ├── DatabricksLLMClient
     │       └── DatabricksFoundationModelClient
     │               └── Uses: requests library
@@ -763,7 +774,7 @@ main.py (Config Generation)
 
 scripts/validate_tables.py (Table & Column Validation)
     │
-    └── src.table_validator
+    └── src.utils.table_validator
             ├── TableValidator
             ├── ValidationReport
             └── ValidationIssue
@@ -771,16 +782,23 @@ scripts/validate_tables.py (Table & Column Validation)
 
 scripts/create_genie_space.py (Space Creation)
     │
-    ├── src.genie_space_client
+    ├── src.api.genie_space_client
     │       ├── GenieSpaceClient
     │       └── create_genie_space_from_file()
     │
-    └── src.config_transformer
+    └── src.utils.config_transformer
             └── transform_to_serialized_space()
+
+scripts/generate_config_with_direct_benchmarks.py (Generate with Benchmarks)
+    │
+    ├── src.prompt.prompt_builder
+    ├── src.llm.databricks_llm
+    └── src.utils.benchmark_extractor
+            └── extract_benchmark_questions()
 
 examples/validate_tables_example.py (Validation Examples)
     │
-    └── src.table_validator
+    └── src.utils.table_validator
             ├── TableValidator
             ├── validate_table()
             ├── validate_columns()
@@ -789,7 +807,7 @@ examples/validate_tables_example.py (Validation Examples)
 
 examples/create_genie_space_example.py (Usage Examples)
     │
-    └── src.genie_space_client
+    └── src.api.genie_space_client
             ├── create_genie_space_from_file()
             ├── GenieSpaceClient
             │   ├── create_space()
@@ -2047,13 +2065,13 @@ python scripts/create_genie_space.py \
 
 #### Configuration Generation
 ```python
-from src.prompt_builder import PromptBuilder
-from src.databricks_llm import DatabricksFoundationModelClient
+from src.prompt.prompt_builder import PromptBuilder
+from src.llm.databricks_llm import DatabricksFoundationModelClient
 
 # Build prompt
 builder = PromptBuilder(
-    context_doc_path="src/docs/curate_effective_genie.md",
-    output_doc_path="src/docs/genie_api.md",
+    context_doc_path="src/prompt/templates/curate_effective_genie.md",
+    output_doc_path="src/prompt/templates/genie_api.md",
     input_data_path="data/demo_requirements.md"
 )
 prompt = builder.build_prompt_with_reasoning()
@@ -2069,7 +2087,7 @@ with open("output/genie_space_config.json", "w") as f:
 
 #### Table & Column Validation
 ```python
-from src.table_validator import TableValidator
+from src.utils.table_validator import TableValidator
 
 # Initialize validator
 validator = TableValidator()
@@ -2102,7 +2120,7 @@ for col in schema['columns']:
 
 #### Space Creation
 ```python
-from src.genie_space_client import GenieSpaceClient, create_genie_space_from_file
+from src.api.genie_space_client import GenieSpaceClient, create_genie_space_from_file
 
 # Method 1: Using convenience function
 result = create_genie_space_from_file("output/genie_space_config.json")
@@ -2122,7 +2140,7 @@ print(f"Space ID: {space_id}")
 
 #### Space Management
 ```python
-from src.genie_space_client import GenieSpaceClient
+from src.api.genie_space_client import GenieSpaceClient
 
 client = GenieSpaceClient()
 
@@ -2158,7 +2176,7 @@ print(f"Access at: {url}")
 
 #### Configuration Transformation
 ```python
-from src.config_transformer import (
+from src.utils.config_transformer import (
     transform_to_serialized_space,
     load_and_transform_config
 )
@@ -2179,23 +2197,27 @@ config, serialized = load_and_transform_config("config.json")
 | `scripts/create_genie_space.py` | Space creation CLI |
 | `scripts/create_genie_space_workflow.sh` | End-to-end automation |
 | `scripts/validate_setup.py` | Setup validation |
+| `scripts/generate_config_with_direct_benchmarks.py` | Generate config with benchmarks |
+| `scripts/update_benchmarks.py` | Update benchmarks in existing config |
 | `examples/validate_tables_example.py` | Table validation examples |
 | `examples/create_genie_space_example.py` | Python API examples |
 | `src/models.py` | Pydantic schema models |
-| `src/prompt_builder.py` | Prompt construction |
-| `src/databricks_llm.py` | LLM client |
-| `src/genie_space_client.py` | Genie Space API client |
-| `src/config_transformer.py` | Config transformation |
-| `src/table_validator.py` | Table & column validator |
-| `src/benchmark_extractor.py` | Benchmark extractor |
-| `src/docs/curate_effective_genie.md` | Best practices context |
-| `src/docs/genie_api.md` | API documentation |
+| `src/prompt/prompt_builder.py` | Prompt construction |
+| `src/llm/databricks_llm.py` | Databricks LLM client |
+| `src/api/genie_space_client.py` | Genie Space API client |
+| `src/utils/config_transformer.py` | Config transformation |
+| `src/utils/table_validator.py` | Table & column validator |
+| `src/utils/benchmark_extractor.py` | Benchmark extractor |
+| `src/prompt/templates/curate_effective_genie.md` | Best practices context |
+| `src/prompt/templates/genie_api.md` | API documentation |
 | `data/demo_requirements.md` | Example requirements |
 | `docs/TABLE_VALIDATION.md` | Table validation guide |
 | `docs/VALIDATION_QUICK_REFERENCE.md` | Validation quick reference |
+| `docs/BENCHMARK_EXTRACTION.md` | Benchmark extraction guide |
 | `output/genie_space_config.json` | Generated configuration |
 | `output/genie_space_result.json` | Creation result |
 | `tests/test_table_validator.py` | Table validator tests |
+| `tests/test_join_specs.py` | Join specification tests |
 
 ### Environment Variables
 
