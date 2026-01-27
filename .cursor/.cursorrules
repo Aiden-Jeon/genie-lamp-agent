@@ -1,0 +1,9 @@
+# Cursor Rules
+
+## Permissions
+- You are allowed to create and modify files in the `changelogs/` directory
+- When writing changelogs, use clear, concise formatting with dates and version numbers
+
+## Changelog Format
+- Use markdown format
+- Include version number, date, and categorized changes (Added, Changed, Fixed, etc.)
