@@ -348,6 +348,14 @@ def main():
         print(f"  Example SQL Queries: {len(config['example_sql_queries'])}")
         print(f"  SQL Expressions: {len(config.get('sql_expressions', []))}")
         print(f"  Benchmark Questions: {len(config['benchmark_questions'])} ✓ (directly extracted)")
+        
+        # Show benchmark questions
+        if config['benchmark_questions']:
+            print(f"\nBenchmark Questions:")
+            for i, bm in enumerate(config['benchmark_questions'], 1):
+                question = bm.get('question', 'N/A')
+                print(f"  {i}. {question}")
+        
         print(f"\n✓ Configuration is ready for Genie space creation!")
         print(f"\nNext steps:")
         print(f"  1. Review the configuration: cat {output_path}")

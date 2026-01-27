@@ -265,6 +265,13 @@ def main():
         print(f"  Example SQL Queries: {len(final_config.get('example_sql_queries', []))}")
         print(f"  Benchmark Questions: {len(final_benchmarks)} ✓")
         
+        # Show benchmark questions
+        if final_benchmarks:
+            print(f"\nBenchmark Questions:")
+            for i, bm in enumerate(final_benchmarks, 1):
+                question = bm.get('question', 'N/A')
+                print(f"  {i}. {question}")
+        
         print(f"\n✓ Benchmarks successfully updated!")
         
         if output_path != config_path:

@@ -182,6 +182,13 @@ def main():
         print(f"Example SQL Queries: {len(config.example_sql_queries)}")
         print(f"SQL Expressions: {len(config.sql_expressions)}")
         print(f"Benchmark Questions: {len(config.benchmark_questions)}")
+        
+        # Show benchmark questions
+        if config.benchmark_questions:
+            print("\nBenchmark Questions:")
+            for i, bm in enumerate(config.benchmark_questions, 1):
+                question = bm.question if hasattr(bm, 'question') else bm.get('question', 'N/A')
+                print(f"  {i}. {question}")
         print()
         
         print("=" * 80)

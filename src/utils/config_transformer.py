@@ -501,6 +501,8 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     # =========================================================================
     # BENCHMARKS SECTION (top-level, not nested in instructions)
     # =========================================================================
+    # IMPORTANT: Databricks API requires each benchmark to have at least one answer,
+    # and only supports "SQL" format. We skip benchmarks without SQL (e.g., FAQ questions).
     benchmarks = config.get("benchmark_questions", [])
     if benchmarks:
         benchmark_questions = []
@@ -508,19 +510,16 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
             question = benchmark.get("question", "")
             expected_sql = benchmark.get("expected_sql", "")
             
-            if question:
+            # Only include benchmarks that have SQL (API requirement)
+            if question and expected_sql:
                 benchmark_q = {
                     "id": _generate_id(),
-                    "question": _to_string_array(question)
-                }
-                
-                # Add answer with SQL if present
-                if expected_sql:
-                    benchmark_q["answer"] = [{
+                    "question": _to_string_array(question),
+                    "answer": [{
                         "format": "SQL",
                         "content": _to_string_array(expected_sql)
                     }]
-                
+                }
                 benchmark_questions.append(benchmark_q)
         
         if benchmark_questions:
