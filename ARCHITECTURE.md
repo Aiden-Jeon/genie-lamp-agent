@@ -9,21 +9,22 @@
 1. [High-Level Flow](#high-level-flow)
 2. [System Capabilities and Features](#system-capabilities-and-features)
 3. [Project Structure](#project-structure)
-4. [Component Details](#component-details)
-5. [Data Flow Diagram](#data-flow-diagram)
-6. [Module Dependency Graph](#module-dependency-graph)
-7. [Error Handling Flow](#error-handling-flow)
-8. [Configuration Options](#configuration-options)
-9. [Performance Characteristics](#performance-characteristics)
-10. [Security Considerations](#security-considerations)
-11. [Scripts and Utilities](#scripts-and-utilities)
-12. [Extension Points](#extension-points)
-13. [Testing Strategy](#testing-strategy)
-14. [Monitoring and Debugging](#monitoring-and-debugging)
-15. [Deployment Options](#deployment-options)
-16. [Genie Space API Integration](#genie-space-api-integration)
-17. [Best Practices and Design Principles](#best-practices-and-design-principles)
-18. [Quick Reference](#quick-reference)
+4. [Output Schema](#output-schema)
+5. [Component Details](#component-details)
+6. [Data Flow Diagram](#data-flow-diagram)
+7. [Module Dependency Graph](#module-dependency-graph)
+8. [Error Handling Flow](#error-handling-flow)
+9. [Configuration Options](#configuration-options)
+10. [Performance Characteristics](#performance-characteristics)
+11. [Security Considerations](#security-considerations)
+12. [Scripts and Utilities](#scripts-and-utilities)
+13. [Extension Points](#extension-points)
+14. [Testing Strategy](#testing-strategy)
+15. [Monitoring and Debugging](#monitoring-and-debugging)
+16. [Deployment Options](#deployment-options)
+17. [Genie Space API Integration](#genie-space-api-integration)
+18. [Best Practices and Design Principles](#best-practices-and-design-principles)
+19. [Quick Reference](#quick-reference)
 
 ## High-Level Flow
 
@@ -215,18 +216,22 @@
 
 ```
 .
-├── main.py                          # Config generation CLI
-├── requirements.txt                 # Python dependencies
-├── .env.example                     # Example environment file
-├── README.md                        # User guide
-├── ARCHITECTURE.md                  # This file
-├── GENIE_CONFIG_GUIDE.md           # Configuration format guide
-├── CHANGELOG.md                     # Version history
-├── SPACE_CREATED.md                # Post-creation documentation
+├── genie.py                        # 🌟 Unified CLI (main entry point)
+├── requirements.txt                # Python dependencies
+├── .env.example                    # Example environment file
+├── README.md                       # User guide
+├── ARCHITECTURE.md                 # This file - System architecture
+├── CONVERSION_PIPELINE.md          # Requirements conversion guide
+├── SIMPLIFIED_WORKFLOW.md          # Simplified workflow details
 │
 ├── src/                            # Core source code
 │   ├── __init__.py
-│   ├── models.py                   # Pydantic models
+│   ├── models.py                   # Pydantic models for Genie space config
+│   ├── pipeline/                   # 🌟 Pipeline orchestration (NEW)
+│   │   ├── __init__.py
+│   │   ├── generator.py            # Configuration generation
+│   │   ├── validator.py            # Table validation
+│   │   └── deployer.py             # Space deployment
 │   ├── api/                        # API clients
 │   │   ├── __init__.py
 │   │   └── genie_space_client.py   # Genie Space API client
@@ -239,6 +244,13 @@
 │   │   └── templates/              # Prompt templates
 │   │       ├── curate_effective_genie.md  # Best practices
 │   │       └── genie_api.md               # API documentation
+│   ├── parsing/                    # Requirements parsing
+│   │   ├── __init__.py
+│   │   ├── pdf_parser.py           # PDF extraction
+│   │   ├── markdown_parser.py      # Markdown extraction
+│   │   ├── requirements_structurer.py  # Data models & structuring
+│   │   ├── llm_enricher.py         # LLM-based enrichment
+│   │   └── markdown_generator.py   # Markdown output generation
 │   └── utils/                      # Utility modules
 │       ├── __init__.py
 │       ├── benchmark_extractor.py  # Benchmark extractor
@@ -248,35 +260,114 @@
 ├── data/                           # Input requirements
 │   └── demo_requirements.md        # Example requirements
 │
-├── docs/                           # Documentation
-│   ├── BENCHMARK_EXTRACTION.md     # Benchmark extraction guide
-│   ├── TABLE_VALIDATION.md         # Table validation guide
-│   ├── VALIDATION_QUICK_REFERENCE.md  # Validation quick reference
-│   └── VALIDATION_IMPLEMENTATION_SUMMARY.md  # Implementation summary
-│
 ├── output/                         # Generated files (gitignored)
 │   ├── genie_space_config.json     # Generated config
 │   └── genie_space_result.json     # Creation result
 │
-├── scripts/                        # Automation scripts
-│   ├── create_genie_space.py       # Space creation script
-│   ├── validate_tables.py          # Table & column validation
-│   ├── create_genie_space_workflow.sh  # End-to-end workflow
-│   ├── validate_setup.py           # Setup validation
-│   ├── generate_config_with_direct_benchmarks.py  # Generate with benchmarks
-│   └── update_benchmarks.py        # Update benchmarks
-│
-├── examples/                       # Usage examples
-│   ├── create_genie_space_example.py  # Python API examples
-│   └── validate_tables_example.py     # Table validation examples
+├── scripts/                        # Scripts
+│   ├── validate_setup.py           # Environment validation
+│   ├── convert_requirements.py     # Requirements conversion
+│   └── legacy/                     # ⚠️ Deprecated scripts
+│       ├── README.md               # Migration guide
+│       ├── main.py
+│       ├── generate_config_with_direct_benchmarks.py
+│       ├── validate_tables.py
+│       ├── create_genie_space.py
+│       ├── create_genie_space_workflow.sh
+│       ├── update_benchmarks.py
+│       └── fix_benchmarks.sh
 │
 └── tests/                          # Test suite
     ├── __init__.py
     ├── test_generation.py          # Generation tests
     ├── test_example_usage.py       # Example usage tests
     ├── test_join_specs.py          # Join specification tests
+    ├── test_requirements_converter.py  # Requirements conversion tests
     └── test_table_validator.py     # Table validator tests
 ```
+
+**Key Changes in Structure:**
+- 🌟 **genie.py**: New unified CLI (main entry point) that combines generate, validate, and deploy
+- 🌟 **src/pipeline/**: New orchestration layer with generator, validator, and deployer modules
+- **src/parsing/**: Complete requirements parsing pipeline (PDF, Markdown, structuring, enrichment)
+- **scripts/legacy/**: Deprecated scripts moved here with migration guide
+
+## Output Schema
+
+The generated configuration follows this structure:
+
+```json
+{
+  "genie_space_config": {
+    "space_name": "Your Analytics Space",
+    "description": "Natural language querying for your data",
+    "purpose": "Enable business users to analyze data",
+    "tables": [
+      {
+        "catalog_name": "your_catalog",
+        "schema_name": "your_schema",
+        "table_name": "your_table",
+        "description": "Table description"
+      }
+    ],
+    "joins": [
+      {
+        "left_table": "your_catalog.your_schema.table1",
+        "left_alias": "table1",
+        "right_table": "your_catalog.your_schema.table2",
+        "right_alias": "table2",
+        "join_condition": "`table1`.`id` = `table2`.`id`",
+        "relationship_type": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE"
+      }
+    ],
+    "instructions": [
+      {
+        "content": "General instructions for querying..."
+      }
+    ],
+    "example_sql_queries": [
+      {
+        "question": "Example question",
+        "sql_query": "SELECT column FROM ...",
+        "description": "Query description"
+      }
+    ],
+    "sql_expressions": [
+      {
+        "name": "metric_name",
+        "expression": "SUM(column)",
+        "description": "Metric description",
+        "type": "metric"
+      }
+    ],
+    "benchmark_questions": [
+      {
+        "question": "Test question"
+      }
+    ],
+    "enable_data_sampling": true
+  },
+  "reasoning": "LLM's explanation for configuration choices...",
+  "confidence_score": 0.95
+}
+```
+
+**Schema Components:**
+- **genie_space_config**: Main configuration object
+  - **space_name**: Display name for the Genie space
+  - **description**: Brief description of the space purpose
+  - **purpose**: Detailed explanation of space objectives
+  - **tables**: List of Unity Catalog tables to include
+  - **joins**: Explicit join specifications between tables
+  - **instructions**: Text instructions guiding the AI assistant
+  - **example_sql_queries**: Example questions with SQL answers
+  - **sql_expressions**: Reusable metrics, filters, and dimensions
+  - **benchmark_questions**: Test questions for validation
+  - **enable_data_sampling**: Whether to enable data sampling (boolean)
+- **reasoning**: Optional explanation of configuration choices from the LLM
+- **confidence_score**: Optional confidence score (0.0-1.0)
+
+**Transformation:** This user-friendly format is automatically transformed to Databricks' internal `serialized_space` format when creating or updating spaces. See [Configuration Format Transformation](#configuration-format-transformation) for details.
 
 ## Component Details
 

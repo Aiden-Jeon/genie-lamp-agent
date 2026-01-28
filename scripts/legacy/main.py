@@ -1,4 +1,15 @@
-"""Main script to generate Genie space configuration using Databricks LLM."""
+"""Main script to generate Genie space configuration using Databricks LLM.
+
+DEPRECATION NOTICE:
+This script is deprecated. Please use the unified CLI instead:
+    python genie.py generate --requirements <path>
+
+For the complete workflow:
+    python genie.py create --requirements <path>
+
+The new CLI provides better error handling, progress indicators, and includes
+validation and deployment in a single command.
+"""
 
 import argparse
 import json
@@ -11,6 +22,20 @@ from src.llm.databricks_llm import DatabricksLLMClient, DatabricksFoundationMode
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Print deprecation warning
+print("⚠️  DEPRECATION WARNING")
+print("=" * 80)
+print("This script (main.py) is deprecated.")
+print("Please use the unified CLI instead:")
+print()
+print("  python genie.py generate --requirements <path>")
+print()
+print("For the complete workflow (recommended):")
+print("  python genie.py create --requirements <path>")
+print()
+print("=" * 80)
+print()
 
 
 def main():
