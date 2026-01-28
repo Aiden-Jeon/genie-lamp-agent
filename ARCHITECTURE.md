@@ -343,7 +343,6 @@
 ├── scripts/                        # Utility scripts
 │   ├── validate_setup.py           # Environment validation
 │   └── convert_requirements.py     # Requirements conversion
-│   # Note: Legacy scripts removed - all functionality migrated to genie.py CLI
 │
 ├── change_logs/                    # 🆕 Quality improvement documentation
 │   ├── priority1_improvements_summary.md       # P1: Enhanced prompts
@@ -372,7 +371,6 @@
 - 🌟 **src/pipeline/**: Orchestration layer with generator, validator, deployer, and parser modules
   - **parser.py**: New async/concurrent document parsing module with progress tracking
 - **src/parsing/**: Complete requirements parsing pipeline (PDF, Markdown, structuring, enrichment)
-- **scripts/legacy/**: ⚠️ **REMOVED** - All functionality migrated to `genie.py` CLI
 
 ## Output Schema
 
@@ -1629,22 +1627,6 @@ print(f"Space URL: {result['space_url']}")
 ```
 
 ---
-
-## Legacy Scripts (Removed)
-
-The following scripts have been **removed** and their functionality migrated to the unified `genie.py` CLI:
-
-| Removed Script | Replacement | Notes |
-|----------------|-------------|-------|
-| `scripts/legacy/main.py` | `genie.py generate` | Basic config generation |
-| `scripts/legacy/generate_config_with_direct_benchmarks.py` | `genie.py generate` | Benchmark extraction now built-in |
-| `scripts/legacy/validate_tables.py` | `genie.py validate` | Interactive catalog/schema replacement added |
-| `scripts/legacy/create_genie_space.py` | `genie.py deploy` | Same functionality |
-| `scripts/legacy/create_genie_space_workflow.sh` | `genie.py create` | Complete pipeline in single command |
-| `scripts/legacy/update_benchmarks.py` | Built into `genie.py generate` | Automatic benchmark extraction |
-| `scripts/legacy/fix_benchmarks.sh` | Built into `genie.py generate` | No longer needed |
-
-**Migration Path**: Replace all `scripts/legacy/` calls with the corresponding `genie.py` command. See [README.md](README.md) for detailed migration examples.
 
 ## Extension Points
 

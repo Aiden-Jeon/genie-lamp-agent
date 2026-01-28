@@ -396,10 +396,10 @@ python genie.py parse \
 # Create space with default settings
 python genie.py create --requirements data/demo_requirements.md
 
-# Use custom model
+# Use another model
 python genie.py create \
   --requirements data/demo_requirements.md \
-  --model llama-3-1-70b
+  --model databricks-claude-sonnet-4-5
 
 # Generate only (for review before deployment)
 python genie.py generate --requirements data/demo_requirements.md
@@ -575,40 +575,6 @@ print(f"Generated space: {config.space_name}")
 print(f"Number of tables: {len(config.tables)}")
 ```
 
-### Legacy Scripts Migration
-
-**The legacy scripts have been removed and fully migrated to the unified `genie.py` CLI.**
-
-All functionality from the following deprecated scripts is now available through `genie.py`:
-
-| Removed Script | New Command | Description |
-|----------------|-------------|-------------|
-| `scripts/legacy/main.py` | `genie.py generate` | Generate configuration |
-| `scripts/legacy/generate_config_with_direct_benchmarks.py` | `genie.py generate` | Generate config with benchmarks (now built-in) |
-| `scripts/legacy/validate_tables.py` | `genie.py validate` | Validate tables and columns |
-| `scripts/legacy/create_genie_space.py` | `genie.py deploy` | Deploy Genie space |
-| `scripts/legacy/create_genie_space_workflow.sh` | `genie.py create` | Complete workflow (generate → validate → deploy) |
-| `scripts/legacy/update_benchmarks.py` | Built into `genie.py generate` | Benchmark extraction (automatic) |
-| `scripts/legacy/fix_benchmarks.sh` | Built into `genie.py generate` | Benchmark fixes (automatic) |
-
-**Migration Benefits:**
-- ✅ Unified CLI with consistent interface
-- ✅ Built-in progress indicators and error handling
-- ✅ Interactive catalog/schema replacement on validation failures
-- ✅ Automatic benchmark extraction (no separate step needed)
-- ✅ Better error messages and debugging support
-
-**Example Migration:**
-```bash
-# Old workflow (deprecated)
-python main.py
-python scripts/validate_tables.py
-python scripts/create_genie_space.py
-
-# New workflow (recommended)
-genie.py create --requirements data/requirements.md
-```
-
 #### Managing Genie Spaces
 
 ```python
@@ -690,15 +656,6 @@ databricks serving-endpoints list
 ### Available Documentation
 - **[README.md](README.md)** (this file): Installation, quick start, and complete usage guide
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture, component details, and integration flows
-
-### Quality Improvements Documentation
-Comprehensive documentation for the three-priority quality improvement system:
-- **[change_logs/priority1_improvements_summary.md](change_logs/priority1_improvements_summary.md)**: Enhanced prompt engineering details
-- **[change_logs/priority2_improvements_summary.md](change_logs/priority2_improvements_summary.md)**: SQL validation and instruction scoring
-- **[change_logs/priority3_improvements_summary.md](change_logs/priority3_improvements_summary.md)**: Domain extraction and comprehensive review
-- **[change_logs/comprehensive_improvements_summary.md](change_logs/comprehensive_improvements_summary.md)**: Combined P1+P2 overview
-- **[change_logs/FINAL_SUMMARY.md](change_logs/FINAL_SUMMARY.md)**: Complete overview of all priorities with test results
-- **[change_logs/sql_quality_quick_reference.md](change_logs/sql_quality_quick_reference.md)**: Developer quick reference for SQL standards
 
 ### Template Documentation
 - **[src/prompt/templates/curate_effective_genie.md](src/prompt/templates/curate_effective_genie.md)**: Databricks Genie best practices
