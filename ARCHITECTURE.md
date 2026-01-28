@@ -11,6 +11,7 @@
 3. [Project Structure](#project-structure)
 4. [Output Schema](#output-schema)
 5. [Component Details](#component-details)
+   - [Instruction Formatting Layer (New in 2026)](#7-instruction-formatting-layer)
 6. [Data Flow Diagram](#data-flow-diagram)
 7. [Module Dependency Graph](#module-dependency-graph)
 8. [Error Handling Flow](#error-handling-flow)
@@ -166,6 +167,7 @@
 - **Confidence Scoring**: Assess configuration quality
 - **Flexible Input**: Markdown requirements documents
 - **Structured Output**: Valid JSON matching Genie API schema
+- **Markdown-Formatted Instructions**: Auto-generated instructions use markdown for better structure and readability
 
 #### Space Management Features
 - **Create**: New spaces with optional parent folder
@@ -353,13 +355,24 @@ The generated configuration follows this structure:
   - **purpose**: Detailed explanation of space objectives
   - **tables**: List of Unity Catalog tables to include
   - **joins**: Explicit join specifications between tables
-  - **instructions**: Text instructions guiding the AI assistant
+  - **instructions**: Text instructions guiding the AI assistant (supports markdown formatting)
   - **example_sql_queries**: Example questions with SQL answers
   - **sql_expressions**: Reusable metrics, filters, and dimensions
   - **benchmark_questions**: Test questions for validation
   - **enable_data_sampling**: Whether to enable data sampling (boolean)
 - **reasoning**: Optional explanation of configuration choices from the LLM
 - **confidence_score**: Optional confidence score (0.0-1.0)
+
+**Markdown-Formatted Instructions (New in 2026):**
+Instructions now support markdown formatting for better structure and readability:
+- Section headings (`##`) organize related instructions
+- Bullet lists (`-`) for multiple related points
+- **Bold** text for emphasis on critical terms
+- Inline `code` for column/table names
+- Numbered lists for sequential steps
+- Blockquotes (`>`) for clarification questions
+
+This improves instruction clarity and makes configurations more maintainable.
 
 **Transformation:** This user-friendly format is automatically transformed to Databricks' internal `serialized_space` format when creating or updating spaces. See [Configuration Format Transformation](#configuration-format-transformation) for details.
 
@@ -570,7 +583,71 @@ ValidationReport
     └── location: Optional[str]
 ```
 
-### 7. Output Layer
+### 7. Instruction Formatting Layer
+
+**Purpose**: Generate well-structured, markdown-formatted instructions for better readability and organization
+
+**Markdown Elements Supported**:
+
+```python
+# Section Headings
+"## Date and Time Handling"
+"## Metric Calculations"
+"## Clarification Questions"
+
+# Bullet Lists
+"- Always use `event_date` column for date-based queries"
+"- Default to **last 30 days** when no time period is specified"
+
+# Bold Emphasis
+"**revenue metrics**"
+"**last 30 days**"
+
+# Inline Code
+"`event_date`"
+"`total_revenue`"
+"`status != 'cancelled'`"
+
+# Numbered Lists
+"1. Use `total_revenue` column (already includes tax)"
+"2. Round all monetary values to 2 decimal places"
+
+# Blockquotes (for clarification questions)
+"> \"To analyze performance, please specify: (1) time period, (2) product category\""
+```
+
+**Example Well-Formatted Instruction**:
+```markdown
+## Date and Time Handling
+- Always use `event_date` column for date-based queries
+- Default to **last 30 days** when no time period is specified
+- Use `CURRENT_DATE()` for "today" and `DATE_SUB(CURRENT_DATE(), 30)` for "last 30 days"
+
+## Metric Calculations
+When calculating **revenue metrics**:
+1. Use `total_revenue` column (already includes tax)
+2. Round all monetary values to 2 decimal places
+3. Filter out cancelled orders using `status != 'cancelled'`
+
+## Clarification Questions
+When users ask about performance but don't specify time range or product category, ask:
+> "To analyze performance, please specify: (1) time period (e.g., last month, Q1 2024), and (2) product category you want to analyze."
+```
+
+**Benefits**:
+- **Better Organization**: Section headings group related instructions
+- **Enhanced Readability**: Lists and formatting make instructions scannable
+- **Clear Emphasis**: Bold text highlights critical terms
+- **Code Clarity**: Inline code distinguishes column/table names from prose
+- **Easier Maintenance**: Structured format is easier to update
+- **Professional Appearance**: Consistent formatting across configurations
+
+**Implementation**:
+- Template files (`guide_prompt.md`, `guide_prompt_with_reasoning.md`) now include markdown formatting guidance
+- LLM automatically generates markdown-formatted instructions
+- No manual formatting required from users
+
+### 8. Output Layer
 
 **Format**: JSON file with validated configuration
 
@@ -582,7 +659,7 @@ ValidationReport
     "description": "Natural language querying...",
     "purpose": "Enable business users...",
     "tables": [...],
-    "instructions": [...],
+    "instructions": [...],  // Now with markdown formatting
     "example_sql_queries": [...],
     "sql_expressions": [...],
     "benchmark_questions": [...]
@@ -1682,6 +1759,16 @@ assert "example_question_sqls" in parsed["instructions"]
    - Test with benchmark questions
    - Update requirements based on results
 
+5. **Use Markdown-Formatted Instructions** (New in 2026)
+   - LLM automatically generates well-structured instructions using markdown
+   - Section headings (`##`) organize related instructions by topic
+   - Bullet lists (`-`) group related rules and guidelines
+   - **Bold text** emphasizes critical terms and actions
+   - Inline `code` highlights column names, table names, and SQL keywords
+   - Numbered lists show sequential steps or priorities
+   - Blockquotes (`>`) format clarification questions
+   - Benefits: Improved readability, easier maintenance, better organization
+
 ### Space Management Best Practices
 
 1. **Validate Before Creation**
@@ -2379,6 +2466,7 @@ VISION_MODEL=databricks-claude-sonnet-4         # Vision model for PDF parsing
 - **Pagination**: Handling large lists of spaces with page tokens
 - **Partial Update**: Update only specific fields without full config
 - **Trash**: Recoverable deletion (vs permanent delete)
+- **Markdown-Formatted Instructions**: Instructions use markdown (headings, lists, bold, code) for better structure and readability
 
 ### Common Configuration Parameters
 

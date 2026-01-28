@@ -45,7 +45,6 @@ The agent follows a structured pipeline:
 4. **Validation**: Verifies tables, columns, and Unity Catalog permissions
 5. **Output**: Produces a production-ready Genie space configuration
 
-## Recent Updates (January 2026)
 
 ### ⚡ Performance Improvements
 
@@ -134,6 +133,7 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
 - **Table & Column Validation**: Verify that all referenced tables and columns exist in Unity Catalog
 - **Direct Benchmark Extraction**: Extract 100% of FAQ questions as benchmarks (no LLM filtering)
 - **Reasoning**: Optional reasoning output to understand configuration choices
+- **Markdown-Formatted Instructions**: Generate well-structured instructions using markdown (headings, lists, bold, code blocks) for better readability and organization
 
 ## Prerequisites
 
@@ -612,10 +612,29 @@ databricks serving-endpoints list
 The system supports a user-friendly configuration format that includes:
 - **Tables**: Unity Catalog tables to include
 - **Joins**: Explicit join specifications between tables
-- **Instructions**: Text instructions guiding the AI
+- **Instructions**: Text instructions guiding the AI (with markdown formatting support)
 - **Example SQL Queries**: Example questions with SQL answers
 - **SQL Expressions**: Reusable metric and dimension definitions
 - **Benchmarks**: Test questions for validation
+
+**Markdown-Formatted Instructions**: The system now recommends using markdown formatting in instruction content for better structure and readability:
+- Use `##` for section headings to organize related instructions
+- Use bullet lists (`-`) for multiple related points
+- Use **bold** for emphasis on critical terms or actions
+- Use `code blocks` or inline `code` for column names, table names, or SQL keywords
+- Use numbered lists for sequential steps or priorities
+
+Example well-formatted instruction:
+```markdown
+## Date and Time Handling
+- Always use `event_date` column for date-based queries
+- Default to **last 30 days** when no time period is specified
+- Use `CURRENT_DATE()` for "today" and `DATE_SUB(CURRENT_DATE(), 30)` for "last 30 days"
+
+## Clarification Questions
+When users ask about performance but don't specify time range, ask:
+> "To analyze performance, please specify: (1) time period (e.g., last month, Q1 2024)"
+```
 
 All configurations are automatically transformed to Databricks' internal `serialized_space` format when creating or updating Genie spaces. The transformation is handled transparently by `src/utils/config_transformer.py`.
 
