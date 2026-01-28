@@ -1,0 +1,47 @@
+---
+alwaysApply: true
+---
+# Python Standards
+
+## Critical Rules
+
+### Virtual Environment Usage
+- **ALWAYS** use `.venv/bin/python` instead of `python` or `python3`
+- **NEVER** run commands with bare `python` - always prefix with `.venv/bin/`
+- For pip installations: `.venv/bin/pip install package_name`
+- For running scripts: `.venv/bin/python script.py`
+
+Examples:
+```bash
+# ❌ WRONG
+python script.py
+pip install requests
+
+# ✅ CORRECT
+.venv/bin/python script.py
+.venv/bin/pip install requests
+```
+
+### Test Organization
+- All test files MUST go in `tests/` directory
+- Test files MUST start with `test_` prefix
+- Example: `tests/test_feature_name.py`
+
+### Documentation & change_logs
+- **ALL** markdown documentation files MUST be placed in `change_logs/` directory
+- This includes: release notes, change logs, feature documentation, and project updates
+- Example: `change_logs/2024-01-release.md`, `change_logs/feature-updates.md`
+```bash
+# ❌ WRONG
+README_updates.md
+docs/changelog.md
+
+# ✅ CORRECT
+change_logs/README_updates.md
+change_logs/changelog.md
+```
+
+---
+
+**Before suggesting any Python command, verify it uses `.venv/bin/python`**
+**Before creating any markdown file, verify it goes in `change_logs/`**
