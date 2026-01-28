@@ -39,10 +39,20 @@ class GenieSpaceSQLExpression(BaseModel):
 
 class GenieSpaceBenchmark(BaseModel):
     """Represents a benchmark question for testing the Genie space."""
-    
+
     question: str = Field(..., description="The benchmark question")
     expected_sql: Optional[str] = Field(None, description="Expected SQL query pattern")
     expected_accuracy: Optional[str] = Field(None, description="Expected accuracy level")
+
+
+class GenieSpaceJoinSpec(BaseModel):
+    """Represents an explicit join specification between two tables."""
+
+    left_table: str = Field(..., description="Left table in fully qualified format: catalog.schema.table")
+    right_table: str = Field(..., description="Right table in fully qualified format: catalog.schema.table")
+    join_type: str = Field(..., description="Join type: INNER, LEFT, RIGHT, or FULL")
+    join_condition: str = Field(..., description="Join condition (e.g., 'left_table.id = right_table.foreign_id')")
+    description: Optional[str] = Field(None, description="Explanation of the relationship between tables")
 
 
 class GenieSpaceConfig(BaseModel):
@@ -54,12 +64,13 @@ class GenieSpaceConfig(BaseModel):
     
     # Data configuration
     tables: List[GenieSpaceTable] = Field(default_factory=list, description="Tables to include in the space")
-    
+    join_specifications: List[GenieSpaceJoinSpec] = Field(default_factory=list, description="Explicit join relationships between tables")
+
     # Instructions and examples
     instructions: List[GenieSpaceInstruction] = Field(default_factory=list, description="Plain text instructions")
     example_sql_queries: List[GenieSpaceExampleSQL] = Field(default_factory=list, description="Example SQL queries")
     sql_expressions: List[GenieSpaceSQLExpression] = Field(default_factory=list, description="SQL expressions for metrics/filters/dimensions")
-    
+
     # Testing
     benchmark_questions: List[GenieSpaceBenchmark] = Field(default_factory=list, description="Benchmark questions for testing")
     

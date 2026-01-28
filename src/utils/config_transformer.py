@@ -155,10 +155,76 @@ def create_join_spec(
     return result
 
 
+def _convert_join_specifications_to_joins(join_specifications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Convert simplified join_specifications format from LLM to internal joins format.
+
+    LLM format (simple):
+    {
+        "left_table": "catalog.schema.table1",
+        "right_table": "catalog.schema.table2",
+        "join_type": "INNER|LEFT|RIGHT|FULL",
+        "join_condition": "table1.col = table2.col",
+        "description": "..."
+    }
+
+    Internal format (for serialization):
+    {
+        "left_table": "catalog.schema.table1",
+        "left_alias": "table1",
+        "right_table": "catalog.schema.table2",
+        "right_alias": "table2",
+        "join_condition": "table1.col = table2.col",
+        "relationship_type": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE",
+        "comment": "..."
+    }
+    """
+    # Map join types to relationship types
+    # INNER/LEFT typically indicate many-to-one (fact to dimension)
+    # This is a reasonable default; can be overridden in config
+    join_type_to_relationship = {
+        "INNER": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE",
+        "LEFT": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE",
+        "RIGHT": "FROM_RELATIONSHIP_TYPE_ONE_TO_MANY",
+        "FULL": "FROM_RELATIONSHIP_TYPE_MANY_TO_MANY",
+    }
+
+    joins = []
+    for spec in join_specifications:
+        left_table = spec.get("left_table", "")
+        right_table = spec.get("right_table", "")
+        join_type = spec.get("join_type", "INNER").upper()
+        join_condition = spec.get("join_condition", "")
+        description = spec.get("description", "")
+
+        # Extract table names for aliases
+        left_alias = left_table.split('.')[-1] if left_table else ""
+        right_alias = right_table.split('.')[-1] if right_table else ""
+
+        # Map join type to relationship type
+        relationship_type = join_type_to_relationship.get(join_type, "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE")
+
+        join = {
+            "left_table": left_table,
+            "left_alias": left_alias,
+            "right_table": right_table,
+            "right_alias": right_alias,
+            "join_condition": join_condition,
+            "relationship_type": relationship_type,
+        }
+
+        if description:
+            join["comment"] = description
+
+        joins.append(join)
+
+    return joins
+
+
 def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     """
     Transform our configuration format to Databricks serialized_space format.
-    
+
     Based on actual Genie room structure analysis:
     - Instructions are nested under an "instructions" object with three arrays:
       - text_instructions: general instructions
@@ -166,10 +232,14 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
       - example_question_sqls: example questions with SQL queries
     - All text fields (content, question, sql) are arrays of strings
     - Benchmarks are a separate top-level section
-    
+
+    Handles two formats for joins:
+    1. "join_specifications" (simple format from LLM) - converted automatically
+    2. "joins" (internal format) - used directly
+
     Args:
         config: Our Genie space configuration
-        
+
     Returns:
         JSON string in serialized_space format
     """
@@ -308,7 +378,14 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     # - FROM_RELATIONSHIP_TYPE_MANY_TO_ONE
     # - FROM_RELATIONSHIP_TYPE_ONE_TO_MANY
     # - FROM_RELATIONSHIP_TYPE_MANY_TO_MANY
+
+    # Handle both join_specifications (new LLM format) and joins (internal format)
     joins = config.get("joins", [])
+    join_specifications = config.get("join_specifications", [])
+
+    # Convert join_specifications to joins format if present
+    if join_specifications and not joins:
+        joins = _convert_join_specifications_to_joins(join_specifications)
     if joins:
         join_specs = []
         for join in joins:
