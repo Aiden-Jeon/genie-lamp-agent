@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Optional
+from src.utils.domain_extractor import DomainKnowledge
 
 
 class PromptBuilder:
@@ -66,10 +67,13 @@ class PromptBuilder:
         
         return prompt
     
-    def build_prompt_with_reasoning(self) -> str:
+    def build_prompt_with_reasoning(self, domain_knowledge: Optional[DomainKnowledge] = None) -> str:
         """
         Build a prompt that includes reasoning in the response.
-        
+
+        Args:
+            domain_knowledge: Optional extracted domain knowledge to inject into prompt
+
         Returns:
             The formatted prompt string that asks for reasoning
         """
@@ -77,15 +81,22 @@ class PromptBuilder:
         context_content = self._read_file(self.context_doc_path)
         output_content = self._read_file(self.output_doc_path)
         input_content = self._read_file(self.input_data_path)
-        
+
+        # Inject domain knowledge if provided
+        if domain_knowledge:
+            domain_context = domain_knowledge.to_structured_context()
+            if domain_context:
+                # Insert domain knowledge before the input content
+                input_content = f"{domain_context}\n\n{'=' * 60}\n\n{input_content}"
+
         # Read the guide prompt with reasoning template
         guide_template = self._read_file(self.guide_prompt_with_reasoning_path)
-        
+
         # Format the template with the content
         prompt = guide_template.format(
             context_content=context_content,
             output_content=output_content,
             input_content=input_content
         )
-        
+
         return prompt

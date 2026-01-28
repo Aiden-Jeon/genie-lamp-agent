@@ -187,6 +187,33 @@ Complete API wrapper in `src/api/genie_space_client.py`:
 - `get_space()`: Fetch space details (optionally with serialized config)
 - `trash_space()`: Soft delete (recoverable)
 
+## Claude Code Skills
+
+This project includes custom skills in the `skills/` directory to automate common workflows.
+
+### Available Skills
+
+**genie-commit**: Automated commit workflow with testing and validation
+- Triggers: When asked to "commit changes" or "create a commit"
+- Runs `.venv/bin/python -m pytest tests/ -v` before committing
+- Follows conventional commit format (feat/fix/refactor/docs/test)
+- Checks for sensitive files and validates staging
+- See `skills/README.md` for installation instructions
+
+### Installing Skills
+
+To use the skills in Claude Code:
+
+```bash
+# Create symlink (recommended - updates automatically with repo)
+ln -s "$(pwd)/skills/genie-commit" ~/.codex/skills/genie-commit
+
+# Or copy to Claude Code skills directory
+cp -r skills/genie-commit ~/.codex/skills/
+
+# Restart Claude Code to load skills
+```
+
 ## Common Workflows
 
 ### Adding New Features to Config Generation

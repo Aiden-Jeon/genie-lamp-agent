@@ -24,9 +24,11 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 **Key Benefits:**
 - 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
 - ✅ **Complete Test Coverage**: Direct benchmark extraction ensures comprehensive FAQ coverage
-- 🔍 **Smart Validation**: Pre-flight checks for tables, columns, and Unity Catalog access
+- 🔍 **Smart Validation**: Multi-layer validation (SQL syntax + instruction quality + comprehensive review)
 - 🎯 **Best Practices Built-in**: Leverages Databricks Genie best practices automatically
 - 🤖 **LLM-Powered**: Uses Databricks foundation models for intelligent configuration generation
+- 🧠 **Domain Intelligence**: Automatically extracts domain knowledge from requirements
+- 📊 **Quality Scoring**: 4-dimension quality assessment (SQL, instructions, joins, coverage)
 
 ### How It Works
 
@@ -38,12 +40,14 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 📄 Your Requirements           ──┘
 ```
 
-The agent follows a structured pipeline:
-1. **Input**: Combines Genie best practices, API specs, and your requirements
-2. **Generation**: Uses Databricks foundation models to generate intelligent configurations
-3. **Extraction**: Directly extracts all FAQ questions as benchmarks
-4. **Validation**: Verifies tables, columns, and Unity Catalog permissions
-5. **Output**: Produces a production-ready Genie space configuration
+The agent follows a structured 7-step pipeline:
+1. **Domain Extraction**: Automatically extracts table relationships, business metrics, and common filters
+2. **Enhanced Prompt Building**: Injects domain knowledge + SQL quality criteria + few-shot examples
+3. **LLM Generation**: Uses Databricks foundation models to generate intelligent configurations
+4. **Benchmark Extraction**: Directly extracts all FAQ questions as benchmarks (100% coverage)
+5. **SQL Validation**: Syntax checks, table references, join patterns, and quality scoring
+6. **Comprehensive Review**: 4-dimension quality assessment with actionable feedback
+7. **Output**: Produces a production-ready Genie space configuration with quality report
 
 
 ### ⚡ Performance Improvements
@@ -126,6 +130,7 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
 
 ## Features
 
+### Core Features
 - **Structured Prompts**: Builds comprehensive prompts with context, output format, and input data
 - **Pydantic Models**: Type-safe configuration models that match Genie API requirements
 - **Databricks Integration**: Direct integration with Databricks serving endpoints and foundation models
@@ -134,6 +139,45 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
 - **Direct Benchmark Extraction**: Extract 100% of FAQ questions as benchmarks (no LLM filtering)
 - **Reasoning**: Optional reasoning output to understand configuration choices
 - **Markdown-Formatted Instructions**: Generate well-structured instructions using markdown (headings, lists, bold, code blocks) for better readability and organization
+
+### Quality Assurance Features (New! ⭐)
+
+#### Priority 1: Enhanced Prompt Engineering
+- **SQL Quality Criteria**: 6-point checklist for correct column references, explicit joins, aggregations, filters, and output formatting
+- **Few-Shot Examples**: High vs low quality configuration examples to guide LLM generation
+- **Instruction Guidelines**: 5 principles for specific, actionable, prioritized, and clear instructions
+- **Join Specifications**: Explicit join relationship documentation for all table pairs
+
+#### Priority 2: Automated Validation
+- **SQL Validator**: Comprehensive SQL syntax, table/column verification, and quality checks
+  - Validates example queries, SQL expressions, and benchmark queries
+  - Detects: syntax errors, missing tables, incomplete joins, SELECT *, hard-coded dates, unsafe division
+  - Provides severity-based feedback (critical, high, medium, low, info)
+- **Instruction Scorer**: 3-dimension quality scoring (0-100 scale)
+  - Specificity (40 pts): Concrete column names, table names, SQL patterns
+  - Structure (30 pts): Markdown headers, lists, code blocks
+  - Clarity (30 pts): No vague terms, actionable language
+  - Letter grades (A-F) with actionable suggestions
+
+#### Priority 3: Domain Intelligence & Comprehensive Review
+- **Domain Knowledge Extractor**: Automatically extracts from requirements:
+  - Table relationships (one-to-one, one-to-many, many-to-one, many-to-many)
+  - Business metrics (formulas, aggregations, KPIs)
+  - Common filters (status, date, boolean flags)
+  - Business terminology (glossary terms, acronyms)
+  - Sample queries with context
+- **Config Review Agent**: 4-dimension quality assessment
+  - SQL Validation Score (35%): Syntax + table references + join patterns
+  - Instruction Quality Score (25%): Average score across all instructions
+  - Join Completeness Score (20%): Coverage of required table relationships
+  - Coverage Score (20%): Example queries per table + benchmark questions + SQL expressions
+  - Overall pass/fail with actionable feedback for each issue
+
+### Test Coverage
+✅ **83/83 tests passing** across all priorities:
+- Priority 1: 7 tests (enhanced prompts, join specs, instruction patterns)
+- Priority 2: 45 tests (SQL validation + instruction scoring)
+- Priority 3: 31 tests (domain extraction + comprehensive review)
 
 ## Prerequisites
 
@@ -225,12 +269,35 @@ python genie.py create --requirements data/demo_requirements.md
 ```
 
 **That's it!** This single command will:
-1. ✅ Generate configuration using LLM (tables, instructions, SQL examples)
-2. ✅ Extract all FAQ questions as benchmarks (100% coverage)
-3. ✅ Validate tables and columns exist in Unity Catalog
-4. ✅ Create the Genie space in your workspace
+1. ✅ Extract domain knowledge from requirements (relationships, metrics, filters)
+2. ✅ Generate configuration using LLM with enhanced prompts
+3. ✅ Extract all FAQ questions as benchmarks (100% coverage)
+4. ✅ Validate SQL syntax, table references, and instruction quality
+5. ✅ Run comprehensive 4-dimension quality review
+6. ✅ Validate tables and columns exist in Unity Catalog
+7. ✅ Create the Genie space in your workspace
 
 Your Genie space is ready to use!
+
+#### Enable Full Quality Validation (Recommended)
+
+For best results, enable all validation and review features:
+
+```bash
+python genie.py create \
+  --requirements data/demo_requirements.md \
+  --validate-sql \
+  --validate-instructions \
+  --review-config \
+  --validation-output output/validation_report.json \
+  --review-output output/review_report.json
+```
+
+This provides:
+- **SQL Validation Report**: All SQL errors and warnings with suggestions
+- **Instruction Quality Report**: Scores and improvement suggestions for each instruction
+- **Comprehensive Review Report**: Overall quality score (0-100) with pass/fail status and detailed issues
+- **Actionable Feedback**: Specific recommendations for improvement
 
 ### Parsing Documents (Optional)
 
@@ -439,14 +506,34 @@ You can use the pipeline functions programmatically:
 ```python
 from src.pipeline import generate_config, validate_config, deploy_space
 
-# Generate configuration
+# Generate configuration with full quality validation
 config = generate_config(
     requirements_path="data/demo_requirements.md",
     output_path="output/config.json",
-    model="databricks-gpt-5-2"
+    model="databricks-gpt-5-2",
+
+    # Enable all quality features
+    extract_domain=True,              # Priority 3: Extract domain knowledge
+    validate_sql=True,                # Priority 2: SQL validation
+    validate_instructions=True,       # Priority 2: Instruction scoring
+    review_config=True,               # Priority 3: Comprehensive review
+    validation_output="output/validation.json",
+    review_output="output/review.json"
 )
 
-# Validate
+# Check quality metrics
+if "_review_report" in config:
+    review = config["_review_report"]
+    print(f"Overall Score: {review['overall_score']:.1f}/100")
+    print(f"Passed: {review['passed']}")
+
+    if review["passed"]:
+        print("✅ Configuration is production-ready!")
+    else:
+        print("❌ Configuration needs improvement")
+        # Review detailed issues in output/review.json
+
+# Validate Unity Catalog tables
 report = validate_config(config_path="output/config.json")
 if report.has_errors():
     print("Validation failed!")
@@ -604,9 +691,19 @@ databricks serving-endpoints list
 - **[README.md](README.md)** (this file): Installation, quick start, and complete usage guide
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture, component details, and integration flows
 
+### Quality Improvements Documentation
+Comprehensive documentation for the three-priority quality improvement system:
+- **[change_logs/priority1_improvements_summary.md](change_logs/priority1_improvements_summary.md)**: Enhanced prompt engineering details
+- **[change_logs/priority2_improvements_summary.md](change_logs/priority2_improvements_summary.md)**: SQL validation and instruction scoring
+- **[change_logs/priority3_improvements_summary.md](change_logs/priority3_improvements_summary.md)**: Domain extraction and comprehensive review
+- **[change_logs/comprehensive_improvements_summary.md](change_logs/comprehensive_improvements_summary.md)**: Combined P1+P2 overview
+- **[change_logs/FINAL_SUMMARY.md](change_logs/FINAL_SUMMARY.md)**: Complete overview of all priorities with test results
+- **[change_logs/sql_quality_quick_reference.md](change_logs/sql_quality_quick_reference.md)**: Developer quick reference for SQL standards
+
 ### Template Documentation
 - **[src/prompt/templates/curate_effective_genie.md](src/prompt/templates/curate_effective_genie.md)**: Databricks Genie best practices
 - **[src/prompt/templates/genie_api.md](src/prompt/templates/genie_api.md)**: Genie Space API specification
+- **[src/prompt/templates/guide_prompt_with_reasoning.md](src/prompt/templates/guide_prompt_with_reasoning.md)**: Enhanced prompt template with SQL quality criteria and few-shot examples
 
 ### Configuration Format
 The system supports a user-friendly configuration format that includes:

@@ -14,6 +14,8 @@ from src.utils.benchmark_extractor import (
 )
 from src.utils.sql_validator import SQLValidator
 from src.utils.instruction_scorer import InstructionQualityScorer
+from src.utils.domain_extractor import extract_domain_knowledge
+from src.pipeline.reviewer import ConfigReviewAgent
 
 
 def generate_config(
@@ -32,6 +34,9 @@ def generate_config(
     validate_sql: bool = True,
     validate_instructions: bool = True,
     validation_output: Optional[str] = None,
+    extract_domain: bool = True,
+    review_config: bool = True,
+    review_output: Optional[str] = None,
     verbose: bool = True
 ) -> Dict[str, Any]:
     """
@@ -59,6 +64,9 @@ def generate_config(
         validate_sql: Run SQL validation on generated queries
         validate_instructions: Run instruction quality scoring
         validation_output: Optional path to save validation report
+        extract_domain: Extract domain knowledge from requirements
+        review_config: Run comprehensive config review
+        review_output: Optional path to save review report
         verbose: Print progress messages
         
     Returns:
@@ -83,22 +91,37 @@ def generate_config(
     output_path_obj.parent.mkdir(parents=True, exist_ok=True)
     
     # =========================================================================
-    # STEP 1: Generate configuration with LLM
+    # STEP 1: Extract domain knowledge (optional, Priority 3)
+    # =========================================================================
+    domain_knowledge = None
+    if extract_domain:
+        if verbose:
+            print("📚 Extracting domain knowledge...")
+
+        try:
+            domain_knowledge = extract_domain_knowledge(requirements_path, verbose=verbose)
+        except Exception as e:
+            if verbose:
+                print(f"   ⚠️  Domain extraction failed: {e}")
+                print("   Continuing without domain knowledge...")
+
+    # =========================================================================
+    # STEP 2: Generate configuration with LLM
     # =========================================================================
     if verbose:
-        print("📝 Generating configuration with LLM...")
-    
+        print("\n📝 Generating configuration with LLM...")
+
     # Build prompt
     builder = PromptBuilder(
         context_doc_path=context_doc,
         output_doc_path=output_doc,
         input_data_path=requirements_path
     )
-    
+
     if no_reasoning:
         prompt = builder.build_prompt()
     else:
-        prompt = builder.build_prompt_with_reasoning()
+        prompt = builder.build_prompt_with_reasoning(domain_knowledge=domain_knowledge)
     
     if verbose:
         print(f"   Prompt: {len(prompt)} characters")
@@ -148,7 +171,7 @@ def generate_config(
         print(f"   LLM-Generated Benchmarks: {len(config.get('benchmark_questions', []))}")
     
     # =========================================================================
-    # STEP 2: Extract benchmarks directly from requirements
+    # STEP 3: Extract benchmarks directly from requirements
     # =========================================================================
     if verbose:
         print("\n📊 Extracting benchmarks from requirements...")
@@ -177,7 +200,7 @@ def generate_config(
             print(f"   ⚠ {len(report['issues'])} validation issues")
     
     # =========================================================================
-    # STEP 3: Merge benchmarks into configuration
+    # STEP 4: Merge benchmarks into configuration
     # =========================================================================
     if verbose:
         print("\n🔗 Merging benchmarks into configuration...")
@@ -195,7 +218,7 @@ def generate_config(
         print(f"   ✓ Added {len(benchmarks)} directly extracted benchmarks")
     
     # =========================================================================
-    # STEP 4: Validate configuration quality (optional)
+    # STEP 5: Validate configuration quality (optional, Priority 2)
     # =========================================================================
     validation_results = {}
 
@@ -317,7 +340,95 @@ def generate_config(
                 print(f"   ✓ Validation report saved")
 
     # =========================================================================
-    # STEP 5: Save final configuration
+    # STEP 6: Comprehensive config review (optional, Priority 3)
+    # =========================================================================
+    review_report = None
+    if review_config:
+        if verbose:
+            print("\n🔬 Running comprehensive configuration review...")
+
+        try:
+            # Get tables for review context
+            from src.models import GenieSpaceTable
+            tables = [
+                GenieSpaceTable(**table) for table in config.get("tables", [])
+            ]
+
+            reviewer = ConfigReviewAgent(available_tables=tables)
+            review_report = reviewer.review_config(
+                config,
+                config_name=config.get("space_name", "Genie Space")
+            )
+
+            if verbose:
+                status = "✅ PASSED" if review_report.passed else "❌ FAILED"
+                print(f"   Review Status: {status}")
+                print(f"   Overall Score: {review_report.overall_score:.1f}/100")
+                print(f"   Component Scores:")
+                print(f"     - SQL: {review_report.sql_validation_score:.1f}/100")
+                print(f"     - Instructions: {review_report.instruction_quality_score:.1f}/100")
+                print(f"     - Joins: {review_report.join_completeness_score:.1f}/100")
+                print(f"     - Coverage: {review_report.coverage_score:.1f}/100")
+
+                # Show critical/high issues
+                critical = review_report.get_issues_by_severity("critical")
+                high = review_report.get_issues_by_severity("high")
+
+                if critical:
+                    print(f"\n   ⚠️  {len(critical)} CRITICAL issues:")
+                    for issue in critical[:3]:  # Show first 3
+                        print(f"       - [{issue.category}] {issue.message}")
+
+                if high:
+                    print(f"\n   ⚠️  {len(high)} HIGH priority issues:")
+                    for issue in high[:3]:  # Show first 3
+                        print(f"       - [{issue.category}] {issue.message}")
+
+            # Save review report if requested
+            if review_output:
+                review_data = {
+                    "config_name": review_report.config_name,
+                    "overall_score": review_report.overall_score,
+                    "passed": review_report.passed,
+                    "component_scores": {
+                        "sql_validation": review_report.sql_validation_score,
+                        "instruction_quality": review_report.instruction_quality_score,
+                        "join_completeness": review_report.join_completeness_score,
+                        "coverage": review_report.coverage_score
+                    },
+                    "metrics": {
+                        "sql_queries": f"{review_report.valid_sql_queries}/{review_report.total_sql_queries}",
+                        "instructions": f"{review_report.high_quality_instructions}/{review_report.total_instructions}",
+                        "joins": f"{review_report.documented_joins}/{review_report.total_joins}"
+                    },
+                    "issues": [
+                        {
+                            "severity": issue.severity,
+                            "category": issue.category,
+                            "message": issue.message,
+                            "suggestion": issue.suggestion,
+                            "affected_item": issue.affected_item
+                        }
+                        for issue in review_report.issues
+                    ]
+                }
+
+                review_path = Path(review_output)
+                review_path.parent.mkdir(parents=True, exist_ok=True)
+
+                with open(review_path, 'w', encoding='utf-8') as f:
+                    json.dump(review_data, f, indent=2, ensure_ascii=False)
+
+                if verbose:
+                    print(f"   ✓ Review report saved to {review_output}")
+
+        except Exception as e:
+            if verbose:
+                print(f"   ⚠️  Config review failed: {e}")
+                print("   Continuing without review...")
+
+    # =========================================================================
+    # STEP 7: Save final configuration
     # =========================================================================
     if verbose:
         print(f"\n💾 Saving configuration to {output_path}...")
@@ -328,8 +439,20 @@ def generate_config(
     if verbose:
         print(f"   ✓ Configuration saved")
 
-    # Add validation results to return value
+    # Add validation and review results to return value
     if validation_results:
         config_data["_validation_results"] = validation_results
+
+    if review_report:
+        config_data["_review_report"] = {
+            "overall_score": review_report.overall_score,
+            "passed": review_report.passed,
+            "component_scores": {
+                "sql": review_report.sql_validation_score,
+                "instructions": review_report.instruction_quality_score,
+                "joins": review_report.join_completeness_score,
+                "coverage": review_report.coverage_score
+            }
+        }
 
     return config_data
