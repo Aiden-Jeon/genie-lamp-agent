@@ -1,9 +1,14 @@
-"""Test script to validate Databricks endpoint connectivity."""
+"""Test script to validate Databricks endpoint connectivity.
+
+NOTE: This test makes real LLM API calls which can incur costs.
+Set environment variable RUN_LLM_TESTS=true to enable this test.
+"""
 
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
+import pytest
 
 # Add project root to path for standalone execution
 project_root = Path(__file__).parent.parent
@@ -14,6 +19,12 @@ load_dotenv()
 
 from src.llm.databricks_llm import DatabricksFoundationModelClient
 
+
+@pytest.mark.llm
+@pytest.mark.skipif(
+    os.getenv("RUN_LLM_TESTS") != "true",
+    reason="Skipped: Makes real LLM API call (costs money). Set RUN_LLM_TESTS=true to run."
+)
 def test_endpoint():
     """Test the Databricks endpoint connection."""
     print("=" * 80)
@@ -96,6 +107,11 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 # Pytest-compatible wrapper
+@pytest.mark.llm
+@pytest.mark.skipif(
+    os.getenv("RUN_LLM_TESTS") != "true",
+    reason="Skipped: Makes real LLM API call (costs money). Set RUN_LLM_TESTS=true to run."
+)
 def test_endpoint_pytest():
     """Pytest wrapper for test_endpoint."""
     result = test_endpoint()

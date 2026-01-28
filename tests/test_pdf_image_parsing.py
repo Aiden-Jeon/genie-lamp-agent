@@ -1,9 +1,14 @@
-"""Test script for image-based PDF parsing with LLM."""
+"""Test script for image-based PDF parsing with LLM.
+
+NOTE: This test makes real LLM API calls (including vision models) which can incur significant costs.
+Set environment variable RUN_LLM_TESTS=true to enable this test.
+"""
 
 import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
+import pytest
 
 # Add project root to path for standalone execution
 project_root = Path(__file__).parent.parent
@@ -15,6 +20,12 @@ load_dotenv()
 from src.llm.databricks_llm import DatabricksFoundationModelClient
 from src.parsing.pdf_parser import PDFParser
 
+
+@pytest.mark.llm
+@pytest.mark.skipif(
+    os.getenv("RUN_LLM_TESTS") != "true",
+    reason="Skipped: Makes real LLM API calls with vision models (HIGH COST). Set RUN_LLM_TESTS=true to run."
+)
 def test_single_page_pdf():
     """Test parsing a single PDF with image-based approach."""
     print("=" * 80)
@@ -124,6 +135,11 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 # Pytest-compatible wrapper
+@pytest.mark.llm
+@pytest.mark.skipif(
+    os.getenv("RUN_LLM_TESTS") != "true",
+    reason="Skipped: Makes real LLM API calls with vision models (HIGH COST). Set RUN_LLM_TESTS=true to run."
+)
 def test_single_page_pdf_pytest():
     """Pytest wrapper for test_single_page_pdf."""
     result = test_single_page_pdf()
