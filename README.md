@@ -24,7 +24,7 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 
 **Key Benefits:**
 - 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
-- ✅ **100% Test Coverage**: Direct benchmark extraction ensures complete FAQ coverage
+- ✅ **Complete Test Coverage**: Direct benchmark extraction ensures comprehensive FAQ coverage
 - 🔍 **Smart Validation**: Pre-flight checks for tables, columns, and Unity Catalog access
 - 🎯 **Best Practices Built-in**: Leverages Databricks Genie best practices automatically
 - 🤖 **LLM-Powered**: Uses Databricks foundation models for intelligent configuration generation
@@ -42,16 +42,16 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 The agent follows a structured pipeline:
 1. **Input**: Combines Genie best practices, API specs, and your requirements
 2. **Generation**: Uses Databricks foundation models to generate intelligent configurations
-3. **Extraction**: Directly extracts 100% of FAQ questions as benchmarks
+3. **Extraction**: Directly extracts all FAQ questions as benchmarks
 4. **Validation**: Verifies tables, columns, and Unity Catalog permissions
 5. **Output**: Produces a production-ready Genie space configuration
 
 ## 🎉 Recent Updates (January 2026)
 
 ### 🆕 Direct Benchmark Extraction (v1.1.0)
-**Problem Solved:** LLMs were only extracting 26% of FAQ questions as benchmarks, missing 74% of important test scenarios.
+**Problem Solved:** LLMs often extract only a subset of FAQ questions as benchmarks, missing important test scenarios.
 
-**Solution:** New direct extraction system ensures 100% FAQ coverage:
+**Solution:** New direct extraction system ensures complete FAQ coverage:
 - ✅ `scripts/generate_config_with_direct_benchmarks.py` - Generate config with complete benchmarks
 - ✅ `scripts/update_benchmarks.py` - Fix benchmarks in existing configs
 - ✅ Preserves exact question phrasing from requirements
@@ -59,8 +59,8 @@ The agent follows a structured pipeline:
 
 **Impact:**
 ```
-Before: 7 benchmarks  (26% coverage) ❌
-After:  27 benchmarks (100% coverage) ✅
+Before: Partial coverage with LLM-based extraction ❌
+After:  Complete coverage with direct extraction ✅
 ```
 
 ### 🔍 Enhanced Table & Column Validation (v1.0.0)
@@ -176,12 +176,12 @@ python scripts/create_genie_space.py
 
 **What this does:**
 1. ✅ Generates configuration using LLM (tables, instructions, SQL)
-2. ✅ **Extracts ALL 27 FAQ questions** directly as benchmarks (100% coverage)
+2. ✅ Extracts all FAQ questions directly as benchmarks
 3. ✅ Validates all tables and columns exist in Unity Catalog
 4. ✅ Creates the Genie space with complete test coverage
 
 **Why use this?**
-- **100% benchmark coverage** vs 26% with LLM-only approach
+- **Complete benchmark coverage** vs partial coverage with LLM-only approach
 - Preserves exact question phrasing from requirements
 - Catches table/column errors before space creation
 - Production-ready configuration
@@ -195,7 +195,7 @@ python scripts/create_genie_space.py
 ```
 
 **Limitations:**
-- ⚠️ LLM-based benchmark extraction (only ~26% of FAQ questions)
+- ⚠️ LLM-based benchmark extraction (only partial FAQ coverage)
 - ⚠️ May miss important test scenarios
 - ⚠️ Questions may be modified or filtered
 
@@ -205,12 +205,12 @@ python scripts/create_genie_space.py
 
 | Feature | Complete Workflow ⭐ | Automated Workflow |
 |---------|---------------------|-------------------|
-| **Benchmark Coverage** | 100% (all 27 FAQs) | ~26% (7 questions) |
+| **Benchmark Coverage** | Complete (all FAQs) | Partial (subset of questions) |
 | **Question Accuracy** | Exact phrasing preserved | Modified/filtered by LLM |
 | **Table Validation** | ✅ Explicit validation step | ❌ No validation |
 | **Error Detection** | ✅ Before space creation | ❌ At runtime |
 | **Production Ready** | ✅ Yes | ⚠️ Prototypes only |
-| **Speed** | ~2-3 minutes | ~1-2 minutes |
+| **Speed** | Slower (more thorough) | Faster (less comprehensive) |
 | **Test Coverage** | Complete | Partial |
 
 **Options:**
@@ -273,7 +273,7 @@ python scripts/generate_config_with_direct_benchmarks.py \
 
 This single command:
 - ✅ Generates configuration with LLM (tables, joins, instructions, SQL examples)
-- ✅ Extracts ALL FAQ questions directly from requirements (100% coverage)
+- ✅ Extracts all FAQ questions directly from requirements
 - ✅ Merges benchmarks into final configuration
 - ✅ Validates configuration structure
 
@@ -326,11 +326,11 @@ python scripts/update_benchmarks.py \
 
 **What this fixes:**
 ```
-Before (LLM extraction):  7 benchmarks  (26% coverage) ❌
-After (Direct extraction): 27 benchmarks (100% coverage) ✅
+Before (LLM extraction):  Partial coverage ❌
+After (Direct extraction): Complete coverage ✅
 ```
 
-This extracts ALL FAQ questions from your requirements document and replaces the LLM-generated benchmarks. 
+This extracts all FAQ questions from your requirements document and replaces the LLM-generated benchmarks. 
 
 **Why Direct Benchmark Extraction?**
 
@@ -338,21 +338,21 @@ Real-world analysis shows LLMs select only "representative" questions:
 
 | Method | Coverage | Exact Match | Issues |
 |--------|----------|-------------|---------|
-| **LLM-based** | 26% (7/27) | 1 question | Modified phrasing, missing categories |
-| **Direct extraction** | 100% (27/27) | All questions | None - exact preservation |
+| **LLM-based** | Partial | Some questions | Modified phrasing, missing categories |
+| **Direct extraction** | Complete | All questions | None - exact preservation |
 
 **Benefits:**
-- ✅ **Complete coverage**: All 27 questions, not just 7
-- ✅ **Exact phrasing**: Preserves original Korean question text
-- ✅ **No filtering**: Includes all question types (KPI, sentiment, exploratory)
+- ✅ **Complete coverage**: All questions extracted
+- ✅ **Exact phrasing**: Preserves original question text
+- ✅ **No filtering**: Includes all question types
 - ✅ **Deterministic**: Same result every time
 - ✅ **Fast**: Completes in milliseconds
 
 **Example output:**
 ```
-✓ Extracted 27 benchmark questions from requirements
+✓ Extracted benchmark questions from requirements
 ✓ Updated configuration with complete benchmarks
-✓ Validation: 27/27 benchmarks valid (100%)
+✓ Validation: All benchmarks valid
 ✓ Configuration saved to: output/genie_space_config.json
 ```
 
@@ -379,11 +379,11 @@ This will:
 TABLE & COLUMN VALIDATION REPORT
 ================================================================================
 
-Tables Checked: 5
-  ✓ Valid:   5
+Tables Checked: N
+  ✓ Valid:   N
 
-Columns Checked: 28
-  ✓ Valid:   28
+Columns Checked: M
+  ✓ Valid:   M
 
 Issues:
   Errors:   0
@@ -496,50 +496,50 @@ The generated configuration follows this structure:
 ```json
 {
   "genie_space_config": {
-    "space_name": "Fashion Retail Analytics",
-    "description": "Natural language querying for fashion retail data",
-    "purpose": "Enable business users to analyze sales and customer behavior",
+    "space_name": "Your Analytics Space",
+    "description": "Natural language querying for your data",
+    "purpose": "Enable business users to analyze data",
     "tables": [
       {
-        "catalog_name": "jongseob_demo",
-        "schema_name": "fashion_recommendations",
-        "table_name": "transactions",
-        "description": "Transaction data table"
+        "catalog_name": "your_catalog",
+        "schema_name": "your_schema",
+        "table_name": "your_table",
+        "description": "Table description"
       }
     ],
     "joins": [
       {
-        "left_table": "jongseob_demo.fashion_recommendations.transactions",
-        "left_alias": "transactions",
-        "right_table": "jongseob_demo.fashion_recommendations.articles",
-        "right_alias": "articles",
-        "join_condition": "`transactions`.`article_id` = `articles`.`article_id`",
+        "left_table": "your_catalog.your_schema.table1",
+        "left_alias": "table1",
+        "right_table": "your_catalog.your_schema.table2",
+        "right_alias": "table2",
+        "join_condition": "`table1`.`id` = `table2`.`id`",
         "relationship_type": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE"
       }
     ],
     "instructions": [
       {
-        "content": "When users ask about sales without specifying time range..."
+        "content": "General instructions for querying..."
       }
     ],
     "example_sql_queries": [
       {
-        "question": "What were the top selling products last week?",
-        "sql_query": "SELECT product_name, COUNT(*) as sales FROM ...",
-        "description": "Shows top 10 products by sales count"
+        "question": "Example question",
+        "sql_query": "SELECT column FROM ...",
+        "description": "Query description"
       }
     ],
     "sql_expressions": [
       {
-        "name": "daily_revenue",
-        "expression": "SUM(total_amount)",
-        "description": "Total revenue for the day",
+        "name": "metric_name",
+        "expression": "SUM(column)",
+        "description": "Metric description",
         "type": "metric"
       }
     ],
     "benchmark_questions": [
       {
-        "question": "What were the top 10 selling products last week?"
+        "question": "Test question"
       }
     ],
     "enable_data_sampling": true
@@ -681,8 +681,8 @@ Calling LLM to generate configuration...
 
 Reasoning:
 --------------------------------------------------------------------------------
-Based on the requirements, I focused on the core transaction and product
-tables as they form the foundation for most business questions...
+Based on the requirements, I focused on the core tables that form the 
+foundation for most business questions...
 
 Confidence Score: 95.00%
 
@@ -690,13 +690,13 @@ Confidence Score: 95.00%
 
 Configuration Summary:
 --------------------------------------------------------------------------------
-Space Name: Fashion Retail Analytics
-Description: Natural language querying for fashion retail sales and customer data
-Tables: 5
-Instructions: 8
-Example SQL Queries: 12
-SQL Expressions: 6
-Benchmark Questions: 10
+Space Name: Your Genie Space Name
+Description: Natural language querying for your data
+Tables: N
+Instructions: N
+Example SQL Queries: N
+SQL Expressions: N
+Benchmark Questions: N
 
 ================================================================================
 Done!
@@ -730,7 +730,7 @@ response = client.generate_genie_config(prompt)
 # Access configuration
 config = response.genie_space_config
 print(f"Generated space: {config.space_name}")
-print(f"Tables: {len(config.tables)}")
+print(f"Number of tables: {len(config.tables)}")
 ```
 
 #### Creating Genie Space
@@ -867,14 +867,213 @@ The system supports a user-friendly configuration format that includes:
 
 All configurations are automatically transformed to Databricks' internal `serialized_space` format when creating or updating Genie spaces. The transformation is handled transparently by `src/utils/config_transformer.py`.
 
+## Parsing Module
+
+The parsing module provides a complete pipeline for extracting, structuring, and generating documentation from various sources (PDFs, markdown files) to create Genie space configurations.
+
+### Module Structure
+
+```
+src/parsing/
+├── __init__.py                    # Module exports
+├── pdf_parser.py                  # PDF extraction (hybrid: pdfplumber + LLM)
+├── markdown_parser.py             # Markdown extraction (regex-based)
+├── requirements_structurer.py     # Data models & structuring
+├── llm_enricher.py               # LLM-based enrichment (optional)
+└── markdown_generator.py          # Markdown output generation
+```
+
+### Components
+
+#### PDF Parser (`pdf_parser.py`)
+**Hybrid approach: Package-based extraction + LLM interpretation**
+
+- **PDFContent**: Raw content dataclass
+- **PDFParser**: Main parser class
+  - `extract_raw_content()`: Uses pdfplumber for text/tables
+  - `interpret_with_llm()`: Uses LLM for intelligent parsing
+  - `parse_pdf()`: Full pipeline
+
+**Usage:**
+```python
+from src.parsing import PDFParser, extract_pdf
+
+parser = PDFParser(llm_client=llm_client)
+data = parser.parse_pdf("document.pdf", use_llm=True)
+```
+
+#### Markdown Parser (`markdown_parser.py`)
+**Regex-based deterministic extraction**
+
+- **MarkdownParser**: Regex-based parser
+  - `parse_file()`: Parse single markdown file
+  - `parse_directory()`: Parse all markdown files in directory
+  - `_categorize_question()`: Auto-categorize questions
+
+**Usage:**
+```python
+from src.parsing import MarkdownParser, parse_markdown_file
+
+parser = MarkdownParser()
+data = parser.parse_file("requirements.md")
+```
+
+#### Requirements Structurer (`requirements_structurer.py`)
+**Unified data models and structuring**
+
+**Data Models:**
+- **Question**: Business question with metadata
+- **TableInfo**: Table schema and description
+- **SQLQuery**: SQL query with context
+- **RequirementSection**: Categorized section
+- **RequirementsDocument**: Complete document
+
+**Usage:**
+```python
+from src.parsing import RequirementsStructurer, structure_requirements
+
+structurer = RequirementsStructurer()
+doc = structurer.structure_data(pdf_data, md_data)
+```
+
+#### LLM Enricher (`llm_enricher.py`)
+**Optional LLM-based enrichment**
+
+- **LLMEnricher**: Enrichment engine
+  - `enrich_document()`: Add descriptions, summaries
+  - `_enrich_tables()`: Generate table descriptions
+  - `_enrich_queries()`: Generate query descriptions
+  - `_generate_scenarios()`: Create business scenarios
+
+**Usage:**
+```python
+from src.parsing import LLMEnricher, enrich_requirements
+
+enricher = LLMEnricher(llm_client)
+enriched_doc = enricher.enrich_document(doc)
+```
+
+#### Markdown Generator (`markdown_generator.py`)
+**Template-based output generation**
+
+- **MarkdownGenerator**: Output generator
+  - `generate()`: Generate full markdown document
+  - Follows `demo_requirements.md` structure
+  - Categorized FAQ with emojis
+  - Table sections with sample queries
+
+**Usage:**
+```python
+from src.parsing import MarkdownGenerator, generate_markdown
+
+markdown = generate_markdown(doc, "output.md")
+```
+
+### Parsing Pipeline Quick Start
+
+#### Basic Usage (All-in-one)
+
+```python
+from src.parsing import (
+    PDFParser,
+    MarkdownParser,
+    RequirementsStructurer,
+    generate_markdown
+)
+
+# 1. Extract
+pdf_parser = PDFParser()
+pdf_data = pdf_parser.parse_pdf("doc.pdf", use_llm=False)
+
+md_parser = MarkdownParser()
+md_data = md_parser.parse_directory("requirements/")
+
+# 2. Structure
+structurer = RequirementsStructurer()
+doc = structurer.structure_data(pdf_data, md_data)
+
+# 3. Generate
+markdown = generate_markdown(doc, "output.md")
+```
+
+#### With LLM Enrichment
+
+```python
+from src.parsing import (
+    PDFParser,
+    MarkdownParser,
+    RequirementsStructurer,
+    LLMEnricher,
+    generate_markdown
+)
+from src.llm.databricks_llm import DatabricksFoundationModelClient
+
+# Initialize LLM
+llm_client = DatabricksFoundationModelClient(model_name="databricks-gpt-5-2")
+
+# 1. Extract with LLM
+pdf_parser = PDFParser(llm_client=llm_client)
+pdf_data = pdf_parser.parse_pdf("doc.pdf", use_llm=True)
+
+md_parser = MarkdownParser()
+md_data = md_parser.parse_directory("requirements/")
+
+# 2. Structure
+structurer = RequirementsStructurer()
+doc = structurer.structure_data(pdf_data, md_data)
+
+# 3. Enrich (optional)
+enricher = LLMEnricher(llm_client)
+doc = enricher.enrich_document(doc)
+
+# 4. Generate
+markdown = generate_markdown(doc, "output.md")
+```
+
+### Data Flow
+
+```
+PDF Files → PDFParser (pdfplumber + LLM) → Structured JSON
+                                                ↓
+Markdown Files → MarkdownParser (regex) → Structured JSON
+                                                ↓
+                                    RequirementsStructurer
+                                                ↓
+                                        Unified Document
+                                                ↓
+                                    LLMEnricher (optional)
+                                                ↓
+                                      Enriched Document
+                                                ↓
+                                    MarkdownGenerator
+                                                ↓
+                                        Output Markdown
+```
+
+### Parsing Module Testing
+
+Run tests for the parsing module:
+
+```bash
+pytest tests/test_requirements_converter.py -v
+```
+
+### Design Principles
+
+1. **Modularity**: Each component is independent
+2. **Flexibility**: LLM is optional, can work without it
+3. **Extensibility**: Easy to add new parsers/generators
+4. **Type Safety**: Dataclasses for structured data
+5. **Testability**: Unit tests for all components
+
 ## Key Scripts Reference
 
 ### Configuration Generation
 | Script | Purpose | Benchmark Coverage |
 |--------|---------|-------------------|
-| `scripts/generate_config_with_direct_benchmarks.py` ⭐ | Generate config with 100% benchmark extraction | 100% (Recommended) |
-| `main.py` | Generate config with LLM-based extraction | ~26% (Traditional) |
-| `scripts/update_benchmarks.py` | Fix benchmarks in existing config | 100% (Fixes existing) |
+| `scripts/generate_config_with_direct_benchmarks.py` ⭐ | Generate config with complete benchmark extraction | Complete (Recommended) |
+| `main.py` | Generate config with LLM-based extraction | Partial (Traditional) |
+| `scripts/update_benchmarks.py` | Fix benchmarks in existing config | Complete (Fixes existing) |
 
 ### Validation & Creation
 | Script | Purpose | When to Use |
@@ -884,17 +1083,24 @@ All configurations are automatically transformed to Databricks' internal `serial
 | `scripts/create_genie_space.py` | Create Genie space from config | After validation passes |
 | `scripts/create_genie_space_workflow.sh` | End-to-end automation | Quick demos (skip benchmarks) |
 
+### Parsing Pipeline
+| Script | Purpose | Related Module |
+|--------|---------|----------------|
+| `scripts/convert_requirements.py` | Main requirements conversion pipeline | `src/parsing/` |
+| `tests/test_requirements_converter.py` | Parsing module tests | `src/parsing/` |
+
 ### Documentation Files
 | File | Description |
 |------|-------------|
 | [README.md](README.md) | Complete getting started guide and API reference |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and design patterns |
+| [CONVERSION_PIPELINE.md](CONVERSION_PIPELINE.md) | Requirements conversion pipeline documentation |
 | [data/demo_requirements.md](data/demo_requirements.md) | Example requirements document |
 
 ## Best Practices
 
 1. **Start Small**: Use focused requirements documents for better results
-2. **Use Direct Benchmark Extraction**: Use `generate_config_with_direct_benchmarks.py` to ensure 100% FAQ coverage (not 26%)
+2. **Use Direct Benchmark Extraction**: Use `generate_config_with_direct_benchmarks.py` to ensure complete FAQ coverage
 3. **Validate Tables First**: Always run `scripts/validate_tables.py` before creating spaces
 4. **Iterate**: Generate multiple configurations with different temperatures
 5. **Validate**: Always review the generated configuration before using it

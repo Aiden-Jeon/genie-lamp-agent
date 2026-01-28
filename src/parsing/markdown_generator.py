@@ -1,0 +1,394 @@
+"""
+Markdown Generator Module
+Generates final markdown documentation following demo_requirements.md structure.
+"""
+
+import logging
+from datetime import datetime
+from typing import Dict, List, Optional
+from collections import defaultdict
+
+from src.parsing.requirements_structurer import RequirementsDocument, Question, TableInfo, SQLQuery
+
+logger = logging.getLogger(__name__)
+
+
+class MarkdownGenerator:
+    """
+    Generates markdown documentation from RequirementsDocument.
+    Follows the structure of demo_requirements.md.
+    """
+    
+    def __init__(self):
+        """Initialize markdown generator"""
+        pass
+    
+    def generate(self, doc: RequirementsDocument, output_path: str) -> str:
+        """
+        Generate markdown documentation.
+        
+        Args:
+            doc: RequirementsDocument to convert
+            output_path: Path where output will be saved
+            
+        Returns:
+            Generated markdown content as string
+        """
+        logger.info(f"Generating markdown documentation")
+        
+        sections = []
+        
+        # 1. Title and Overview
+        sections.append(self._generate_header(doc))
+        sections.append(self._generate_overview(doc))
+        
+        # 2. FAQ Questions List
+        sections.append(self._generate_faq_section(doc))
+        
+        # 3. Table Sections with Sample Queries
+        sections.append(self._generate_table_sections(doc))
+        
+        # 4. Table Relationships (ERD)
+        sections.append(self._generate_erd_section(doc))
+        
+        # 5. Common Filters & Dimensions
+        sections.append(self._generate_filters_section(doc))
+        
+        # 6. Table Mapping for Business Questions
+        sections.append(self._generate_table_mapping(doc))
+        
+        # 7. Meta Tables
+        sections.append(self._generate_meta_tables_section(doc))
+        
+        # Combine all sections
+        markdown = "\n\n---\n\n".join(sections)
+        
+        logger.info(f"Generated {len(markdown)} characters of markdown")
+        
+        return markdown
+    
+    def _generate_header(self, doc: RequirementsDocument) -> str:
+        """Generate document header"""
+        title = doc.metadata.get("title", "Requirements Documentation")
+        domain = doc.metadata.get("primary_domain", "Analytics")
+        
+        # Make title more readable
+        if domain == "combined":
+            title = "Social & KPI Analytics - Genie Demo Documentation"
+        elif domain == "social_analytics":
+            title = "Social Analytics - Genie Demo Documentation"
+        elif domain == "kpi_analytics":
+            title = "KPI Analytics - Genie Demo Documentation"
+        else:
+            title = f"{domain.replace('_', ' ').title()} - Genie Demo Documentation"
+        
+        return f"# {title}"
+    
+    def _generate_overview(self, doc: RequirementsDocument) -> str:
+        """Generate overview section"""
+        date = datetime.now().strftime("%m/%d/%Y")
+        num_questions = doc.metadata.get("num_questions", len(doc.all_questions))
+        
+        # Extract catalog.schema from tables
+        catalog_schemas = set()
+        for table in doc.all_tables:
+            catalog_schemas.add(f"{table.catalog}.{table.schema}")
+        catalog_schema_str = ", ".join([f"`{cs}`" for cs in sorted(catalog_schemas)])
+        
+        summary = doc.metadata.get("summary", f"Requirements document with {num_questions} business questions")
+        
+        overview = f"""## 개요
+
+| **목적** | AI Agent Demo using Databricks Genie |
+| --- | --- |
+| **작성자** | Generated from Requirements Conversion Pipeline |
+| **작성일자** | {date} |
+| **Catalog.Schema** | {catalog_schema_str if catalog_schema_str else '`catalog.schema`'} |
+
+**Summary:** {summary}"""
+        
+        return overview
+    
+    def _generate_faq_section(self, doc: RequirementsDocument) -> str:
+        """Generate FAQ questions section"""
+        num_questions = len(doc.all_questions)
+        
+        # Group questions by category
+        questions_by_category = defaultdict(list)
+        for q in doc.all_questions:
+            questions_by_category[q.category].append(q)
+        
+        # Build FAQ section
+        lines = [
+            "## 📊 질문 목록 (FAQ)",
+            "",
+            f"총 {num_questions}개 질문:",
+            ""
+        ]
+        
+        # Category order preference
+        category_order = ["KPI", "Social", "Sentiment", "Trend", "Comparison", "Regional", "Other"]
+        
+        for category in category_order:
+            if category not in questions_by_category:
+                continue
+            
+            questions = questions_by_category[category]
+            
+            # Category emoji mapping
+            emoji_map = {
+                "KPI": "📈",
+                "Social": "💬",
+                "Sentiment": "😊😢",
+                "Trend": "📊",
+                "Comparison": "🔄",
+                "Regional": "🌍",
+                "Other": "❓"
+            }
+            
+            emoji = emoji_map.get(category, "")
+            lines.append(f"### {emoji} {category} Analysis")
+            lines.append("")
+            
+            for q in sorted(questions, key=lambda x: x.id):
+                # Extract question number
+                q_num = q.id.replace("Q", "").replace("_", "")
+                lines.append(f"{q_num}. {q.text}")
+            
+            lines.append("")
+        
+        return "\n".join(lines)
+    
+    def _generate_table_sections(self, doc: RequirementsDocument) -> str:
+        """Generate table sections with sample queries"""
+        sections = []
+        
+        for table in doc.all_tables:
+            section = self._generate_single_table_section(table, doc)
+            if section:
+                sections.append(section)
+        
+        return "\n\n---\n\n".join(sections)
+    
+    def _generate_single_table_section(self, table: TableInfo, doc: RequirementsDocument) -> str:
+        """Generate section for a single table"""
+        # Find sample query for this table
+        sample_query = table.sample_query
+        if not sample_query:
+            # Try to find from all_queries
+            for query in doc.all_queries:
+                if table.full_name in query.query:
+                    sample_query = query.query
+                    break
+        
+        # Build section
+        lines = [
+            f"## {table.description or table.table}",
+            "",
+            f"**Table:** `{table.full_name}`",
+            ""
+        ]
+        
+        if table.related_kpi:
+            lines.append(f"**Related KPI:** {table.related_kpi}")
+            lines.append("")
+        
+        if sample_query:
+            lines.append("**Sample Query:**")
+            lines.append("```sql")
+            lines.append(sample_query.strip())
+            lines.append("```")
+        
+        return "\n".join(lines)
+    
+    def _generate_erd_section(self, doc: RequirementsDocument) -> str:
+        """Generate ERD/table relationships section"""
+        lines = [
+            "## 🗂️ 테이블 정보 (ERD)",
+            "",
+            "### Core Tables",
+            ""
+        ]
+        
+        # List all tables
+        lines.append("#### 주요 테이블")
+        for table in doc.all_tables:
+            lines.append(f"- `{table.full_name}`: {table.description or 'Table'}")
+        
+        lines.append("")
+        lines.append("#### 주요 조인 관계")
+        
+        # Extract join relationships from questions
+        join_relationships = set()
+        for q in doc.all_questions:
+            for join in q.join_conditions:
+                join_relationships.add(join)
+        
+        if join_relationships:
+            lines.append("```")
+            for join in sorted(join_relationships)[:10]:  # Limit to 10
+                lines.append(join)
+            lines.append("```")
+        else:
+            lines.append("```")
+            lines.append("# Join relationships will be extracted from queries")
+            lines.append("```")
+        
+        lines.append("")
+        lines.append("#### 주요 컬럼")
+        
+        # List key columns from tables
+        for table in doc.all_tables[:5]:  # First 5 tables
+            if table.columns:
+                col_names = ", ".join([col.name for col in table.columns[:5]])
+                lines.append(f"- **{table.table}**: {col_names}")
+        
+        return "\n".join(lines)
+    
+    def _generate_filters_section(self, doc: RequirementsDocument) -> str:
+        """Generate common filters and dimensions section"""
+        lines = [
+            "## 📊 Common Filters & Dimensions",
+            "",
+            "### Filters",
+            "```sql"
+        ]
+        
+        # Extract common filters from questions
+        date_filters = set()
+        other_filters = set()
+        
+        for q in doc.all_questions:
+            for filter_cond in q.filtering_conditions:
+                if 'date' in filter_cond.lower() or 'event_date' in filter_cond.lower():
+                    date_filters.add(filter_cond)
+                else:
+                    other_filters.add(filter_cond)
+        
+        # Add date filters
+        if date_filters:
+            lines.append("-- 날짜 필터")
+            for f in sorted(date_filters)[:3]:
+                lines.append(f)
+            lines.append("")
+        else:
+            lines.append("-- 날짜 필터")
+            lines.append("WHERE event_date >= '2024-01-01'")
+            lines.append("WHERE event_date >= CURRENT_DATE - 30")
+            lines.append("")
+        
+        # Add other common filters
+        if other_filters:
+            lines.append("-- 기타 필터")
+            for f in sorted(other_filters)[:3]:
+                lines.append(f)
+        
+        lines.append("```")
+        lines.append("")
+        lines.append("### Key Dimensions")
+        
+        # Extract dimensions from table columns
+        dimensions = set()
+        for table in doc.all_tables:
+            for col in table.columns:
+                col_name = col.name.split(".")[-1] if "." in col.name else col.name
+                if any(dim_word in col_name.lower() for dim_word in ['date', 'type', 'category', 'status', 'channel']):
+                    dimensions.add(f"**{col_name}**")
+        
+        if dimensions:
+            for dim in sorted(dimensions)[:10]:
+                lines.append(f"- {dim}")
+        else:
+            lines.append("- **event_date**: Date dimension")
+            lines.append("- **category**: Category dimension")
+        
+        return "\n".join(lines)
+    
+    def _generate_table_mapping(self, doc: RequirementsDocument) -> str:
+        """Generate table mapping for business questions"""
+        lines = [
+            "## 📋 Table Mapping for Business Questions",
+            "",
+            "### 질문별 테이블 매핑",
+            "",
+            "| Question | Primary Table | Key Metrics |",
+            "|----------|--------------|-------------|"
+        ]
+        
+        # Map questions to tables
+        for q in doc.all_questions[:15]:  # First 15 questions
+            primary_table = q.tables_needed[0] if q.tables_needed else "N/A"
+            # Shorten table name
+            if "." in primary_table:
+                primary_table = primary_table.split(".")[-1]
+            
+            # Extract metrics from query if available
+            metrics = []
+            if q.example_query:
+                # Simple extraction of aggregate functions
+                for metric_word in ['SUM', 'COUNT', 'AVG', 'MAX', 'MIN']:
+                    if metric_word in q.example_query.upper():
+                        metrics.append(metric_word)
+            
+            metrics_str = ", ".join(set(metrics[:3])) if metrics else "Various"
+            
+            # Truncate question if too long
+            question_text = q.text[:50] + "..." if len(q.text) > 50 else q.text
+            
+            lines.append(f"| {question_text} | {primary_table} | {metrics_str} |")
+        
+        return "\n".join(lines)
+    
+    def _generate_meta_tables_section(self, doc: RequirementsDocument) -> str:
+        """Generate meta tables section"""
+        lines = [
+            "## 🗃️ Meta Tables",
+            ""
+        ]
+        
+        # Look for tables with 'meta' or 'dim' in name
+        meta_tables = [t for t in doc.all_tables if 'meta' in t.table.lower() or 'dim' in t.table.lower()]
+        
+        if meta_tables:
+            for table in meta_tables:
+                lines.append(f"### {table.description or table.table}")
+                lines.append(f"**Table:** `{table.full_name}`")
+                lines.append("")
+                
+                if table.columns:
+                    lines.append("**Key Columns:**")
+                    for col in table.columns[:10]:
+                        lines.append(f"- `{col.name}`")
+                    lines.append("")
+        else:
+            lines.append("### Metadata Tables")
+            lines.append("")
+            lines.append("Metadata tables provide reference data for dimensions and lookups.")
+        
+        return "\n".join(lines)
+
+
+def generate_markdown(doc: RequirementsDocument, output_path: str) -> str:
+    """
+    Convenience function to generate markdown documentation.
+    
+    Args:
+        doc: RequirementsDocument to convert
+        output_path: Path where output will be saved
+        
+    Returns:
+        Generated markdown content
+    """
+    generator = MarkdownGenerator()
+    markdown = generator.generate(doc, output_path)
+    
+    # Save to file
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(markdown)
+        logger.info(f"Markdown saved to: {output_path}")
+    except Exception as e:
+        logger.error(f"Error saving markdown: {e}")
+        raise
+    
+    return markdown

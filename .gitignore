@@ -1,3 +1,6 @@
+data/
+real_requirements/
+
 # Python
 __pycache__/
 *.py[cod]
