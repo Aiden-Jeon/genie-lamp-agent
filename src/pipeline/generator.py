@@ -12,6 +12,8 @@ from src.utils.benchmark_extractor import (
     merge_benchmarks_into_config,
     validate_benchmarks
 )
+from src.utils.sql_validator import SQLValidator
+from src.utils.instruction_scorer import InstructionQualityScorer
 
 
 def generate_config(
@@ -27,6 +29,9 @@ def generate_config(
     faq_section: str = "## 📊 질문 목록 (FAQ)",
     databricks_host: Optional[str] = None,
     databricks_token: Optional[str] = None,
+    validate_sql: bool = True,
+    validate_instructions: bool = True,
+    validation_output: Optional[str] = None,
     verbose: bool = True
 ) -> Dict[str, Any]:
     """
@@ -51,6 +56,9 @@ def generate_config(
         faq_section: FAQ section title to extract benchmarks from
         databricks_host: Databricks workspace URL
         databricks_token: Databricks personal access token
+        validate_sql: Run SQL validation on generated queries
+        validate_instructions: Run instruction quality scoring
+        validation_output: Optional path to save validation report
         verbose: Print progress messages
         
     Returns:
@@ -187,15 +195,141 @@ def generate_config(
         print(f"   ✓ Added {len(benchmarks)} directly extracted benchmarks")
     
     # =========================================================================
-    # STEP 4: Save final configuration
+    # STEP 4: Validate configuration quality (optional)
+    # =========================================================================
+    validation_results = {}
+
+    if validate_sql or validate_instructions:
+        if verbose:
+            print("\n🔍 Running validation checks...")
+
+        config = config_data["genie_space_config"]
+
+        # SQL Validation
+        if validate_sql:
+            if verbose:
+                print("   Running SQL validation...")
+
+            # Get tables for validation context
+            from src.models import GenieSpaceTable
+            tables = [
+                GenieSpaceTable(**table) for table in config.get("tables", [])
+            ]
+
+            sql_validator = SQLValidator(available_tables=tables)
+            sql_results = sql_validator.validate_config_sql(config)
+            validation_results["sql_validation"] = sql_results
+
+            if verbose:
+                summary = sql_results["summary"]
+                print(f"   SQL Validation Results:")
+                print(f"     - Total queries: {summary['total_queries']}")
+                print(f"     - Valid queries: {summary['valid_queries']}")
+                print(f"     - With errors: {summary['queries_with_errors']}")
+                print(f"     - With warnings: {summary['queries_with_warnings']}")
+
+                # Show first few errors if any
+                all_reports = sql_results["example_queries"] + sql_results["sql_expressions"]
+                errors_shown = 0
+                for report in all_reports:
+                    if not report.is_valid and errors_shown < 3:
+                        print(f"\n   ⚠️  SQL Error in query:")
+                        for error in report.get_errors()[:2]:
+                            print(f"       - {error.message}")
+                        errors_shown += 1
+
+        # Instruction Quality Validation
+        if validate_instructions:
+            if verbose:
+                print("\n   Running instruction quality scoring...")
+
+            scorer = InstructionQualityScorer()
+            quality_report = scorer.score_config_instructions(config)
+            validation_results["instruction_quality"] = {
+                "average_score": quality_report.average_score,
+                "total_instructions": quality_report.total_instructions,
+                "high_quality_count": quality_report.high_quality_count,
+                "medium_quality_count": quality_report.medium_quality_count,
+                "low_quality_count": quality_report.low_quality_count,
+                "scores": [
+                    {
+                        "score": s.total_score,
+                        "grade": s.grade(),
+                        "specificity": s.specificity_score,
+                        "structure": s.structure_score,
+                        "clarity": s.clarity_score,
+                        "issues": s.issues,
+                        "suggestions": s.suggestions
+                    }
+                    for s in quality_report.instruction_scores
+                ]
+            }
+
+            if verbose:
+                print(f"   Instruction Quality Results:")
+                print(f"     - Average score: {quality_report.average_score:.1f}/100")
+                print(f"     - High quality (≥80): {quality_report.high_quality_count}")
+                print(f"     - Medium quality (60-79): {quality_report.medium_quality_count}")
+                print(f"     - Low quality (<60): {quality_report.low_quality_count}")
+
+                # Show issues for low-quality instructions
+                for i, score in enumerate(quality_report.instruction_scores):
+                    if score.total_score < 60:
+                        print(f"\n   ⚠️  Low-quality instruction #{i+1} (Score: {score.total_score:.1f}):")
+                        for issue in score.issues[:2]:
+                            print(f"       - {issue}")
+
+        # Save validation report if requested
+        if validation_output:
+            if verbose:
+                print(f"\n   Saving validation report to {validation_output}...")
+
+            validation_path = Path(validation_output)
+            validation_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(validation_path, 'w', encoding='utf-8') as f:
+                # Convert reports to JSON-serializable format
+                serializable_results = {
+                    "sql_validation": {},
+                    "instruction_quality": validation_results.get("instruction_quality", {})
+                }
+
+                if "sql_validation" in validation_results:
+                    sql_val = validation_results["sql_validation"]
+                    serializable_results["sql_validation"] = {
+                        "summary": sql_val["summary"],
+                        "example_queries": [
+                            {
+                                "is_valid": r.is_valid,
+                                "tables": list(r.tables_referenced),
+                                "columns": list(r.columns_referenced),
+                                "has_joins": r.has_explicit_joins,
+                                "errors": [{"severity": e.severity, "category": e.category, "message": e.message} for e in r.get_errors()],
+                                "warnings": [{"severity": w.severity, "category": w.category, "message": w.message} for w in r.get_warnings()],
+                            }
+                            for r in sql_val["example_queries"]
+                        ]
+                    }
+
+                json.dump(serializable_results, f, indent=2, ensure_ascii=False)
+
+            if verbose:
+                print(f"   ✓ Validation report saved")
+
+    # =========================================================================
+    # STEP 5: Save final configuration
     # =========================================================================
     if verbose:
         print(f"\n💾 Saving configuration to {output_path}...")
-    
+
     with open(output_path_obj, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, indent=2, ensure_ascii=False)
-    
+
     if verbose:
         print(f"   ✓ Configuration saved")
-    
+
+    # Add validation results to return value
+    if validation_results:
+        config_data["_validation_results"] = validation_results
+
     return config_data
