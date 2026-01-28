@@ -93,14 +93,16 @@ def extract_sample_queries_as_benchmarks(
     """
     Extract sample SQL queries from requirements document as benchmarks.
     
-    This function looks for sections with **Sample Query:** patterns and extracts
-    the SQL queries along with the section context (title, KPIs, etc.) to create
+    This function looks for sections with BOTH **Sample Questions:** and **Sample Query:**
+    patterns. Each sample question is paired with the SQL query from that section to create
     benchmarks with expected_sql.
     
     Pattern:
         ## Section Title
         **Table:** table_name
-        **Related KPI:** KPI description
+        **Sample Questions:**
+        1. Question text 1
+        2. Question text 2
         **Sample Query:**
         ```sql
         SELECT ...
@@ -110,15 +112,18 @@ def extract_sample_queries_as_benchmarks(
         requirements_path: Path to the requirements document
         
     Returns:
-        List of benchmark dictionaries with expected_sql filled in
+        List of benchmark dictionaries with expected_sql filled in.
+        One benchmark per sample question in each section.
         
     Example:
-        >>> benchmarks = extract_sample_queries_as_benchmarks("data/demo_requirements.md")
+        >>> benchmarks = extract_sample_queries_as_benchmarks("data/parsed_requirements.md")
         >>> benchmarks[0]
         {
-            "question": "Daily Sales Summary (Daily Sales, Revenue, Customer Count, ARPU)",
-            "expected_sql": "SELECT t.t_dat as transaction_date...",
-            "expected_accuracy": "High"
+            "question": "디스코드에서 리액션이 가장 많은 메시지는 무엇인가요?",
+            "expected_sql": "WITH hot_messages AS (...",
+            "expected_accuracy": "High",
+            "table": "main.log_discord.channel_list",
+            "source": "sample_query"
         }
     """
     doc_path = Path(requirements_path)
@@ -140,16 +145,36 @@ def extract_sample_queries_as_benchmarks(
         if line.startswith('## ') and not line.startswith('###'):
             section_title = line.replace('##', '').strip()
             
-            # Extract metadata from next lines
+            # Extract metadata and check for Sample Questions
             table_name = None
-            related_kpi = None
+            sample_questions = []
+            sample_sql = None
             
             j = i + 1
             while j < len(lines) and not lines[j].startswith('##'):
+                # Extract table name
                 if lines[j].startswith('**Table:**'):
                     table_name = lines[j].replace('**Table:**', '').strip()
-                elif lines[j].startswith('**Related KPI:**'):
-                    related_kpi = lines[j].replace('**Related KPI:**', '').strip()
+                
+                # Extract Sample Questions
+                elif lines[j].startswith('**Sample Questions:**'):
+                    # Extract all numbered questions following this marker
+                    k = j + 1
+                    while k < len(lines):
+                        stripped = lines[k].strip()
+                        # Check if this is a numbered question
+                        question_match = re.match(r'^(\d+)\.\s+(.+)$', stripped)
+                        if question_match:
+                            question_text = question_match.group(2)
+                            sample_questions.append(question_text)
+                            k += 1
+                        elif stripped == '' or stripped.startswith('**'):
+                            # Empty line or next section marker - stop collecting questions
+                            break
+                        else:
+                            k += 1
+                
+                # Extract Sample Query
                 elif lines[j].startswith('**Sample Query:**'):
                     # Found a sample query - extract the SQL
                     sql_lines = []
@@ -169,28 +194,22 @@ def extract_sample_queries_as_benchmarks(
                         
                         # Build the SQL query
                         if sql_lines:
-                            expected_sql = '\n'.join(sql_lines)
-                            
-                            # Create question from section title and KPI
-                            if related_kpi:
-                                question = f"{section_title} ({related_kpi})"
-                            else:
-                                question = section_title
-                            
-                            # Remove emojis from question for cleaner text
-                            question = re.sub(r'[^\w\s\(\),\-:가-힣]', '', question).strip()
-                            
-                            benchmarks.append({
-                                "question": question,
-                                "expected_sql": expected_sql,
-                                "expected_accuracy": "High",  # Sample queries should have high accuracy
-                                "table": table_name,
-                                "source": "sample_query"
-                            })
+                            sample_sql = '\n'.join(sql_lines)
                     
                     break  # Found and processed the sample query for this section
                 
                 j += 1
+            
+            # Create benchmarks only if we have BOTH sample questions AND sample SQL
+            if sample_questions and sample_sql:
+                for question in sample_questions:
+                    benchmarks.append({
+                        "question": question,
+                        "expected_sql": sample_sql,
+                        "expected_accuracy": "High",  # Sample queries should have high accuracy
+                        "table": table_name,
+                        "source": "sample_query"
+                    })
         
         i += 1
     
