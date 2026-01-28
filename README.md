@@ -980,17 +980,34 @@ We welcome contributions to make Genie Lamp Agent better! Here's how you can hel
 git clone https://github.com/YOUR_USERNAME/genie-lamp-agent.git
 cd genie-lamp-agent
 
+# Install Claude Code skills (optional but recommended)
+./.claude/install-skills.sh
+
 # Create a feature branch
 git checkout -b feature/your-feature-name
 
 # Make your changes and test
-python -m pytest tests/
+.venv/bin/python -m pytest tests/
 
-# Commit and push
+# Commit and push (use genie-commit skill or manual)
 git add .
 git commit -m "Add your feature description"
 git push origin feature/your-feature-name
 ```
+
+### Claude Code Skills
+
+This project includes custom skills for Claude Code in `.claude/skills/`:
+
+- **genie-commit**: Automated commit workflow with testing and validation
+
+To install:
+```bash
+./.claude/install-skills.sh
+# Then restart Claude Code
+```
+
+See `.claude/skills/README.md` for details.
 
 ### Extension Points
 

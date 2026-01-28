@@ -189,7 +189,7 @@ Complete API wrapper in `src/api/genie_space_client.py`:
 
 ## Claude Code Skills
 
-This project includes custom skills in the `skills/` directory to automate common workflows.
+This project includes custom skills in the `.claude/skills/` directory to automate common workflows.
 
 ### Available Skills
 
@@ -198,7 +198,7 @@ This project includes custom skills in the `skills/` directory to automate commo
 - Runs `.venv/bin/python -m pytest tests/ -v` before committing
 - Follows conventional commit format (feat/fix/refactor/docs/test)
 - Checks for sensitive files and validates staging
-- See `skills/README.md` for installation instructions
+- See `.claude/skills/README.md` for installation instructions
 
 ### Installing Skills
 
@@ -206,10 +206,10 @@ To use the skills in Claude Code:
 
 ```bash
 # Create symlink (recommended - updates automatically with repo)
-ln -s "$(pwd)/skills/genie-commit" ~/.codex/skills/genie-commit
+ln -s "$(pwd)/.claude/skills/genie-commit" ~/.codex/skills/genie-commit
 
 # Or copy to Claude Code skills directory
-cp -r skills/genie-commit ~/.codex/skills/
+cp -r .claude/skills/genie-commit ~/.codex/skills/
 
 # Restart Claude Code to load skills
 ```

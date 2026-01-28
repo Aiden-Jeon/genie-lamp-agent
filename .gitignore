@@ -49,5 +49,8 @@ Thumbs.db
 .env
 .env.local
 
+# Claude Code local settings (but track skills)
+.claude/settings.local.json
+
 # Logs
 *.log
