@@ -663,8 +663,6 @@ See [scripts/legacy/README.md](scripts/legacy/README.md) for migration guide.
 |------|-------------|
 | [README.md](README.md) | Complete getting started guide and API reference |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and design patterns |
-| [CONVERSION_PIPELINE.md](CONVERSION_PIPELINE.md) | Requirements conversion pipeline documentation |
-| [SIMPLIFIED_WORKFLOW.md](SIMPLIFIED_WORKFLOW.md) | Simplified workflow implementation details |
 | [data/demo_requirements.md](data/demo_requirements.md) | Example requirements document |
 
 ## Best Practices
