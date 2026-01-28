@@ -186,15 +186,15 @@
 
 1. **One-Shot Generation + Creation**
    ```bash
-   ./scripts/create_genie_space_workflow.sh
+   genie.py create --requirements data/requirements.md
    ```
 
 2. **Manual Review + Editing**
    ```bash
-   python main.py  # Generate
-   python scripts/validate_tables.py  # Validate
-   vim output/genie_space_config.json  # Edit
-   python scripts/create_genie_space.py  # Create
+   genie.py generate --requirements data/requirements.md  # Generate
+   genie.py validate  # Validate (interactive fixes if needed)
+   vim output/genie_space_config.json  # Edit if needed
+   genie.py deploy  # Deploy
    ```
 
 3. **Programmatic Python API**
@@ -227,11 +227,12 @@
 ├── src/                            # Core source code
 │   ├── __init__.py
 │   ├── models.py                   # Pydantic models for Genie space config
-│   ├── pipeline/                   # 🌟 Pipeline orchestration (NEW)
+│   ├── pipeline/                   # 🌟 Pipeline orchestration
 │   │   ├── __init__.py
 │   │   ├── generator.py            # Configuration generation
 │   │   ├── validator.py            # Table validation
-│   │   └── deployer.py             # Space deployment
+│   │   ├── deployer.py             # Space deployment
+│   │   └── parser.py               # Document parsing (async/concurrent)
 │   ├── api/                        # API clients
 │   │   ├── __init__.py
 │   │   └── genie_space_client.py   # Genie Space API client
@@ -264,18 +265,10 @@
 │   ├── genie_space_config.json     # Generated config
 │   └── genie_space_result.json     # Creation result
 │
-├── scripts/                        # Scripts
+├── scripts/                        # Utility scripts
 │   ├── validate_setup.py           # Environment validation
-│   ├── convert_requirements.py     # Requirements conversion
-│   └── legacy/                     # ⚠️ Deprecated scripts
-│       ├── README.md               # Migration guide
-│       ├── main.py
-│       ├── generate_config_with_direct_benchmarks.py
-│       ├── validate_tables.py
-│       ├── create_genie_space.py
-│       ├── create_genie_space_workflow.sh
-│       ├── update_benchmarks.py
-│       └── fix_benchmarks.sh
+│   └── convert_requirements.py     # Requirements conversion
+│   # Note: Legacy scripts removed - all functionality migrated to genie.py CLI
 │
 └── tests/                          # Test suite
     ├── __init__.py
@@ -287,10 +280,11 @@
 ```
 
 **Key Changes in Structure:**
-- 🌟 **genie.py**: New unified CLI (main entry point) that combines generate, validate, and deploy
-- 🌟 **src/pipeline/**: New orchestration layer with generator, validator, and deployer modules
+- 🌟 **genie.py**: Unified CLI (main entry point) that combines parse, generate, validate, and deploy
+- 🌟 **src/pipeline/**: Orchestration layer with generator, validator, deployer, and parser modules
+  - **parser.py**: New async/concurrent document parsing module with progress tracking
 - **src/parsing/**: Complete requirements parsing pipeline (PDF, Markdown, structuring, enrichment)
-- **scripts/legacy/**: Deprecated scripts moved here with migration guide
+- **scripts/legacy/**: ⚠️ **REMOVED** - All functionality migrated to `genie.py` CLI
 
 ## Output Schema
 
@@ -470,7 +464,56 @@ LLMResponse
 - Data structure validation
 - Custom constraints
 
-### 5. Table & Column Validation Layer
+### 5. Document Parsing Layer
+
+**Module**: `src/pipeline/parser.py`
+
+**Responsibilities**:
+```python
+async def parse_documents_async(
+    input_dir: str,
+    output_path: str = "data/parsed_requirements.md",
+    llm_model: str = "databricks-gpt-5-2",
+    vision_model: str = "databricks-claude-sonnet-4",
+    use_llm: bool = True,
+    domain: str = "combined",
+    databricks_host: Optional[str] = None,
+    databricks_token: Optional[str] = None,
+    verbose: bool = True,
+    max_concurrent_pdfs: int = 3
+) -> Dict[str, Any]:
+    # Parse PDFs and markdown files into structured requirements
+    
+def parse_documents(...):
+    # Synchronous wrapper for async parsing
+```
+
+**Process**:
+1. Extract content from PDF files (async/concurrent)
+   - Uses vision model for image-based parsing
+   - Configurable concurrency (default: 3 concurrent PDFs)
+   - Per-page processing (2.21x faster based on benchmarks)
+   - Progress bars via `tqdm` for real-time feedback
+2. Extract content from Markdown files (regex-based)
+3. Structure and combine data using `RequirementsStructurer`
+4. Optional LLM enrichment via `LLMEnricher`
+5. Generate output markdown via `MarkdownGenerator`
+
+**Features**:
+- Async/concurrent PDF processing with semaphore control
+- Vision model integration (`databricks-claude-sonnet-4`)
+- Real-time progress tracking with `tqdm_asyncio`
+- Automatic error handling and recovery
+- Supports multiple domain types (social_analytics, kpi_analytics, combined)
+- Environment variable support for credentials
+
+**Output**: Structured markdown file containing:
+- Questions (categorized by domain)
+- Tables with descriptions
+- SQL queries with context
+- Metadata about extracted content
+
+### 6. Table & Column Validation Layer
 
 **Class**: `TableValidator`
 
@@ -527,7 +570,7 @@ ValidationReport
     └── location: Optional[str]
 ```
 
-### 6. Output Layer
+### 7. Output Layer
 
 **Format**: JSON file with validated configuration
 
@@ -557,10 +600,12 @@ ValidationReport
 ┌─────────────────────────────────────────────────────────────────┐
 │                        USER ENTRY POINTS                         │
 ├─────────────────────────────────────────────────────────────────┤
-│  1. scripts/create_genie_space_workflow.sh (Automated)          │
-│  2. main.py (Manual - Config Generation)                        │
-│  3. scripts/create_genie_space.py (Manual - Space Creation)     │
-│  4. examples/create_genie_space_example.py (Python API)         │
+│  1. genie.py create (Automated - Full Pipeline)                 │
+│  2. genie.py parse (Document Parsing)                           │
+│  3. genie.py generate (Config Generation)                       │
+│  4. genie.py validate (Table Validation)                        │
+│  5. genie.py deploy (Space Deployment)                          │
+│  6. examples/create_genie_space_example.py (Python API)         │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -568,15 +613,17 @@ ValidationReport
 │                    PHASE 1: CONFIG GENERATION                    │
 └─────────────────────────────────────────────────────────────────┘
 
-main.py (CLI Entry Point)
+genie.py (CLI Entry Point)
     │
     ├─── Load environment (.env file)
     ├─── Parse command-line arguments
+    │    • Command: parse, create, generate, validate, deploy
     │    • --model, --endpoint
-    │    • --input-data, --output
+    │    • --requirements, --config, --output
     │    • --max-tokens, --temperature
+    │    • --max-concurrent (for parse)
     │
-    └─── Orchestrate generation flow
+    └─── Route to appropriate pipeline function
             │
             ▼
 
@@ -661,7 +708,7 @@ Save Configuration
 │          PHASE 2: TABLE & COLUMN VALIDATION (RECOMMENDED)        │
 └─────────────────────────────────────────────────────────────────┘
 
-scripts/validate_tables.py
+genie.py validate (or src.pipeline.validator)
     │
     ├─── Load configuration from JSON file
     │       output/genie_space_config.json
@@ -715,7 +762,7 @@ Review Validation Report
 │             PHASE 3: GENIE SPACE CREATION                        │
 └─────────────────────────────────────────────────────────────────┘
 
-scripts/create_genie_space.py
+genie.py deploy (or src.pipeline.deployer)
     │
     ├─── Load configuration from JSON file
     │       output/genie_space_config.json
@@ -796,15 +843,18 @@ Save Creation Result
 
 ### Alternative Workflows
 
-#### Workflow A: Automated End-to-End
+#### Workflow A: Automated End-to-End (Unified CLI)
 
 ```
-scripts/create_genie_space_workflow.sh
+genie.py create --requirements data/requirements.md
     │
-    ├─── Execute: python main.py (config generation)
+    ├─── Step 1: Generate config (src.pipeline.generate_config)
     │       └─── Output: genie_space_config.json
     │
-    └─── Execute: python scripts/create_genie_space.py
+    ├─── Step 2: Validate (src.pipeline.validate_config)
+    │       └─── Interactive catalog/schema replacement if needed
+    │
+    └─── Step 3: Deploy (src.pipeline.deploy_space)
             └─── Output: genie_space_result.json + Space URL
 ```
 
@@ -842,59 +892,43 @@ examples/create_genie_space_example.py
 ## Module Dependency Graph
 
 ```
-main.py (Config Generation)
+genie.py (Unified CLI)
     │
-    ├── src.prompt.prompt_builder
-    │       └── PromptBuilder
-    │               └── Reads: src/prompt/templates/*.md, data/*.md
+    ├── Command: parse
+    │   └── src.pipeline.parser
+    │       ├── parse_documents() / parse_documents_async()
+    │       ├── src.parsing.pdf_parser (PDFParser)
+    │       ├── src.parsing.markdown_parser (MarkdownParser)
+    │       ├── src.parsing.requirements_structurer
+    │       ├── src.parsing.llm_enricher (LLMEnricher)
+    │       └── src.parsing.markdown_generator
+    │           └── Uses: aiohttp, tqdm, pdfplumber
     │
-    ├── src.llm.databricks_llm
-    │       ├── DatabricksLLMClient
-    │       └── DatabricksFoundationModelClient
-    │               └── Uses: requests library
+    ├── Command: generate
+    │   └── src.pipeline.generator
+    │       ├── generate_config()
+    │       ├── src.prompt.prompt_builder (PromptBuilder)
+    │       ├── src.llm.databricks_llm (DatabricksFoundationModelClient)
+    │       ├── src.utils.benchmark_extractor
+    │       └── src.models (Pydantic models)
+    │           └── Uses: pydantic, requests
     │
-    └── src.models
-            ├── GenieSpaceConfig
-            ├── GenieSpaceTable
-            ├── GenieSpaceInstruction
-            ├── GenieSpaceExampleSQL
-            ├── GenieSpaceSQLExpression
-            ├── GenieSpaceBenchmark
-            └── LLMResponse
-                    └── Uses: pydantic library
-
-scripts/validate_tables.py (Table & Column Validation)
+    ├── Command: validate
+    │   └── src.pipeline.validator
+    │       ├── validate_config()
+    │       └── src.utils.table_validator (TableValidator)
+    │           └── Uses: requests, Unity Catalog API
     │
-    └── src.utils.table_validator
-            ├── TableValidator
-            ├── ValidationReport
-            └── ValidationIssue
-                    └── Uses: requests library, Unity Catalog API
-
-scripts/create_genie_space.py (Space Creation)
+    ├── Command: deploy
+    │   └── src.pipeline.deployer
+    │       ├── deploy_space()
+    │       ├── src.api.genie_space_client (GenieSpaceClient)
+    │       └── src.utils.config_transformer
     │
-    ├── src.api.genie_space_client
-    │       ├── GenieSpaceClient
-    │       └── create_genie_space_from_file()
-    │
-    └── src.utils.config_transformer
-            └── transform_to_serialized_space()
-
-scripts/generate_config_with_direct_benchmarks.py (Generate with Benchmarks)
-    │
-    ├── src.prompt.prompt_builder
-    ├── src.llm.databricks_llm
-    └── src.utils.benchmark_extractor
-            └── extract_benchmark_questions()
-
-examples/validate_tables_example.py (Validation Examples)
-    │
-    └── src.utils.table_validator
-            ├── TableValidator
-            ├── validate_table()
-            ├── validate_columns()
-            ├── get_table_schema()
-            └── validate_config()
+    └── Command: create (combines all above)
+        ├── generate_config()
+        ├── validate_config()
+        └── deploy_space()
 
 examples/create_genie_space_example.py (Usage Examples)
     │
@@ -911,11 +945,8 @@ examples/create_genie_space_example.py (Usage Examples)
 scripts/validate_setup.py (Setup Validation)
     └── Validates: environment variables, credentials, connectivity
 
-scripts/create_genie_space_workflow.sh (End-to-End Automation)
-    │
-    ├── main.py (generate config)
-    │
-    └── scripts/create_genie_space.py (create space)
+scripts/convert_requirements.py (Requirements Conversion)
+    └── src.parsing modules for document conversion
 ```
 
 ## Error Handling Flow
@@ -1022,114 +1053,40 @@ export DATABRICKS_TOKEN="dapi1234..."
 
 ## Scripts and Utilities
 
-### 1. Main Configuration Generator (`main.py`)
+### 1. Unified CLI (`genie.py`)
 
-**Purpose**: Generate Genie space configurations using LLMs
+**Purpose**: Single entry point for all Genie space operations
 
-**Key Features**:
-- Supports both foundation models and custom endpoints
-- Configurable context, output format, and input documents
-- Optional reasoning and confidence scores
-- JSON validation via Pydantic
-
-**Usage**:
-```bash
-python main.py \
-  --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
-  --max-tokens 16000 \
-  --output output/genie_space_config.json
-```
-
-### 2. Space Creation Script (`scripts/create_genie_space.py`)
-
-**Purpose**: Create Databricks Genie spaces from configuration files
+**Available Commands**:
+- `parse` - Parse documents into structured requirements
+- `create` - Full pipeline (generate → validate → deploy)
+- `generate` - Generate configuration only
+- `validate` - Validate tables and columns
+- `deploy` - Deploy existing configuration
 
 **Key Features**:
-- Transforms config to serialized_space format
-- Posts to Genie Spaces API
-- Returns space ID and URL
-- Saves creation result
+- Unified interface for all operations
+- Built-in progress indicators
+- Interactive catalog/schema replacement
+- Automatic benchmark extraction
+- Environment variable support
+- Error handling with helpful messages
 
 **Usage**:
 ```bash
-python scripts/create_genie_space.py \
-  --config output/genie_space_config.json \
-  --output output/genie_space_result.json
+# Parse documents
+genie.py parse --input-dir docs/ --output data/requirements.md --max-concurrent 5
+
+# Complete workflow (recommended)
+genie.py create --requirements data/requirements.md
+
+# Individual steps
+genie.py generate --requirements data/requirements.md
+genie.py validate --config output/genie_space_config.json
+genie.py deploy --config output/genie_space_config.json
 ```
 
-### 3. Automated Workflow Script (`scripts/create_genie_space_workflow.sh`)
-
-**Purpose**: End-to-end automation of config generation and space creation
-
-**Workflow**:
-1. Generates configuration using LLM
-2. Creates Genie space via API
-3. Displays space URL
-
-**Usage**:
-```bash
-./scripts/create_genie_space_workflow.sh \
-  --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
-  --max-tokens 16000 \
-  --temperature 0.1
-```
-
-### 4. Table & Column Validation Script (`scripts/validate_tables.py`)
-
-**Purpose**: Validate tables and columns in configuration against Unity Catalog
-
-**Key Features**:
-- Verifies all tables exist in Unity Catalog
-- Validates columns exist in their tables
-- Extracts column references from SQL expressions
-- Generates detailed validation reports
-- Supports JSON and human-readable output
-
-**Usage**:
-```bash
-# Validate default configuration
-python scripts/validate_tables.py
-
-# Validate custom configuration
-python scripts/validate_tables.py path/to/config.json
-
-# JSON output (for CI/CD)
-python scripts/validate_tables.py --json
-
-# Verbose mode
-python scripts/validate_tables.py --verbose
-```
-
-**What It Validates**:
-- Table existence in Unity Catalog
-- Column existence in tables
-- SQL expression column references
-- Access permissions
-
-**Output Example**:
-```
-================================================================================
-TABLE & COLUMN VALIDATION REPORT
-================================================================================
-
-Tables Checked: 5
-  ✓ Valid:   5
-
-Columns Checked: 28
-  ✓ Valid:   28
-
-Issues:
-  Errors:   0
-  Warnings: 0
-
-================================================================================
-✓ VALIDATION PASSED - All tables and columns are valid!
-================================================================================
-```
-
-### 5. Setup Validation Script (`scripts/validate_setup.py`)
+### 2. Setup Validation Script (`scripts/validate_setup.py`)
 
 **Purpose**: Validate environment setup and connectivity
 
@@ -1144,28 +1101,7 @@ Issues:
 python scripts/validate_setup.py
 ```
 
-### 6. Table Validation Examples (`examples/validate_tables_example.py`)
-
-**Purpose**: Demonstrate table validation API usage
-
-**Examples Include**:
-- `example_1_validate_config()`: Validate entire configuration
-- `example_2_validate_single_table()`: Validate single table
-- `example_3_validate_columns()`: Validate specific columns
-- `example_4_get_table_schema()`: Get complete table schema
-- `example_5_custom_validation()`: Custom validation logic
-
-**Usage**:
-```python
-from src.table_validator import TableValidator
-
-# Validate configuration
-validator = TableValidator()
-report = validator.validate_config("output/genie_space_config.json")
-print(report.summary())
-```
-
-### 7. Genie Space Usage Examples (`examples/create_genie_space_example.py`)
+### 3. Genie Space Usage Examples (`examples/create_genie_space_example.py`)
 
 **Purpose**: Demonstrate Python API usage patterns
 
@@ -1188,6 +1124,24 @@ from examples.create_genie_space_example import example_create_space_from_file
 result = example_create_space_from_file()
 print(f"Space URL: {result['space_url']}")
 ```
+
+---
+
+## Legacy Scripts (Removed)
+
+The following scripts have been **removed** and their functionality migrated to the unified `genie.py` CLI:
+
+| Removed Script | Replacement | Notes |
+|----------------|-------------|-------|
+| `scripts/legacy/main.py` | `genie.py generate` | Basic config generation |
+| `scripts/legacy/generate_config_with_direct_benchmarks.py` | `genie.py generate` | Benchmark extraction now built-in |
+| `scripts/legacy/validate_tables.py` | `genie.py validate` | Interactive catalog/schema replacement added |
+| `scripts/legacy/create_genie_space.py` | `genie.py deploy` | Same functionality |
+| `scripts/legacy/create_genie_space_workflow.sh` | `genie.py create` | Complete pipeline in single command |
+| `scripts/legacy/update_benchmarks.py` | Built into `genie.py generate` | Automatic benchmark extraction |
+| `scripts/legacy/fix_benchmarks.sh` | Built into `genie.py generate` | No longer needed |
+
+**Migration Path**: Replace all `scripts/legacy/` calls with the corresponding `genie.py` command. See [README.md](README.md) for detailed migration examples.
 
 ## Extension Points
 
@@ -1254,7 +1208,7 @@ Integration Tests
 ### Logging Points
 
 ```python
-# In main.py
+# In genie.py / pipeline modules
 log.info("Building prompt...")
 log.info(f"Prompt length: {len(prompt)}")
 log.info("Calling LLM...")
@@ -1282,22 +1236,25 @@ Add `--debug` flag to enable:
 
 ### Local Development
 ```bash
-python main.py
+genie.py create --requirements data/requirements.md
 ```
 
-### Automated Workflow Script
+### Automated Workflow
 ```bash
 # Generate config and create space in one command
-./scripts/create_genie_space_workflow.sh \
+genie.py create \
+  --requirements data/demo_requirements.md \
   --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
   --max-tokens 16000
 ```
 
 ### Scheduled Job
 ```bash
 # Run as a Python task in Databricks Job
-python main.py --model databricks-gpt-5-2 --output /dbfs/output/config.json
+genie.py create \
+  --requirements /dbfs/requirements.md \
+  --model databricks-gpt-5-2 \
+  --output /dbfs/output/config.json
 ```
 
 ### API Endpoint
@@ -1317,7 +1274,7 @@ After the LLM generates the Genie space configuration, you can use the Genie Spa
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      CONFIGURATION GENERATION                        │
-│  (main.py → LLM → genie_space_config.json)                         │
+│  (genie.py generate → LLM → genie_space_config.json)               │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -1590,47 +1547,56 @@ Common errors and solutions:
 
 ```bash
 # Single command for end-to-end generation and creation
-./scripts/create_genie_space_workflow.sh \
+genie.py create --requirements data/demo_requirements.md
+
+# With custom options
+genie.py create \
+  --requirements data/demo_requirements.md \
   --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
   --max-tokens 16000 \
-  --temperature 0.1
+  --temperature 0.1 \
+  --parent-path /Workspace/Users/your.email@domain.com/genie_spaces
 
 # Output:
 # - output/genie_space_config.json (generated config)
 # - output/genie_space_result.json (space ID and URL)
 ```
 
-#### Option 2: Manual Step-by-Step (Recommended)
+#### Option 2: Manual Step-by-Step (For More Control)
 
 ```bash
 # 1. Validate setup (optional but recommended)
 python scripts/validate_setup.py
 
-# 2. Generate config with LLM
-python main.py \
+# 2. Parse documents if needed (async/concurrent with progress bars)
+genie.py parse \
+  --input-dir real_requirements \
+  --output data/my_requirements.md \
+  --max-concurrent 5
+
+# 3. Generate config with LLM
+genie.py generate \
+  --requirements data/my_requirements.md \
   --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
   --output output/genie_space_config.json
 
-# 3. Validate tables and columns (RECOMMENDED)
-python scripts/validate_tables.py
+# 4. Validate tables and columns (RECOMMENDED)
+genie.py validate --config output/genie_space_config.json
+# Interactive prompts for catalog/schema replacement if validation fails
 
-# 4. Review generated config
+# 5. Review generated config
 cat output/genie_space_config.json
 
-# 5. (Optional) Edit warehouse_id, fix validation errors, etc.
+# 6. (Optional) Edit warehouse_id, fix validation errors, etc.
 vim output/genie_space_config.json
 
-# 6. Re-validate if edited
-python scripts/validate_tables.py
+# 7. Re-validate if edited
+genie.py validate --config output/genie_space_config.json
 
-# 7. Create Genie space from config
-python scripts/create_genie_space.py \
-  --config output/genie_space_config.json \
-  --output output/genie_space_result.json
+# 8. Deploy Genie space
+genie.py deploy --config output/genie_space_config.json
 
-# 8. Access your Genie space
+# 9. Access your Genie space
 # Space URL is printed and saved in output/genie_space_result.json
 ```
 
@@ -1719,8 +1685,8 @@ assert "example_question_sqls" in parsed["instructions"]
 ### Space Management Best Practices
 
 1. **Validate Before Creation**
-   - Run `scripts/validate_setup.py` to check environment
-   - **Run `scripts/validate_tables.py` to verify tables and columns** (CRITICAL)
+   - Run `python scripts/validate_setup.py` to check environment
+   - **Run `genie.py validate` to verify tables and columns** (CRITICAL)
    - Verify `warehouse_id` is valid
    - Ensure all tables exist in Unity Catalog
    - Review generated configuration manually
@@ -1858,8 +1824,8 @@ assert "example_question_sqls" in parsed["instructions"]
    | `Invalid table identifier` | Malformed table name | Check `catalog.schema.table` format |
    | `Authentication failed` | Invalid token | Verify `DATABRICKS_TOKEN` in `.env` |
    | `Permission denied` | Insufficient permissions | Ensure CAN EDIT permission on space |
-   | `Table not found` (at creation) | Table doesn't exist | Run `scripts/validate_tables.py` first |
-   | `Column not found` (at runtime) | Column doesn't exist | Run `scripts/validate_tables.py` first |
+   | `Table not found` (at creation) | Table doesn't exist | Run `genie.py validate` first |
+   | `Column not found` (at runtime) | Column doesn't exist | Run `genie.py validate` first |
    | Table validation fails | Table not in Unity Catalog | Check table exists with `SHOW TABLES` |
    | Column validation fails | Column name mismatch | Check column with `DESCRIBE TABLE` |
    | JSON parsing errors | Incomplete LLM response | Increase `max_tokens` parameter |
@@ -1880,19 +1846,19 @@ assert "example_question_sqls" in parsed["instructions"]
    python scripts/validate_setup.py
    
    # 3. Develop and test
-   python main.py --input-data data/demo_requirements.md
+   genie.py generate --requirements data/demo_requirements.md
    
    # 4. Validate tables and columns (CRITICAL STEP)
-   python scripts/validate_tables.py
+   genie.py validate
    
-   # 5. Fix any validation errors
-   vim output/genie_space_config.json
+   # 5. Fix any validation errors (interactive prompts available)
+   # Validation can interactively fix catalog/schema issues
    
-   # 6. Re-validate
-   python scripts/validate_tables.py
+   # 6. Re-validate if manual edits were made
+   genie.py validate
    
-   # 7. Create space
-   python scripts/create_genie_space.py
+   # 7. Deploy space
+   genie.py deploy
    ```
 
 2. **Testing Strategy**
@@ -2044,22 +2010,26 @@ The validation system integrates at multiple points in the workflow:
 
 1. **After Configuration Generation**
    ```bash
-   python main.py
-   python scripts/validate_tables.py  # ← Validate here
-   python scripts/create_genie_space.py
+   genie.py generate --requirements data/requirements.md
+   genie.py validate  # ← Validate here (interactive fixes)
+   genie.py deploy
    ```
 
-2. **Before Space Creation** (critical)
+2. **Built into Create Command** (recommended)
+   ```bash
+   genie.py create --requirements data/requirements.md
+   # Automatically runs: generate → validate → deploy
+   ```
+
+3. **Before Space Creation** (critical when using Python API)
    - Always validate before calling create_space()
    - Fix errors, then re-validate
    - Only create space after validation passes
 
-3. **In CI/CD Pipelines**
+4. **In CI/CD Pipelines**
    ```yaml
-   - run: python scripts/validate_tables.py --json
-   - run: |
-       has_errors=$(jq -r '.has_errors' validation.json)
-       if [ "$has_errors" = "true" ]; then exit 1; fi
+   - run: genie.py validate --config output/genie_space_config.json
+   # Returns non-zero exit code on validation failure
    ```
 
 ### Performance
@@ -2119,47 +2089,115 @@ python scripts/validate_tables.py --json  # JSON output
 python scripts/validate_tables.py --verbose  # Verbose mode
 ```
 
+#### Document Parsing
+```bash
+# Parse PDFs and markdown with concurrent processing
+genie.py parse --input-dir docs/ --output data/requirements.md
+
+# Parse with custom concurrency and models
+genie.py parse \
+  --input-dir docs/ \
+  --output data/requirements.md \
+  --max-concurrent 5 \
+  --llm-model databricks-gpt-5-2 \
+  --vision-model databricks-claude-sonnet-4
+
+# Parse without LLM enrichment (faster)
+genie.py parse --input-dir docs/ --output data/requirements.md --no-llm
+```
+
 #### Configuration Generation
 ```bash
 # Generate with foundation model (recommended)
-python main.py \
+genie.py generate \
+  --requirements data/demo_requirements.md \
   --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
   --max-tokens 16000 \
   --output output/genie_space_config.json
 
 # Generate with custom endpoint
-python main.py \
+genie.py generate \
+  --requirements data/demo_requirements.md \
   --endpoint my-llm-endpoint \
-  --input-data data/demo_requirements.md \
   --output output/genie_space_config.json
 
 # Generate without reasoning
-python main.py --model databricks-gpt-5-2 --no-reasoning
+genie.py generate --requirements data/demo_requirements.md --no-reasoning
+```
+
+#### Table Validation
+```bash
+# Validate tables and columns (with interactive fixes)
+genie.py validate --config output/genie_space_config.json
+
+# Validation includes:
+# - Table existence in Unity Catalog
+# - Column existence in tables
+# - Interactive catalog/schema replacement on failures
+# - Up to 3 validation attempts
 ```
 
 #### Space Creation
 ```bash
-# Create from configuration file
-python scripts/create_genie_space.py \
+# Deploy from configuration file
+genie.py deploy \
   --config output/genie_space_config.json \
-  --output output/genie_space_result.json
+  --result-output output/genie_space_result.json
 
-# End-to-end automated workflow
-./scripts/create_genie_space_workflow.sh \
-  --model databricks-gpt-5-2 \
-  --input-data data/demo_requirements.md \
-  --max-tokens 16000
+# Deploy with custom parent path
+genie.py deploy \
+  --config output/genie_space_config.json \
+  --parent-path /Workspace/Users/your.email@domain.com/genie_spaces
+
+# End-to-end automated workflow (recommended)
+genie.py create --requirements data/demo_requirements.md
 ```
 
 ### Key Python API Patterns
 
+#### Document Parsing
+```python
+from src.pipeline import parse_documents
+import asyncio
+
+# Synchronous wrapper (async under the hood)
+result = parse_documents(
+    input_dir="docs/",
+    output_path="data/requirements.md",
+    llm_model="databricks-gpt-5-2",
+    vision_model="databricks-claude-sonnet-4",
+    use_llm=True,
+    max_concurrent_pdfs=5
+)
+
+# Direct async usage
+from src.pipeline.parser import parse_documents_async
+result = asyncio.run(parse_documents_async(
+    input_dir="docs/",
+    output_path="data/requirements.md",
+    max_concurrent_pdfs=5
+))
+
+print(f"Extracted: {result['questions_count']} questions, {result['tables_count']} tables")
+```
+
 #### Configuration Generation
 ```python
+from src.pipeline import generate_config
+
+# Generate configuration using pipeline function
+config = generate_config(
+    requirements_path="data/demo_requirements.md",
+    output_path="output/genie_space_config.json",
+    model="databricks-gpt-5-2",
+    max_tokens=16000,
+    temperature=0.1
+)
+
+# Or use lower-level components
 from src.prompt.prompt_builder import PromptBuilder
 from src.llm.databricks_llm import DatabricksFoundationModelClient
 
-# Build prompt
 builder = PromptBuilder(
     context_doc_path="src/prompt/templates/curate_effective_genie.md",
     output_doc_path="src/prompt/templates/genie_api.md",
@@ -2167,11 +2205,10 @@ builder = PromptBuilder(
 )
 prompt = builder.build_prompt_with_reasoning()
 
-# Generate config
 client = DatabricksFoundationModelClient(model_name="databricks-gpt-5-2")
 response = client.generate_genie_config(prompt, max_tokens=16000)
 
-# Save config
+import json
 with open("output/genie_space_config.json", "w") as f:
     json.dump(response.model_dump(), f, indent=2)
 ```
@@ -2283,15 +2320,14 @@ config, serialized = load_and_transform_config("config.json")
 
 | File | Purpose |
 |------|---------|
-| `main.py` | Configuration generation CLI |
-| `scripts/validate_tables.py` | Table & column validation CLI |
-| `scripts/create_genie_space.py` | Space creation CLI |
-| `scripts/create_genie_space_workflow.sh` | End-to-end automation |
+| `genie.py` | 🌟 Unified CLI (parse, create, generate, validate, deploy) |
 | `scripts/validate_setup.py` | Setup validation |
-| `scripts/generate_config_with_direct_benchmarks.py` | Generate config with benchmarks |
-| `scripts/update_benchmarks.py` | Update benchmarks in existing config |
-| `examples/validate_tables_example.py` | Table validation examples |
+| `scripts/convert_requirements.py` | Requirements conversion |
 | `examples/create_genie_space_example.py` | Python API examples |
+| `src/pipeline/parser.py` | Document parsing module (async/concurrent) |
+| `src/pipeline/generator.py` | Configuration generation module |
+| `src/pipeline/validator.py` | Table validation module |
+| `src/pipeline/deployer.py` | Space deployment module |
 | `src/models.py` | Pydantic schema models |
 | `src/prompt/prompt_builder.py` | Prompt construction |
 | `src/llm/databricks_llm.py` | Databricks LLM client |
@@ -2299,16 +2335,19 @@ config, serialized = load_and_transform_config("config.json")
 | `src/utils/config_transformer.py` | Config transformation |
 | `src/utils/table_validator.py` | Table & column validator |
 | `src/utils/benchmark_extractor.py` | Benchmark extractor |
+| `src/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) |
+| `src/parsing/markdown_parser.py` | Markdown extraction (regex) |
+| `src/parsing/requirements_structurer.py` | Data models & structuring |
+| `src/parsing/llm_enricher.py` | LLM-based enrichment |
+| `src/parsing/markdown_generator.py` | Markdown output generation |
 | `src/prompt/templates/curate_effective_genie.md` | Best practices context |
 | `src/prompt/templates/genie_api.md` | API documentation |
 | `data/demo_requirements.md` | Example requirements |
-| `docs/TABLE_VALIDATION.md` | Table validation guide |
-| `docs/VALIDATION_QUICK_REFERENCE.md` | Validation quick reference |
-| `docs/BENCHMARK_EXTRACTION.md` | Benchmark extraction guide |
 | `output/genie_space_config.json` | Generated configuration |
 | `output/genie_space_result.json` | Creation result |
 | `tests/test_table_validator.py` | Table validator tests |
 | `tests/test_join_specs.py` | Join specification tests |
+| `tests/test_pdf_image_parsing.py` | PDF image parsing tests |
 
 ### Environment Variables
 
@@ -2317,9 +2356,19 @@ config, serialized = load_and_transform_config("config.json")
 DATABRICKS_HOST=https://your-workspace.databricks.com
 DATABRICKS_TOKEN=dapi...
 
-# Optional (can be provided as CLI args)
-WORKSPACE_ROOT=/path/to/project
+# Optional (with defaults)
+LLM_MODEL=databricks-gpt-5-2                    # Text-based LLM for config generation
+VISION_MODEL=databricks-claude-sonnet-4         # Vision model for PDF parsing
 ```
+
+**Environment Variable Details**:
+
+| Variable | Required | Default | Used By |
+|----------|----------|---------|---------|
+| `DATABRICKS_HOST` | ✅ Yes | - | All components |
+| `DATABRICKS_TOKEN` | ✅ Yes | - | All components |
+| `LLM_MODEL` | No | `databricks-gpt-5-2` | `parse`, `generate` commands |
+| `VISION_MODEL` | No | `databricks-claude-sonnet-4` | `parse` command (PDF parsing) |
 
 ### Key Concepts
 
@@ -2347,14 +2396,16 @@ WORKSPACE_ROOT=/path/to/project
 
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
-alias genie-generate='python main.py --model databricks-gpt-5-2'
-alias genie-validate-tables='python scripts/validate_tables.py'
-alias genie-validate-setup='python scripts/validate_setup.py'
-alias genie-create='python scripts/create_genie_space.py'
-alias genie-workflow='./scripts/create_genie_space_workflow.sh'
+alias genie='python genie.py'
+alias genie-parse='python genie.py parse'
+alias genie-generate='python genie.py generate'
+alias genie-validate='python genie.py validate'
+alias genie-deploy='python genie.py deploy'
+alias genie-create='python genie.py create'
 
-# Combined workflow
-alias genie-full='python main.py --model databricks-gpt-5-2 && python scripts/validate_tables.py && python scripts/create_genie_space.py'
+# With common options
+alias genie-fast='python genie.py create --skip-validation -y'
+alias genie-parse-fast='python genie.py parse --no-llm'
 ```
 
 ---

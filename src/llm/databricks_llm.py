@@ -2,9 +2,13 @@
 
 import json
 import os
-from typing import Dict, Any, Optional
+import base64
+from io import BytesIO
+from typing import Dict, Any, Optional, List, Union
 import requests
+import aiohttp
 from pydantic import ValidationError
+from PIL import Image
 
 from src.models import LLMResponse, GenieSpaceConfig
 
@@ -93,21 +97,26 @@ class DatabricksLLMClient:
         prompt: str,
         max_tokens: int = 4000,
         temperature: float = 0.1,
+        images: Optional[List[Union[str, Image.Image]]] = None,
         **kwargs
     ) -> str:
         """
-        Generate text from the LLM.
+        Generate text from the LLM, optionally with images.
         
         Args:
             prompt: The prompt to send to the model
             max_tokens: Maximum number of tokens to generate
             temperature: Sampling temperature
+            images: Optional list of images (PIL Image objects or base64 strings)
             **kwargs: Additional parameters
             
         Returns:
             The generated text
         """
-        response = self._make_request(prompt, max_tokens, temperature, **kwargs)
+        if images:
+            response = self._make_multimodal_request(prompt, images, max_tokens, temperature, **kwargs)
+        else:
+            response = self._make_request(prompt, max_tokens, temperature, **kwargs)
         
         # Extract the generated text from the response
         # Note: The exact structure depends on the serving endpoint format
@@ -124,6 +133,98 @@ class DatabricksLLMClient:
         else:
             # Return the whole response as string if format is unknown
             return str(response)
+    
+    def _make_multimodal_request(
+        self,
+        prompt: str,
+        images: List[Union[str, Image.Image]],
+        max_tokens: int = 4000,
+        temperature: float = 0.1,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Make a multimodal request with text and images.
+        
+        Args:
+            prompt: Text prompt
+            images: List of images (PIL Image objects or base64 strings)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional parameters
+            
+        Returns:
+            The raw response from the API
+        """
+        headers = {
+            "Authorization": f"Bearer {self.databricks_token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Build content array with text and images
+        content = []
+        
+        # Add text
+        content.append({
+            "type": "text",
+            "text": prompt
+        })
+        
+        # Add images
+        for img in images:
+            if isinstance(img, str):
+                # Already base64 encoded
+                image_data = img
+            elif isinstance(img, Image.Image):
+                # Convert PIL Image to base64
+                image_data = self._image_to_base64(img)
+            else:
+                raise ValueError(f"Unsupported image type: {type(img)}")
+            
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{image_data}"
+                }
+            })
+        
+        payload = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": content
+                }
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            **kwargs
+        }
+        
+        response = requests.post(
+            self.endpoint_url,
+            headers=headers,
+            json=payload,
+            timeout=300  # 5 minutes timeout
+        )
+        
+        response.raise_for_status()
+        return response.json()
+    
+    @staticmethod
+    def _image_to_base64(image: Image.Image, format: str = "PNG") -> str:
+        """
+        Convert PIL Image to base64 string.
+        
+        Args:
+            image: PIL Image object
+            format: Image format (PNG, JPEG, etc.)
+            
+        Returns:
+            Base64 encoded image string
+        """
+        buffered = BytesIO()
+        image.save(buffered, format=format)
+        img_bytes = buffered.getvalue()
+        return base64.b64encode(img_bytes).decode('utf-8')
     
     def generate_genie_config(
         self,
@@ -179,6 +280,167 @@ class DatabricksLLMClient:
             # Response is just the GenieSpaceConfig
             genie_config = GenieSpaceConfig(**response_data)
             return LLMResponse(genie_space_config=genie_config)
+    
+    async def generate_async(
+        self,
+        prompt: str,
+        max_tokens: int = 4000,
+        temperature: float = 0.1,
+        images: Optional[List[Union[str, Image.Image]]] = None,
+        **kwargs
+    ) -> str:
+        """
+        Async version of generate method.
+        
+        Args:
+            prompt: The prompt to send to the model
+            max_tokens: Maximum number of tokens to generate
+            temperature: Sampling temperature
+            images: Optional list of images (PIL Image objects or base64 strings)
+            **kwargs: Additional parameters
+            
+        Returns:
+            The generated text
+        """
+        if images:
+            response = await self._make_multimodal_request_async(prompt, images, max_tokens, temperature, **kwargs)
+        else:
+            response = await self._make_request_async(prompt, max_tokens, temperature, **kwargs)
+        
+        # Extract the generated text from the response
+        if "choices" in response:
+            # OpenAI-style format
+            return response["choices"][0]["message"]["content"]
+        elif "predictions" in response:
+            # MLflow model format
+            return response["predictions"][0]
+        elif "outputs" in response:
+            # Alternative format
+            return response["outputs"][0]
+        else:
+            # Return the whole response as string if format is unknown
+            return str(response)
+    
+    async def _make_request_async(
+        self,
+        prompt: str,
+        max_tokens: int = 4000,
+        temperature: float = 0.1,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Async version of _make_request.
+        
+        Args:
+            prompt: The prompt to send to the model
+            max_tokens: Maximum number of tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional parameters to pass to the model
+            
+        Returns:
+            The raw response from the API
+        """
+        headers = {
+            "Authorization": f"Bearer {self.databricks_token}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            **kwargs
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.endpoint_url,
+                headers=headers,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=300)  # 5 minutes timeout
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
+    
+    async def _make_multimodal_request_async(
+        self,
+        prompt: str,
+        images: List[Union[str, Image.Image]],
+        max_tokens: int = 4000,
+        temperature: float = 0.1,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Async version of _make_multimodal_request.
+        
+        Args:
+            prompt: Text prompt
+            images: List of images (PIL Image objects or base64 strings)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional parameters
+            
+        Returns:
+            The raw response from the API
+        """
+        headers = {
+            "Authorization": f"Bearer {self.databricks_token}",
+            "Content-Type": "application/json"
+        }
+        
+        # Build content array with text and images
+        content = []
+        
+        # Add text
+        content.append({
+            "type": "text",
+            "text": prompt
+        })
+        
+        # Add images
+        for img in images:
+            if isinstance(img, str):
+                # Already base64 encoded
+                image_data = img
+            elif isinstance(img, Image.Image):
+                # Convert PIL Image to base64
+                image_data = self._image_to_base64(img)
+            else:
+                raise ValueError(f"Unsupported image type: {type(img)}")
+            
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{image_data}"
+                }
+            })
+        
+        payload = {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": content
+                }
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            **kwargs
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self.endpoint_url,
+                headers=headers,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=300)  # 5 minutes timeout
+            ) as response:
+                response.raise_for_status()
+                return await response.json()
 
 
 class DatabricksFoundationModelClient(DatabricksLLMClient):
@@ -186,7 +448,7 @@ class DatabricksFoundationModelClient(DatabricksLLMClient):
     
     def __init__(
         self,
-        model_name: str = "databricks-gpt-5-2",
+        model_name: str = "databricks-claude-sonnet-4",
         databricks_host: Optional[str] = None,
         databricks_token: Optional[str] = None
     ):

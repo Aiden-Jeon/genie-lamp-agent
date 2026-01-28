@@ -1,6 +1,6 @@
 data/
 real_requirements/
-changelogs/
+change_logs/
 
 # Python
 __pycache__/

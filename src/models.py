@@ -1,7 +1,7 @@
 """Pydantic models for Genie space creation."""
 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class GenieSpaceTable(BaseModel):
@@ -67,8 +67,8 @@ class GenieSpaceConfig(BaseModel):
     warehouse_id: Optional[str] = Field(None, description="SQL warehouse ID to use")
     enable_data_sampling: bool = Field(True, description="Whether to enable data sampling")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "space_name": "Fashion Retail Analytics",
                 "description": "Natural language querying for fashion retail data",
@@ -99,6 +99,7 @@ class GenieSpaceConfig(BaseModel):
                 ]
             }
         }
+    )
 
 
 class LLMResponse(BaseModel):

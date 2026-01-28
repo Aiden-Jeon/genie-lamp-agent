@@ -181,7 +181,7 @@ def main():
         print("\n✓ All tests passed! The system is ready to use.")
         print("\nNext steps:")
         print("1. Set DATABRICKS_HOST and DATABRICKS_TOKEN environment variables")
-        print("2. Run: python main.py")
+        print("2. Run: genie.py create --requirements data/demo_requirements.md")
         return 0
     else:
         print(f"\n✗ {failed} test(s) failed. Please fix the issues above.")

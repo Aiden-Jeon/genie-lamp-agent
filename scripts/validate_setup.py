@@ -73,9 +73,7 @@ def test_files():
     print("Testing required files...")
     
     required_files = [
-        "main.py",
-        "scripts/create_genie_space.py",
-        "scripts/create_genie_space_workflow.sh",
+        "genie.py",
         "scripts/validate_setup.py",
         "requirements.txt",
         ".env.example",
@@ -259,9 +257,11 @@ def main():
         print()
         print("Next steps:")
         print("  1. Configure .env with your Databricks credentials")
-        print("  2. Run: python main.py --model databricks-gpt-5-2")
-        print("  3. Update warehouse_id in output/genie_space_config.json")
-        print("  4. Run: python scripts/create_genie_space.py")
+        print("  2. Run: genie.py create --requirements data/demo_requirements.md")
+        print("     Or step-by-step:")
+        print("       - genie.py generate --requirements data/demo_requirements.md")
+        print("       - genie.py validate")
+        print("       - genie.py deploy")
         print()
         return 0
     else:

@@ -45,6 +45,86 @@ The agent follows a structured pipeline:
 4. **Validation**: Verifies tables, columns, and Unity Catalog permissions
 5. **Output**: Produces a production-ready Genie space configuration
 
+## Recent Updates (January 2026)
+
+### ⚡ Performance Improvements
+
+**Per-Page PDF Parsing (2.21x Faster!)** 🚀
+- PDF pages are now processed individually with async parallel execution
+- **2.21x faster** than batch processing based on real-world benchmarks
+- **Extracts more content**: +92% more questions, +24% more tables in tests
+- Automatically enabled by default - no code changes needed
+- See [PER_PAGE_PARSING.md](PER_PAGE_PARSING.md) for detailed benchmarks and configuration
+
+**Async PDF Parsing with Progress Tracking**
+- PDF parsing now runs asynchronously with concurrent processing
+- Added real-time progress bars for tracking document processing
+- Configurable concurrency level (default: 3 concurrent PDFs, adjustable with `--max-concurrent`)
+- Significant performance improvements when processing multiple PDFs
+- Uses `aiohttp` for async HTTP requests and `tqdm` for progress visualization
+
+**Usage:**
+```bash
+# Process PDFs with default concurrency (3)
+python genie.py parse --input-dir docs/ --output data/requirements.md
+
+# Process more PDFs simultaneously for faster results
+python genie.py parse --input-dir docs/ --output data/requirements.md --max-concurrent 5
+```
+
+**Python API:**
+```python
+from src.pipeline.parser import parse_documents, parse_documents_async
+
+# Synchronous (with async under the hood)
+result = parse_documents(
+    input_dir="docs/",
+    max_concurrent_pdfs=5
+)
+
+# Direct async usage
+import asyncio
+result = asyncio.run(parse_documents_async(
+    input_dir="docs/",
+    max_concurrent_pdfs=5
+))
+```
+
+### 🔄 Interactive Catalog/Schema Replacement
+
+**Smart Validation Failure Handling**
+- When validation fails due to missing tables, the agent now prompts for correct catalog/schema names
+- Automatically updates all references: tables, SQL expressions, and example queries
+- Re-validates after updates to ensure correctness
+- Up to 3 validation attempts with interactive prompts
+
+**Example Workflow:**
+```bash
+.venv/bin/python genie.py create --requirements data/requirements.md
+
+# If validation fails:
+# ⚠️  TABLE VALIDATION FAILED
+# The following catalog.schema combinations have tables that were not found:
+#   1. main.log_discord (Tables: message, reaction)
+# 
+# Replace catalog/schema? [y/N]: y
+# 
+# Replacing: main.log_discord
+#   New catalog (current: main): prod
+#   New schema (current: log_discord): social_discord
+#   ✓ Updated 2 table(s)
+# 
+# 🔄 Configuration updated. Re-validating...
+```
+
+**Benefits:**
+- **No Manual Editing**: Updates configuration automatically
+- **Comprehensive**: Updates tables, SQL expressions, and example queries
+- **Safe**: Re-validates after each update
+- **Time-Saving**: Eliminates trial-and-error with table names
+
+See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema-replacement-feature.md) for detailed documentation.
+
 ## Features
 
 - **Structured Prompts**: Builds comprehensive prompts with context, output format, and input data
@@ -93,15 +173,44 @@ cp .env.example .env
 
 2. Edit `.env` and add your credentials:
 ```bash
+# Required Configuration
 DATABRICKS_HOST=https://your-workspace.databricks.com
 DATABRICKS_TOKEN=your-personal-access-token
+
+# Optional Model Configuration
+# LLM model for text-based tasks (enrichment, config generation)
+LLM_MODEL=databricks-gpt-5-2
+
+# Vision model for image-based PDF parsing
+# Recommended: databricks-claude-sonnet-4 (13.7s per page)
+# Alternative: databricks-claude-sonnet-4-5 (14.0s per page)
+VISION_MODEL=databricks-claude-sonnet-4
 ```
 
 Alternatively, you can use environment variables:
 ```bash
+# Required
 export DATABRICKS_HOST="https://your-workspace.databricks.com"
 export DATABRICKS_TOKEN="your-personal-access-token"
+
+# Optional (uses defaults if not set)
+export LLM_MODEL="databricks-gpt-5-2"
+export VISION_MODEL="databricks-claude-sonnet-4"
 ```
+
+**Configuration Details:**
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `DATABRICKS_HOST` | ✅ Yes | - | Your Databricks workspace URL |
+| `DATABRICKS_TOKEN` | ✅ Yes | - | Personal access token |
+| `LLM_MODEL` | No | `databricks-gpt-5-2` | Text-based LLM for config generation and enrichment |
+| `VISION_MODEL` | No | `databricks-claude-sonnet-4` | Vision model for image-based PDF parsing |
+
+**Model Recommendations:**
+- For **image-based PDF parsing**, use `databricks-claude-sonnet-4` (13.7s/page) or `databricks-claude-sonnet-4-5` (14.0s/page)
+- For **text-based enrichment and config generation**, use `databricks-gpt-5-2` (default)
+- Models can be overridden via CLI arguments (`--llm-model`, `--vision-model`, `--model`)
 
 Or provide them as command-line arguments (see Usage).
 
@@ -123,13 +232,38 @@ python genie.py create --requirements data/demo_requirements.md
 
 Your Genie space is ready to use!
 
+### Parsing Documents (Optional)
+
+If you have PDF or markdown documents that need to be converted to the standard format:
+
+```bash
+# Parse documents into structured requirements (with concurrent processing)
+python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+
+# Process multiple PDFs faster with increased concurrency
+python genie.py parse --input-dir real_requirements --output data/my_requirements.md --max-concurrent 5
+
+# Then create Genie space
+python genie.py create --requirements data/my_requirements.md
+```
+
+This is useful when you have:
+- PDF documents with requirements (processed concurrently with progress bars)
+- Markdown files in non-standard format
+- Multiple source documents to combine
+
+**Performance Note**: PDF parsing now runs asynchronously with a progress bar. Use `--max-concurrent` to control how many PDFs are processed simultaneously (default: 3).
+
 ### Step-by-Step (Advanced)
 
 For more control, run individual steps:
 
 ```bash
+# Parse documents (if needed)
+python genie.py parse --input-dir real_requirements --output data/parsed.md
+
 # Generate config only
-python genie.py generate --requirements data/demo_requirements.md
+python genie.py generate --requirements data/parsed.md
 
 # Validate config
 python genie.py validate
@@ -161,6 +295,9 @@ python genie.py create --help
 The `genie.py` CLI provides all the functionality you need:
 
 ```bash
+# Parse documents (optional first step)
+python genie.py parse --input-dir <directory-with-documents>
+
 # Full pipeline (recommended)
 python genie.py create --requirements <path-to-requirements>
 
@@ -173,6 +310,22 @@ python genie.py deploy [--config <config-path>]
 ### Common Examples
 
 ```bash
+# Parse documents first
+python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+
+# Parse without LLM (faster)
+python genie.py parse \
+  --input-dir real_requirements \
+  --output data/my_requirements.md \
+  --no-llm
+
+# Parse with custom models
+python genie.py parse \
+  --input-dir real_requirements \
+  --output data/my_requirements.md \
+  --llm-model databricks-gpt-5-2 \
+  --vision-model databricks-claude-sonnet-4
+
 # Create space with default settings
 python genie.py create --requirements data/demo_requirements.md
 
@@ -186,6 +339,10 @@ python genie.py generate --requirements data/demo_requirements.md
 # Review: cat output/genie_space_config.json
 python genie.py validate
 python genie.py deploy
+
+# Full workflow with parsing
+python genie.py parse --input-dir docs --output data/parsed.md
+python genie.py create --requirements data/parsed.md
 
 # Skip validation (faster, but risky)
 python genie.py create \
@@ -204,6 +361,7 @@ python genie.py create \
 See all available options for any command:
 
 ```bash
+python genie.py parse --help
 python genie.py create --help
 python genie.py generate --help
 python genie.py validate --help
@@ -330,16 +488,39 @@ print(f"Generated space: {config.space_name}")
 print(f"Number of tables: {len(config.tables)}")
 ```
 
-### Legacy Scripts
+### Legacy Scripts Migration
 
-The following scripts are still available for backward compatibility:
+**The legacy scripts have been removed and fully migrated to the unified `genie.py` CLI.**
 
-- `scripts/generate_config_with_direct_benchmarks.py` - Generate config (use `genie.py generate` instead)
-- `scripts/validate_tables.py` - Validate tables (use `genie.py validate` instead)
-- `scripts/create_genie_space.py` - Create space (use `genie.py deploy` instead)
-- `main.py` - Basic generator (use `genie.py generate` instead)
+All functionality from the following deprecated scripts is now available through `genie.py`:
 
-**Recommendation:** Use `genie.py` for all new workflows. Legacy scripts are maintained for compatibility but may be deprecated in future versions.
+| Removed Script | New Command | Description |
+|----------------|-------------|-------------|
+| `scripts/legacy/main.py` | `genie.py generate` | Generate configuration |
+| `scripts/legacy/generate_config_with_direct_benchmarks.py` | `genie.py generate` | Generate config with benchmarks (now built-in) |
+| `scripts/legacy/validate_tables.py` | `genie.py validate` | Validate tables and columns |
+| `scripts/legacy/create_genie_space.py` | `genie.py deploy` | Deploy Genie space |
+| `scripts/legacy/create_genie_space_workflow.sh` | `genie.py create` | Complete workflow (generate → validate → deploy) |
+| `scripts/legacy/update_benchmarks.py` | Built into `genie.py generate` | Benchmark extraction (automatic) |
+| `scripts/legacy/fix_benchmarks.sh` | Built into `genie.py generate` | Benchmark fixes (automatic) |
+
+**Migration Benefits:**
+- ✅ Unified CLI with consistent interface
+- ✅ Built-in progress indicators and error handling
+- ✅ Interactive catalog/schema replacement on validation failures
+- ✅ Automatic benchmark extraction (no separate step needed)
+- ✅ Better error messages and debugging support
+
+**Example Migration:**
+```bash
+# Old workflow (deprecated)
+python main.py
+python scripts/validate_tables.py
+python scripts/create_genie_space.py
+
+# New workflow (recommended)
+genie.py create --requirements data/requirements.md
+```
 
 #### Managing Genie Spaces
 
@@ -642,6 +823,7 @@ pytest tests/test_requirements_converter.py -v
 ### Main CLI
 | Command | Purpose | When to Use |
 |---------|---------|------------|
+| `genie.py parse` | Parse documents into structured requirements | Convert PDFs/markdown to standard format |
 | `genie.py create` ⭐ | Full pipeline (generate → validate → deploy) | Primary workflow (recommended) |
 | `genie.py generate` | Generate configuration only | When you want to review config before deploying |
 | `genie.py validate` | Validate tables and columns | After manual config edits |
@@ -652,11 +834,6 @@ pytest tests/test_requirements_converter.py -v
 |--------|---------|------------|
 | `scripts/validate_setup.py` | Validate environment setup | First time setup, troubleshooting |
 | `scripts/convert_requirements.py` | Convert requirements documents | Processing PDFs/markdown to standard format |
-
-### Legacy Scripts
-**⚠️ Deprecated** - The following scripts are in `scripts/legacy/` and are deprecated. Please use `genie.py` instead.
-
-See [scripts/legacy/README.md](scripts/legacy/README.md) for migration guide.
 
 ### Documentation Files
 | File | Description |

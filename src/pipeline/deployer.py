@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 from src.api.genie_space_client import GenieSpaceClient
-from src.utils.config_transformer import transform_to_serialized_space
 
 
 def deploy_space(
@@ -65,18 +64,6 @@ def deploy_space(
     with open(config_path_obj, 'r', encoding='utf-8') as f:
         config_data = json.load(f)
     
-    # Extract genie_space_config if wrapped
-    if "genie_space_config" in config_data:
-        genie_config = config_data["genie_space_config"]
-    else:
-        genie_config = config_data
-    
-    # Transform to Databricks format
-    if verbose:
-        print(f"   Transforming configuration...")
-    
-    serialized_space = transform_to_serialized_space(genie_config)
-    
     # Initialize client
     client = GenieSpaceClient(
         databricks_host=host,
@@ -88,8 +75,9 @@ def deploy_space(
         print(f"   Creating space via API...")
     
     response = client.create_space(
-        config=serialized_space,
-        parent_path=parent_path
+        config=config_data,
+        parent_path=parent_path,
+        verbose=verbose
     )
     
     space_id = response.get("space_id")

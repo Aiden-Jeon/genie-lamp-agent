@@ -57,11 +57,46 @@ class GenieSpaceClient:
             "Content-Type": "application/json"
         }
     
+    def get_available_warehouse(self) -> Optional[str]:
+        """
+        Get the first available SQL warehouse.
+        
+        Returns:
+            Warehouse ID of the first available warehouse, or None if no warehouses found
+            
+        API Reference:
+            https://docs.databricks.com/api/workspace/warehouses/list
+        """
+        try:
+            response = requests.get(
+                f"{self.databricks_host}/api/2.0/sql/warehouses",
+                headers=self._get_headers(),
+                timeout=60
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            warehouses = data.get("warehouses", [])
+            if not warehouses:
+                return None
+            
+            # Prefer warehouses that are running, otherwise take the first one
+            for warehouse in warehouses:
+                if warehouse.get("state") == "RUNNING":
+                    return warehouse.get("id")
+            
+            # If no running warehouse, return the first one
+            return warehouses[0].get("id")
+            
+        except Exception:
+            return None
+    
     def create_space(
         self,
         config: Dict[str, Any],
         parent_path: Optional[str] = None,
-        timeout: int = 300
+        timeout: int = 300,
+        verbose: bool = False
     ) -> Dict[str, Any]:
         """
         Create a new Genie space.
@@ -70,6 +105,7 @@ class GenieSpaceClient:
             config: Genie space configuration (should match GenieSpaceConfig schema)
             parent_path: Parent folder path where the space will be registered (optional)
             timeout: Request timeout in seconds
+            verbose: Print informational messages (e.g., auto-selected warehouse)
             
         Returns:
             Response from the API containing space_id and other metadata
@@ -89,14 +125,22 @@ class GenieSpaceClient:
         
         # Extract required fields for the API
         warehouse_id = config_copy.get("warehouse_id")
-        if not warehouse_id:
-            raise ValueError("warehouse_id is required to create a Genie space")
         
-        if warehouse_id == "REPLACE_WITH_YOUR_SQL_WAREHOUSE_ID":
-            raise ValueError(
-                "Please update warehouse_id in your configuration file with a valid SQL warehouse ID. "
-                "You can find available warehouses in your Databricks workspace under SQL > Warehouses."
-            )
+        # Auto-fetch warehouse if not provided or placeholder
+        if not warehouse_id or warehouse_id == "REPLACE_WITH_YOUR_SQL_WAREHOUSE_ID":
+            if verbose:
+                print("   No warehouse_id specified, fetching available warehouse...")
+            
+            warehouse_id = self.get_available_warehouse()
+            
+            if not warehouse_id:
+                raise ValueError(
+                    "No SQL warehouse found in your workspace. "
+                    "Please create a SQL warehouse first or provide a warehouse_id in the configuration."
+                )
+            
+            if verbose:
+                print(f"   Auto-selected warehouse: {warehouse_id}")
         
         # Extract optional fields
         title = config_copy.get("space_name")
@@ -104,6 +148,18 @@ class GenieSpaceClient:
         
         # Transform our config to Databricks serialized_space format
         serialized_space = transform_to_serialized_space(config_copy)
+        
+        # Debug: Save serialized space if verbose
+        if verbose:
+            try:
+                debug_path = "output/debug_serialized_space.json"
+                import os
+                os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+                with open(debug_path, 'w', encoding='utf-8') as f:
+                    f.write(serialized_space)
+                print(f"   Debug: Saved serialized space to {debug_path}")
+            except Exception:
+                pass  # Don't fail deployment if debug save fails
         
         # Build the API request payload according to Databricks API spec
         payload = {
@@ -125,7 +181,24 @@ class GenieSpaceClient:
             timeout=timeout
         )
         
-        response.raise_for_status()
+        # Handle errors with more detailed information
+        if not response.ok:
+            error_msg = f"{response.status_code} {response.reason} for url: {response.url}"
+            try:
+                error_details = response.json()
+                if "message" in error_details:
+                    error_msg += f"\nAPI Error: {error_details['message']}"
+                if "error_code" in error_details:
+                    error_msg += f"\nError Code: {error_details['error_code']}"
+                if "details" in error_details:
+                    error_msg += f"\nDetails: {error_details['details']}"
+            except:
+                # If we can't parse JSON, include the raw text
+                if response.text:
+                    error_msg += f"\nResponse: {response.text[:500]}"
+            
+            raise requests.HTTPError(error_msg, response=response)
+        
         return response.json()
     
     def get_space(

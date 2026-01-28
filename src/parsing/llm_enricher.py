@@ -98,7 +98,7 @@ Respond with ONLY the description, no additional text."""
         
         try:
             response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
+                prompt=prompt,
                 temperature=0.1,
                 max_tokens=200
             )
@@ -125,7 +125,7 @@ Respond with ONLY the description, no additional text."""
         
         try:
             response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
+                prompt=prompt,
                 temperature=0.1,
                 max_tokens=200
             )
@@ -175,7 +175,7 @@ Respond with ONLY valid JSON, no additional text."""
         
         try:
             response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
+                prompt=prompt,
                 temperature=0.3,
                 max_tokens=1000
             )
@@ -232,7 +232,7 @@ Write in clear, professional language."""
         
         try:
             response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
+                prompt=prompt,
                 temperature=0.2,
                 max_tokens=500
             )
@@ -280,7 +280,7 @@ Respond with ONLY the refined question, no additional text."""
         
         try:
             response = self.llm_client.generate(
-                messages=[{"role": "user", "content": prompt}],
+                prompt=prompt,
                 temperature=0.1,
                 max_tokens=150
             )

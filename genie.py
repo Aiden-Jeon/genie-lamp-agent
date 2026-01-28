@@ -28,7 +28,167 @@ load_dotenv()
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from src.pipeline import generate_config, validate_config, deploy_space
+from src.pipeline import generate_config, validate_config, deploy_space, parse_documents
+
+
+def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema: str, new_catalog: str, new_schema: str):
+    """Update catalog and schema in configuration file."""
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    
+    # Get the genie_space_config
+    if "genie_space_config" in config:
+        genie_config = config["genie_space_config"]
+    else:
+        genie_config = config
+    
+    # Update tables
+    updated_count = 0
+    for table_def in genie_config.get("tables", []):
+        if table_def.get("catalog_name") == old_catalog and table_def.get("schema_name") == old_schema:
+            table_def["catalog_name"] = new_catalog
+            table_def["schema_name"] = new_schema
+            updated_count += 1
+    
+    # Update SQL expressions
+    sql_expr_count = 0
+    for expr in genie_config.get("sql_expressions", []):
+        old_prefix = f"{old_catalog}.{old_schema}."
+        new_prefix = f"{new_catalog}.{new_schema}."
+        if "expression" in expr and old_prefix in expr["expression"]:
+            expr["expression"] = expr["expression"].replace(old_prefix, new_prefix)
+            sql_expr_count += 1
+    
+    # Update example queries
+    example_query_count = 0
+    for query in genie_config.get("example_sql_queries", []):
+        old_prefix = f"{old_catalog}.{old_schema}."
+        new_prefix = f"{new_catalog}.{new_schema}."
+        if "sql_query" in query and old_prefix in query["sql_query"]:
+            query["sql_query"] = query["sql_query"].replace(old_prefix, new_prefix)
+            example_query_count += 1
+    
+    # Update benchmark questions
+    benchmark_count = 0
+    for benchmark in genie_config.get("benchmark_questions", []):
+        old_prefix = f"{old_catalog}.{old_schema}."
+        new_prefix = f"{new_catalog}.{new_schema}."
+        updated_this_benchmark = False
+        
+        # Update expected_sql field (may be null for FAQ items)
+        if "expected_sql" in benchmark and benchmark["expected_sql"] and old_prefix in benchmark["expected_sql"]:
+            benchmark["expected_sql"] = benchmark["expected_sql"].replace(old_prefix, new_prefix)
+            updated_this_benchmark = True
+        
+        # Update table field (contains backtick-quoted table names)
+        if "table" in benchmark and benchmark["table"]:
+            old_table_ref = f"`{old_catalog}.{old_schema}."
+            new_table_ref = f"`{new_catalog}.{new_schema}."
+            if old_table_ref in benchmark["table"]:
+                benchmark["table"] = benchmark["table"].replace(old_table_ref, new_table_ref)
+                updated_this_benchmark = True
+        
+        if updated_this_benchmark:
+            benchmark_count += 1
+    
+    # Save back to file
+    if "genie_space_config" in config:
+        config["genie_space_config"] = genie_config
+    else:
+        config = genie_config
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+    
+    return {
+        'tables': updated_count,
+        'sql_expressions': sql_expr_count,
+        'example_queries': example_query_count,
+        'benchmark_questions': benchmark_count
+    }
+
+
+def prompt_catalog_schema_replacement(report, config_path: str) -> bool:
+    """
+    Prompt user for catalog/schema replacement when tables are not found.
+    
+    Returns:
+        True if configuration was updated, False otherwise
+    """
+    # Find table_not_found errors
+    table_not_found_errors = [
+        issue for issue in report.issues 
+        if issue.severity == "error" and issue.type == "table_not_found"
+    ]
+    
+    if not table_not_found_errors:
+        return False
+    
+    # Extract unique catalog.schema combinations from failed tables
+    failed_schemas = {}
+    for issue in table_not_found_errors:
+        if issue.table:
+            parts = issue.table.split('.')
+            if len(parts) == 3:
+                catalog, schema, table = parts
+                key = f"{catalog}.{schema}"
+                if key not in failed_schemas:
+                    failed_schemas[key] = []
+                failed_schemas[key].append(table)
+    
+    if not failed_schemas:
+        return False
+    
+    print()
+    print("=" * 80)
+    print("⚠️  TABLE VALIDATION FAILED")
+    print("=" * 80)
+    print()
+    print("The following catalog.schema combinations have tables that were not found:")
+    print()
+    
+    for i, (schema_key, tables) in enumerate(failed_schemas.items(), 1):
+        print(f"  {i}. {schema_key}")
+        print(f"     Tables: {', '.join(tables[:3])}" + ("..." if len(tables) > 3 else ""))
+    
+    print()
+    print("Would you like to replace the catalog and schema names?")
+    response = input("Replace catalog/schema? [y/N]: ").strip().lower()
+    
+    if response not in ['y', 'yes']:
+        return False
+    
+    # Prompt for replacements
+    updated = False
+    for schema_key, tables in failed_schemas.items():
+        old_catalog, old_schema = schema_key.split('.')
+        
+        print()
+        print(f"Replacing: {schema_key}")
+        new_catalog = input(f"  New catalog (current: {old_catalog}): ").strip()
+        new_schema = input(f"  New schema (current: {old_schema}): ").strip()
+        
+        if new_catalog and new_schema:
+            print(f"  Updating {old_catalog}.{old_schema} → {new_catalog}.{new_schema}...")
+            counts = update_config_catalog_schema(
+                config_path, 
+                old_catalog, 
+                old_schema, 
+                new_catalog, 
+                new_schema
+            )
+            print(f"  ✓ Updated:")
+            print(f"     - {counts['tables']} table(s)")
+            print(f"     - {counts['sql_expressions']} SQL expression(s)")
+            print(f"     - {counts['example_queries']} example query/queries")
+            print(f"     - {counts['benchmark_questions']} benchmark question(s)")
+            updated = True
+        elif not new_catalog and not new_schema:
+            print(f"  Skipping {schema_key}")
+        else:
+            print(f"  ⚠️  Both catalog and schema must be provided. Skipping {schema_key}")
+    
+    return updated
 
 
 def cmd_create(args):
@@ -68,33 +228,55 @@ def cmd_create(args):
             print("✓ Step 2/3: Validating tables and columns...")
             print("-" * 80)
             
-            report = validate_config(
-                config_path=args.output,
-                databricks_host=args.databricks_host,
-                databricks_token=args.databricks_token,
-                verbose=True
-            )
+            max_validation_attempts = 3
+            validation_attempt = 0
             
-            if report.has_errors():
-                print()
-                print("❌ Validation failed with errors!")
-                print()
-                print("Validation Report:")
-                print(report.summary())
-                print()
-                print("Please fix the errors and try again.")
-                return 1
-            
-            if report.has_warnings():
-                print()
-                print("⚠️  Validation completed with warnings.")
-                print()
-                # Ask user if they want to continue
-                if not args.yes:
-                    response = input("Continue with deployment? [y/N]: ")
-                    if response.lower() not in ['y', 'yes']:
-                        print("Deployment cancelled.")
-                        return 0
+            while validation_attempt < max_validation_attempts:
+                validation_attempt += 1
+                
+                report = validate_config(
+                    config_path=args.output,
+                    databricks_host=args.databricks_host,
+                    databricks_token=args.databricks_token,
+                    verbose=True
+                )
+                
+                if report.has_errors():
+                    print()
+                    print("❌ Validation failed with errors!")
+                    print()
+                    print("Validation Report:")
+                    print(report.summary())
+                    
+                    # Prompt for catalog/schema replacement
+                    if not args.yes and validation_attempt < max_validation_attempts:
+                        updated = prompt_catalog_schema_replacement(report, args.output)
+                        
+                        if updated:
+                            print()
+                            print("=" * 80)
+                            print("🔄 Configuration updated. Re-validating...")
+                            print("=" * 80)
+                            print()
+                            continue
+                    
+                    print()
+                    print("Please fix the errors and try again.")
+                    return 1
+                
+                if report.has_warnings():
+                    print()
+                    print("⚠️  Validation completed with warnings.")
+                    print()
+                    # Ask user if they want to continue
+                    if not args.yes:
+                        response = input("Continue with deployment? [y/N]: ")
+                        if response.lower() not in ['y', 'yes']:
+                            print("Deployment cancelled.")
+                            return 0
+                
+                # Validation passed
+                break
             
             print()
             print("✓ Validation passed!")
@@ -221,30 +403,48 @@ def cmd_validate(args):
     print()
     
     try:
-        report = validate_config(
-            config_path=args.config,
-            databricks_host=args.databricks_host,
-            databricks_token=args.databricks_token,
-            verbose=True
-        )
+        max_validation_attempts = 3
+        validation_attempt = 0
         
-        print()
-        print("=" * 80)
-        print("Validation Report")
-        print("=" * 80)
-        print()
-        print(report.summary())
-        print()
-        
-        if report.has_errors():
-            print("Next steps:")
-            print("  1. Fix the errors in your configuration")
-            print("  2. Run validation again")
-            return 1
-        else:
-            print("Next steps:")
-            print(f"  Deploy: python genie.py deploy")
-            return 0
+        while validation_attempt < max_validation_attempts:
+            validation_attempt += 1
+            
+            report = validate_config(
+                config_path=args.config,
+                databricks_host=args.databricks_host,
+                databricks_token=args.databricks_token,
+                verbose=True
+            )
+            
+            print()
+            print("=" * 80)
+            print("Validation Report")
+            print("=" * 80)
+            print()
+            print(report.summary())
+            print()
+            
+            if report.has_errors():
+                # Prompt for catalog/schema replacement
+                if validation_attempt < max_validation_attempts:
+                    updated = prompt_catalog_schema_replacement(report, args.config)
+                    
+                    if updated:
+                        print()
+                        print("=" * 80)
+                        print("🔄 Configuration updated. Re-validating...")
+                        print("=" * 80)
+                        print()
+                        continue
+                
+                print("Next steps:")
+                print("  1. Fix the errors in your configuration")
+                print("  2. Run validation again")
+                return 1
+            else:
+                print("Next steps:")
+                print(f"  Deploy: python genie.py deploy")
+                return 0
         
     except Exception as e:
         print()
@@ -286,6 +486,59 @@ def cmd_deploy(args):
         print()
         print(f"Space ID:  {result['space_id']}")
         print(f"Space URL: {result['space_url']}")
+        print()
+        
+        return 0
+        
+    except Exception as e:
+        print()
+        print(f"❌ Error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
+def cmd_parse(args):
+    """Parse documents into structured requirements format."""
+    print("=" * 80)
+    print("📄 Document Parser")
+    print("=" * 80)
+    print()
+    
+    try:
+        result = parse_documents(
+            input_dir=args.input_dir,
+            output_path=args.output,
+            llm_model=args.llm_model,
+            vision_model=args.vision_model,
+            use_llm=not args.no_llm,
+            domain=args.domain,
+            databricks_host=args.databricks_host,
+            databricks_token=args.databricks_token,
+            verbose=True,
+            max_concurrent_pdfs=args.max_concurrent
+        )
+        
+        print()
+        print("=" * 80)
+        print("✓ Parsing Summary")
+        print("=" * 80)
+        print()
+        print(f"Output file: {result['output_path']}")
+        print()
+        print(f"Extracted content:")
+        print(f"  Questions: {result['questions_count']}")
+        print(f"  Tables: {result['tables_count']}")
+        print(f"  SQL Queries: {result['queries_count']}")
+        print(f"  Sections: {result['sections_count']}")
+        print()
+        print(f"LLM enrichment: {'Yes' if result['used_llm'] else 'No'}")
+        print(f"Domain: {result['domain']}")
+        print()
+        print("Next steps:")
+        print(f"  Generate config: python genie.py generate --requirements {result['output_path']}")
+        print(f"  Full pipeline:   python genie.py create --requirements {result['output_path']}")
         print()
         
         return 0
@@ -594,6 +847,70 @@ Environment Variables:
     )
     
     deploy_parser.set_defaults(func=cmd_deploy)
+    
+    # =========================================================================
+    # PARSE command
+    # =========================================================================
+    parse_parser = subparsers.add_parser(
+        "parse",
+        help="Parse documents into structured requirements",
+        description="Parse PDF and markdown files into structured requirements format"
+    )
+    
+    parse_parser.add_argument(
+        "--input-dir",
+        type=str,
+        required=True,
+        help="Directory containing PDF and markdown files"
+    )
+    parse_parser.add_argument(
+        "--output",
+        type=str,
+        default="data/parsed_requirements.md",
+        help="Output path for generated markdown (default: data/parsed_requirements.md)"
+    )
+    parse_parser.add_argument(
+        "--llm-model",
+        type=str,
+        default=os.getenv("LLM_MODEL", "databricks-gpt-5-2"),
+        help="Foundation model for text-based LLM enrichment (default: databricks-gpt-5-2)"
+    )
+    parse_parser.add_argument(
+        "--vision-model",
+        type=str,
+        default=os.getenv("VISION_MODEL", "databricks-claude-sonnet-4"),
+        help="Foundation model for image-based PDF parsing (default: databricks-claude-sonnet-4)"
+    )
+    parse_parser.add_argument(
+        "--no-llm",
+        action="store_true",
+        help="Disable LLM enrichment (faster but less intelligent)"
+    )
+    parse_parser.add_argument(
+        "--domain",
+        type=str,
+        choices=["social_analytics", "kpi_analytics", "combined"],
+        default="combined",
+        help="Domain type (default: combined)"
+    )
+    parse_parser.add_argument(
+        "--databricks-host",
+        type=str,
+        help="Databricks workspace URL (required if using LLM)"
+    )
+    parse_parser.add_argument(
+        "--databricks-token",
+        type=str,
+        help="Databricks token (required if using LLM)"
+    )
+    parse_parser.add_argument(
+        "--max-concurrent",
+        type=int,
+        default=3,
+        help="Maximum number of PDFs to process concurrently (default: 3)"
+    )
+    
+    parse_parser.set_defaults(func=cmd_parse)
     
     # Parse arguments
     args = parser.parse_args()

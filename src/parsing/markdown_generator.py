@@ -150,14 +150,20 @@ class MarkdownGenerator:
             lines.append(f"### {emoji} {category} Analysis")
             lines.append("")
             
-            for q in sorted(questions, key=lambda x: x.id):
-                # Extract question number
-                q_num = q.id.replace("Q", "").replace("_", "")
-                lines.append(f"{q_num}. {q.text}")
+            # Sort questions by extracting numeric part from ID, then assign sequential numbers
+            sorted_questions = sorted(questions, key=lambda x: self._extract_question_number(x.id))
+            for idx, q in enumerate(sorted_questions, start=1):
+                lines.append(f"{idx}. {q.text}")
             
             lines.append("")
         
         return "\n".join(lines)
+    
+    def _extract_question_number(self, question_id: str) -> int:
+        """Extract numeric part from question ID for sorting"""
+        import re
+        match = re.search(r'\d+', question_id)
+        return int(match.group()) if match else 9999
     
     def _generate_table_sections(self, doc: RequirementsDocument) -> str:
         """Generate table sections with sample queries"""
@@ -181,6 +187,19 @@ class MarkdownGenerator:
                     sample_query = query.query
                     break
         
+        # Find sample questions that use this table
+        sample_questions = []
+        for q in doc.all_questions:
+            # Check if this table is in the question's tables_needed list
+            # Match by full name or by partial name (table name only)
+            for needed_table in q.tables_needed:
+                if (table.full_name == needed_table or 
+                    table.full_name in needed_table or 
+                    needed_table in table.full_name or
+                    table.table == needed_table.split('.')[-1]):
+                    sample_questions.append(q.text)
+                    break  # Only add each question once
+        
         # Build section
         lines = [
             f"## {table.description or table.table}",
@@ -191,6 +210,13 @@ class MarkdownGenerator:
         
         if table.related_kpi:
             lines.append(f"**Related KPI:** {table.related_kpi}")
+            lines.append("")
+        
+        # Add sample questions if sample query exists
+        if sample_query and sample_questions:
+            lines.append("**Sample Questions:**")
+            for idx, question in enumerate(sample_questions[:5], start=1):  # Limit to 5 questions
+                lines.append(f"{idx}. {question}")
             lines.append("")
         
         if sample_query:
