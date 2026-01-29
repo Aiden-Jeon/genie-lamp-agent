@@ -3,6 +3,8 @@
 This module provides common test fixtures used across all test domains.
 """
 
+import os
+import subprocess
 import pytest
 import json
 import tempfile
@@ -16,6 +18,75 @@ from src.models import (
     GenieSpaceSQLExpression,
     GenieSpaceBenchmark
 )
+
+
+def pytest_configure(config):
+    """
+    Configure pytest to automatically skip LLM tests when llm/ folder is not modified.
+    
+    This hook runs before test collection and sets SKIP_LLM_TESTS environment variable
+    based on whether src/llm/ has been modified in the working tree or staged changes.
+    
+    To force running LLM tests, set: RUN_LLM_TESTS=true
+    """
+    # Check if user explicitly wants to run LLM tests
+    if os.getenv("RUN_LLM_TESTS", "").lower() == "true":
+        os.environ["SKIP_LLM_TESTS"] = "false"
+        return
+    
+    # Check if SKIP_LLM_TESTS is already explicitly set
+    if "SKIP_LLM_TESTS" in os.environ:
+        return
+    
+    try:
+        # Check if src/llm/ has been modified (staged or unstaged)
+        # Get root directory of git repo
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        
+        if result.returncode != 0:
+            # Not a git repo, default to skipping LLM tests
+            os.environ["SKIP_LLM_TESTS"] = "true"
+            return
+        
+        # Check for modified files in src/llm/
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD", "src/llm/"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        
+        modified_files = result.stdout.strip()
+        
+        # Also check staged changes
+        result_staged = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "src/llm/"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        
+        staged_files = result_staged.stdout.strip()
+        
+        # If no files modified in src/llm/, skip LLM tests
+        if not modified_files and not staged_files:
+            os.environ["SKIP_LLM_TESTS"] = "true"
+            print("\n⚡ Auto-skipping LLM tests (src/llm/ not modified)")
+            print("   To run LLM tests, set: RUN_LLM_TESTS=true\n")
+        else:
+            os.environ["SKIP_LLM_TESTS"] = "false"
+            print(f"\n🔥 Running LLM tests (src/llm/ modified)")
+            print(f"   Modified: {modified_files or staged_files}\n")
+            
+    except Exception as e:
+        # On any error, default to skipping LLM tests
+        os.environ["SKIP_LLM_TESTS"] = "true"
+        print(f"\n⚠️  Could not detect LLM changes, defaulting to skip: {e}\n")
 
 
 @pytest.fixture

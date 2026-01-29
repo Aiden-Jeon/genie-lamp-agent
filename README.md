@@ -1218,8 +1218,11 @@ cd genie-lamp-agent
 # Create a feature branch
 git checkout -b feature/your-feature-name
 
-# Make your changes and test
+# Make your changes and test (LLM tests auto-skipped if src/llm/ not modified)
 .venv/bin/python -m pytest tests/
+
+# To force run LLM tests:
+RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/
 
 # Commit and push (use genie-commit skill or manual)
 git add .

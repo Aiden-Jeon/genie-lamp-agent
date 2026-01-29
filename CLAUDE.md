@@ -20,14 +20,24 @@ cp .env.example .env
 
 ### Running Tests
 ```bash
-# Run all tests
+# Run all tests (LLM tests auto-skipped if src/llm/ not modified)
 .venv/bin/python -m pytest tests/ -v
 
-# Run specific test modules
-.venv/bin/python -m pytest tests/test_generation.py -v
-.venv/bin/python -m pytest tests/test_requirements_converter.py -v
-.venv/bin/python -m pytest tests/test_table_validator.py -v
+# Run specific test domains
+.venv/bin/python -m pytest tests/test_generation_domain.py -v
+.venv/bin/python -m pytest tests/test_validation_domain.py -v
+.venv/bin/python -m pytest tests/test_requirements_domain.py -v
+.venv/bin/python -m pytest tests/test_transformation_domain.py -v
+.venv/bin/python -m pytest tests/test_integration.py -v
+
+# Force run LLM tests (even if src/llm/ not modified)
+RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
+
+# Force skip LLM tests
+SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
 ```
+
+**Note:** LLM tests are automatically skipped unless `src/llm/` has been modified. This speeds up test runs and avoids unnecessary API costs. To force running LLM tests, set `RUN_LLM_TESTS=true`.
 
 ### Main CLI Commands
 ```bash
