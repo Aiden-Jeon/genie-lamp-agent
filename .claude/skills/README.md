@@ -74,6 +74,36 @@ Claude will:
 - Result output: `output/genie_space_result.json`
 - Auto-replacement: `sandbox.agent_poc`
 
+### create-folder
+
+Safely create directories with validation and parent directory creation.
+
+**Triggers:** When you ask to "create folder", "make directory", "mkdir -p", or "ensure folder exists"
+
+**Features:**
+- Checks if directory already exists before creation
+- Creates parent directories automatically with `-p` flag
+- Verifies successful creation
+- Handles errors gracefully with clear messages
+- Supports single or multiple directory creation
+
+**Example Usage:**
+```
+User: "create folder if not exists for output"
+
+Claude will:
+1. Check if 'output' directory exists
+2. Create with mkdir -p if needed
+3. Verify creation success
+4. Report status to user
+```
+
+**Use Cases:**
+- Single directory: `mkdir -p data`
+- Nested directories: `mkdir -p output/configs/prod`
+- Multiple directories: `mkdir -p data benchmarks logs`
+- Project structure: `mkdir -p src/api src/models tests/unit`
+
 ## Installing Skills
 
 ### Option 1: Symlink to Claude Code skills directory (Recommended)
@@ -87,8 +117,11 @@ ln -s "$(pwd)/.claude/skills/genie-commit" ~/.codex/skills/genie-commit
 # Create symlink for genie-deploy
 ln -s "$(pwd)/.claude/skills/genie-deploy" ~/.codex/skills/genie-deploy
 
+# Create symlink for create-folder
+ln -s "$(pwd)/.claude/skills/create-folder" ~/.codex/skills/create-folder
+
 # Verify
-ls -la ~/.codex/skills/genie-*
+ls -la ~/.codex/skills/genie-* ~/.codex/skills/create-folder
 ```
 
 ### Option 2: Copy to Claude Code skills directory
@@ -97,9 +130,10 @@ ls -la ~/.codex/skills/genie-*
 # Copy the skills
 cp -r .claude/skills/genie-commit ~/.codex/skills/
 cp -r .claude/skills/genie-deploy ~/.codex/skills/
+cp -r .claude/skills/create-folder ~/.codex/skills/
 
 # Verify
-ls -la ~/.codex/skills/genie-*
+ls -la ~/.codex/skills/genie-* ~/.codex/skills/create-folder
 ```
 
 ### After Installation

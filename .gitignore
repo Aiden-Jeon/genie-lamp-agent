@@ -1,7 +1,6 @@
 feedback/
 data/
 real_requirements/
-change_logs/
 
 # Python
 __pycache__/

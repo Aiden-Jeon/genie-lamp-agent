@@ -27,21 +27,6 @@ pip install requests
 - Test files MUST start with `test_` prefix
 - Example: `tests/test_feature_name.py`
 
-### Documentation & change_logs
-- **ALL** markdown documentation files MUST be placed in `change_logs/` directory
-- This includes: release notes, change logs, feature documentation, and project updates
-- Example: `change_logs/2024-01-release.md`, `change_logs/feature-updates.md`
-```bash
-# ❌ WRONG
-README_updates.md
-docs/changelog.md
-
-# ✅ CORRECT
-change_logs/README_updates.md
-change_logs/changelog.md
-```
-
 ---
 
 **Before suggesting any Python command, verify it uses `.venv/bin/python`**
-**Before creating any markdown file, verify it goes in `change_logs/`**

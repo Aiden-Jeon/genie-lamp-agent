@@ -375,14 +375,6 @@
 │   ├── analyze_feedback.py         # 🆕 Genie Space feedback analysis
 │   └── export_feedback_csv.py      # 🆕 Export feedback to CSV
 │
-├── change_logs/                    # 🆕 Quality improvement documentation
-│   ├── priority1_improvements_summary.md       # P1: Enhanced prompts
-│   ├── priority2_improvements_summary.md       # P2: Validation
-│   ├── priority3_improvements_summary.md       # P3: Domain & review
-│   ├── comprehensive_improvements_summary.md   # Combined overview
-│   ├── FINAL_SUMMARY.md                        # Complete 3-priority summary
-│   └── sql_quality_quick_reference.md          # SQL standards reference
-│
 └── tests/                          # Test suite (all passing ✅)
     ├── __init__.py
     ├── conftest.py                 # Pytest fixtures and configuration
