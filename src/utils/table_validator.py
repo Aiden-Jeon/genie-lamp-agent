@@ -4,11 +4,12 @@ Validator for Databricks tables and columns referenced in Genie Space configurat
 This module validates that:
 1. All tables referenced in the configuration exist in Unity Catalog
 2. All columns referenced in SQL queries and expressions exist in their respective tables
-3. The user has proper access permissions to the tables
+3. All tables referenced in benchmark questions are valid
+4. The user has proper access permissions to the tables
 
 Usage:
     from src.table_validator import TableValidator
-    
+
     validator = TableValidator()
     report = validator.validate_config("output/genie_space_config.json")
     print(report.summary())
@@ -348,10 +349,16 @@ class TableValidator:
     def validate_config(self, config_path: str) -> ValidationReport:
         """
         Validate all tables and columns in a Genie space configuration.
-        
+
+        This includes validation of:
+        - Table definitions in the 'tables' section
+        - Tables referenced in SQL expressions
+        - Tables referenced in example SQL queries
+        - Tables referenced in benchmark questions
+
         Args:
             config_path: Path to the Genie space configuration JSON file
-            
+
         Returns:
             ValidationReport containing all validation results and issues
         """
@@ -426,7 +433,8 @@ class TableValidator:
         # Extract and validate columns from SQL expressions
         self._validate_sql_expressions(genie_config, table_map, report)
         self._validate_example_queries(genie_config, table_map, report)
-        
+        self._validate_benchmark_queries(genie_config, table_map, report)
+
         return report
     
     def _validate_sql_expressions(
@@ -536,6 +544,44 @@ class TableValidator:
                         location=f"example_sql_queries[{question[:50]}...]"
                     )
     
+    def _validate_benchmark_queries(
+        self,
+        genie_config: Dict[str, Any],
+        table_map: Dict[str, Any],
+        report: ValidationReport
+    ):
+        """Validate tables referenced in benchmark_questions."""
+        benchmark_questions = genie_config.get("benchmark_questions", [])
+
+        if not benchmark_questions:
+            return
+
+        report.add_issue(
+            severity="info",
+            type="validation_section",
+            message=f"Validating tables in {len(benchmark_questions)} benchmark questions"
+        )
+
+        for i, benchmark in enumerate(benchmark_questions):
+            question = benchmark.get("question", f"Benchmark {i+1}")
+            expected_sql = benchmark.get("expected_sql", "")
+
+            if not expected_sql:
+                continue
+
+            # Extract table names from the SQL query
+            tables_in_query = self._extract_tables_from_sql(expected_sql)
+
+            for table_ref in tables_in_query:
+                if table_ref not in report.tables_valid:
+                    report.add_issue(
+                        severity="warning",
+                        type="table_reference_invalid",
+                        message=f"Benchmark question references table that failed validation",
+                        table=table_ref,
+                        location=f"benchmark_questions[{question[:50]}...]"
+                    )
+
     def _build_alias_map(self, genie_config: Dict[str, Any]) -> Dict[str, str]:
         """Build a map of common table aliases to full table names."""
         alias_map = {}
@@ -570,13 +616,16 @@ class TableValidator:
     def _extract_tables_from_sql(self, sql: str) -> Set[str]:
         """Extract full table names from SQL query."""
         tables = set()
-        
-        # Pattern to match catalog.schema.table references
-        pattern = r'\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
-        
+
+        # Pattern to match catalog.schema.table references with optional backticks
+        # Matches: catalog.schema.table or `catalog`.`schema`.`table` or mixed
+        pattern = r'`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.`?([a-zA-Z_][a-zA-Z0-9_]*)`?\.`?([a-zA-Z_][a-zA-Z0-9_]*)`?'
+
         for match in re.finditer(pattern, sql):
-            tables.add(match.group(1))
-        
+            # Combine the three parts (catalog, schema, table) without backticks
+            full_name = f"{match.group(1)}.{match.group(2)}.{match.group(3)}"
+            tables.add(full_name)
+
         return tables
 
 

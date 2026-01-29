@@ -31,17 +31,192 @@ sys.path.insert(0, str(project_root))
 from src.pipeline import generate_config, validate_config, deploy_space, parse_documents
 
 
-def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema: str, new_catalog: str, new_schema: str):
-    """Update catalog and schema in configuration file."""
+def update_config_catalog_schema_table(
+    config_path: str,
+    old_catalog: str,
+    old_schema: str,
+    old_table: str,
+    new_catalog: str,
+    new_schema: str,
+    new_table: str
+):
+    """
+    Update catalog, schema, and table name in configuration file.
+
+    Args:
+        config_path: Path to the configuration JSON file
+        old_catalog: Old catalog name
+        old_schema: Old schema name
+        old_table: Old table name
+        new_catalog: New catalog name
+        new_schema: New schema name
+        new_table: New table name
+
+    Returns:
+        Dictionary with counts of updated items
+    """
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
-    
+
     # Get the genie_space_config
     if "genie_space_config" in config:
         genie_config = config["genie_space_config"]
     else:
         genie_config = config
-    
+
+    # Build old and new full table identifiers
+    old_full_table = f"{old_catalog}.{old_schema}.{old_table}"
+    new_full_table = f"{new_catalog}.{new_schema}.{new_table}"
+
+    # Update tables
+    updated_count = 0
+    for table_def in genie_config.get("tables", []):
+        if (table_def.get("catalog_name") == old_catalog and
+            table_def.get("schema_name") == old_schema and
+            table_def.get("table_name") == old_table):
+            table_def["catalog_name"] = new_catalog
+            table_def["schema_name"] = new_schema
+            table_def["table_name"] = new_table
+            updated_count += 1
+
+    # Update SQL expressions - replace full table references
+    sql_expr_count = 0
+    for expr in genie_config.get("sql_expressions", []):
+        if "expression" in expr and old_full_table in expr["expression"]:
+            expr["expression"] = expr["expression"].replace(old_full_table, new_full_table)
+            sql_expr_count += 1
+
+    # Update example queries - replace full table references
+    example_query_count = 0
+    for query in genie_config.get("example_sql_queries", []):
+        if "sql_query" in query and old_full_table in query["sql_query"]:
+            query["sql_query"] = query["sql_query"].replace(old_full_table, new_full_table)
+            example_query_count += 1
+
+    # Update benchmark questions
+    benchmark_count = 0
+    for benchmark in genie_config.get("benchmark_questions", []):
+        updated_this_benchmark = False
+
+        # Update expected_sql field (may be null for FAQ items)
+        if "expected_sql" in benchmark and benchmark["expected_sql"] and old_full_table in benchmark["expected_sql"]:
+            benchmark["expected_sql"] = benchmark["expected_sql"].replace(old_full_table, new_full_table)
+            updated_this_benchmark = True
+
+        # Update table field (contains backtick-quoted table names)
+        if "table" in benchmark and benchmark["table"]:
+            old_table_ref = f"`{old_full_table}`"
+            new_table_ref = f"`{new_full_table}`"
+            if old_table_ref in benchmark["table"]:
+                benchmark["table"] = benchmark["table"].replace(old_table_ref, new_table_ref)
+                updated_this_benchmark = True
+
+        if updated_this_benchmark:
+            benchmark_count += 1
+
+    # Update instructions - replace full table references
+    instruction_count = 0
+    for instruction in genie_config.get("instructions", []):
+        if "content" in instruction and old_full_table in instruction["content"]:
+            instruction["content"] = instruction["content"].replace(old_full_table, new_full_table)
+            instruction_count += 1
+
+    # Update joins if they reference this table
+    join_count = 0
+    for join in genie_config.get("joins", []):
+        updated_this_join = False
+
+        if join.get("left_table") == old_full_table:
+            join["left_table"] = new_full_table
+            join["left_alias"] = new_table
+            updated_this_join = True
+
+        if join.get("right_table") == old_full_table:
+            join["right_table"] = new_full_table
+            join["right_alias"] = new_table
+            updated_this_join = True
+
+        # Update join condition
+        if "join_condition" in join and old_full_table in join["join_condition"]:
+            join["join_condition"] = join["join_condition"].replace(old_full_table, new_full_table)
+            updated_this_join = True
+
+        # Also replace old table alias references in join condition
+        if "join_condition" in join:
+            old_alias_pattern = f"{old_table}."
+            new_alias_pattern = f"{new_table}."
+            if old_alias_pattern in join["join_condition"]:
+                join["join_condition"] = join["join_condition"].replace(old_alias_pattern, new_alias_pattern)
+                updated_this_join = True
+
+        if updated_this_join:
+            join_count += 1
+
+    # Update join_specifications if they exist (alternative format)
+    join_spec_count = 0
+    for join_spec in genie_config.get("join_specifications", []):
+        updated_this_spec = False
+
+        if join_spec.get("left_table") == old_full_table:
+            join_spec["left_table"] = new_full_table
+            updated_this_spec = True
+
+        if join_spec.get("right_table") == old_full_table:
+            join_spec["right_table"] = new_full_table
+            updated_this_spec = True
+
+        # Update join condition
+        if "join_condition" in join_spec and old_full_table in join_spec["join_condition"]:
+            join_spec["join_condition"] = join_spec["join_condition"].replace(old_full_table, new_full_table)
+            updated_this_spec = True
+
+        # Also replace table aliases in join condition
+        if "join_condition" in join_spec:
+            old_alias_pattern = f"{old_table}."
+            new_alias_pattern = f"{new_table}."
+            if old_alias_pattern in join_spec["join_condition"]:
+                join_spec["join_condition"] = join_spec["join_condition"].replace(old_alias_pattern, new_alias_pattern)
+                updated_this_spec = True
+
+        if updated_this_spec:
+            join_spec_count += 1
+
+    # Save back to file
+    if "genie_space_config" in config:
+        config["genie_space_config"] = genie_config
+    else:
+        config = genie_config
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
+    return {
+        'tables': updated_count,
+        'sql_expressions': sql_expr_count,
+        'example_queries': example_query_count,
+        'benchmark_questions': benchmark_count,
+        'instructions': instruction_count,
+        'joins': join_count,
+        'join_specifications': join_spec_count
+    }
+
+
+def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema: str, new_catalog: str, new_schema: str):
+    """
+    Update catalog and schema in configuration file (legacy function, kept for backwards compatibility).
+    This function updates ALL tables with matching catalog.schema.
+
+    For individual table updates, use update_config_catalog_schema_table instead.
+    """
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    # Get the genie_space_config
+    if "genie_space_config" in config:
+        genie_config = config["genie_space_config"]
+    else:
+        genie_config = config
+
     # Update tables
     updated_count = 0
     for table_def in genie_config.get("tables", []):
@@ -49,7 +224,7 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
             table_def["catalog_name"] = new_catalog
             table_def["schema_name"] = new_schema
             updated_count += 1
-    
+
     # Update SQL expressions
     sql_expr_count = 0
     for expr in genie_config.get("sql_expressions", []):
@@ -58,7 +233,7 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
         if "expression" in expr and old_prefix in expr["expression"]:
             expr["expression"] = expr["expression"].replace(old_prefix, new_prefix)
             sql_expr_count += 1
-    
+
     # Update example queries
     example_query_count = 0
     for query in genie_config.get("example_sql_queries", []):
@@ -67,7 +242,7 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
         if "sql_query" in query and old_prefix in query["sql_query"]:
             query["sql_query"] = query["sql_query"].replace(old_prefix, new_prefix)
             example_query_count += 1
-    
+
     # Update benchmark questions
     benchmark_count = 0
     for benchmark in genie_config.get("benchmark_questions", []):
@@ -99,7 +274,51 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
         if "content" in instruction and old_prefix in instruction["content"]:
             instruction["content"] = instruction["content"].replace(old_prefix, new_prefix)
             instruction_count += 1
-    
+
+    # Update joins
+    join_count = 0
+    for join in genie_config.get("joins", []):
+        updated_this_join = False
+        old_prefix = f"{old_catalog}.{old_schema}."
+        new_prefix = f"{new_catalog}.{new_schema}."
+
+        if "left_table" in join and old_prefix in join["left_table"]:
+            join["left_table"] = join["left_table"].replace(old_prefix, new_prefix)
+            updated_this_join = True
+
+        if "right_table" in join and old_prefix in join["right_table"]:
+            join["right_table"] = join["right_table"].replace(old_prefix, new_prefix)
+            updated_this_join = True
+
+        if "join_condition" in join and old_prefix in join["join_condition"]:
+            join["join_condition"] = join["join_condition"].replace(old_prefix, new_prefix)
+            updated_this_join = True
+
+        if updated_this_join:
+            join_count += 1
+
+    # Update join_specifications
+    join_spec_count = 0
+    for join_spec in genie_config.get("join_specifications", []):
+        updated_this_spec = False
+        old_prefix = f"{old_catalog}.{old_schema}."
+        new_prefix = f"{new_catalog}.{new_schema}."
+
+        if "left_table" in join_spec and old_prefix in join_spec["left_table"]:
+            join_spec["left_table"] = join_spec["left_table"].replace(old_prefix, new_prefix)
+            updated_this_spec = True
+
+        if "right_table" in join_spec and old_prefix in join_spec["right_table"]:
+            join_spec["right_table"] = join_spec["right_table"].replace(old_prefix, new_prefix)
+            updated_this_spec = True
+
+        if "join_condition" in join_spec and old_prefix in join_spec["join_condition"]:
+            join_spec["join_condition"] = join_spec["join_condition"].replace(old_prefix, new_prefix)
+            updated_this_spec = True
+
+        if updated_this_spec:
+            join_spec_count += 1
+
     # Save back to file
     if "genie_space_config" in config:
         config["genie_space_config"] = genie_config
@@ -114,91 +333,176 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
         'sql_expressions': sql_expr_count,
         'example_queries': example_query_count,
         'benchmark_questions': benchmark_count,
-        'instructions': instruction_count
+        'instructions': instruction_count,
+        'joins': join_count,
+        'join_specifications': join_spec_count
     }
 
 
 def prompt_catalog_schema_replacement(report, config_path: str) -> bool:
     """
-    Prompt user for catalog/schema replacement when tables are not found.
-    
+    Prompt user for catalog/schema/table replacement when tables are not found.
+
+    Supports two modes:
+    1. Bulk replacement: Replace catalog.schema for all tables at once
+    2. Individual replacement: Replace catalog.schema.table one by one
+
     Returns:
         True if configuration was updated, False otherwise
     """
-    # Find table_not_found errors
-    table_not_found_errors = [
-        issue for issue in report.issues 
-        if issue.severity == "error" and issue.type == "table_not_found"
+    # Find table_not_found errors and table_reference_invalid warnings
+    table_issues = [
+        issue for issue in report.issues
+        if (issue.severity == "error" and issue.type == "table_not_found") or
+           (issue.severity == "warning" and issue.type == "table_reference_invalid")
     ]
-    
-    if not table_not_found_errors:
+
+    if not table_issues:
         return False
-    
-    # Extract unique catalog.schema combinations from failed tables
-    failed_schemas = {}
-    for issue in table_not_found_errors:
+
+    # Extract failed tables with full details
+    failed_tables = []
+    for issue in table_issues:
         if issue.table:
             parts = issue.table.split('.')
             if len(parts) == 3:
                 catalog, schema, table = parts
-                key = f"{catalog}.{schema}"
-                if key not in failed_schemas:
-                    failed_schemas[key] = []
-                failed_schemas[key].append(table)
-    
-    if not failed_schemas:
+                failed_tables.append({
+                    'full_name': issue.table,
+                    'catalog': catalog,
+                    'schema': schema,
+                    'table': table
+                })
+
+    if not failed_tables:
         return False
-    
+
     print()
     print("=" * 80)
-    print("⚠️  TABLE VALIDATION FAILED")
+    print("⚠️  TABLE VALIDATION ISSUES FOUND")
     print("=" * 80)
     print()
-    print("The following catalog.schema combinations have tables that were not found:")
+    print(f"Found {len(failed_tables)} table(s) with issues:")
     print()
-    
-    for i, (schema_key, tables) in enumerate(failed_schemas.items(), 1):
-        print(f"  {i}. {schema_key}")
-        print(f"     Tables: {', '.join(tables[:3])}" + ("..." if len(tables) > 3 else ""))
-    
+
+    for i, table_info in enumerate(failed_tables, 1):
+        print(f"  {i}. {table_info['full_name']}")
+
     print()
-    print("Would you like to replace the catalog and schema names?")
-    response = input("Replace catalog/schema? [y/N]: ").strip().lower()
-    
-    if response not in ['y', 'yes']:
+    print("Choose replacement mode:")
+    print("  1. Bulk replacement (replace catalog.schema for all tables)")
+    print("  2. Individual replacement (replace catalog.schema.table one by one)")
+    print("  3. Cancel")
+
+    mode = input("Enter choice [1/2/3]: ").strip()
+
+    if mode == "3" or not mode:
         return False
-    
-    # Prompt for replacements
+
     updated = False
-    for schema_key, tables in failed_schemas.items():
-        old_catalog, old_schema = schema_key.split('.')
-        
+
+    if mode == "1":
+        # Bulk replacement mode - group by catalog.schema
+        failed_schemas = {}
+        for table_info in failed_tables:
+            key = f"{table_info['catalog']}.{table_info['schema']}"
+            if key not in failed_schemas:
+                failed_schemas[key] = []
+            failed_schemas[key].append(table_info['table'])
+
+        for schema_key, tables in failed_schemas.items():
+            old_catalog, old_schema = schema_key.split('.')
+
+            print()
+            print(f"Replacing: {schema_key}")
+            print(f"  Affects {len(tables)} table(s): {', '.join(tables[:3])}" + ("..." if len(tables) > 3 else ""))
+            new_catalog = input(f"  New catalog (current: {old_catalog}, press Enter to keep): ").strip()
+            new_schema = input(f"  New schema (current: {old_schema}, press Enter to keep): ").strip()
+
+            # Use existing values if user pressed Enter
+            if not new_catalog:
+                new_catalog = old_catalog
+            if not new_schema:
+                new_schema = old_schema
+
+            # Only update if something changed
+            if new_catalog != old_catalog or new_schema != old_schema:
+                print(f"  Updating {old_catalog}.{old_schema} → {new_catalog}.{new_schema}...")
+                counts = update_config_catalog_schema(
+                    config_path,
+                    old_catalog,
+                    old_schema,
+                    new_catalog,
+                    new_schema
+                )
+                print(f"  ✓ Updated:")
+                print(f"     - {counts['tables']} table(s)")
+                print(f"     - {counts['sql_expressions']} SQL expression(s)")
+                print(f"     - {counts['example_queries']} example query/queries")
+                print(f"     - {counts['benchmark_questions']} benchmark question(s)")
+                print(f"     - {counts['instructions']} instruction(s)")
+                print(f"     - {counts['joins']} join(s)")
+                print(f"     - {counts['join_specifications']} join specification(s)")
+                updated = True
+            else:
+                print(f"  Skipping {schema_key} (no changes)")
+
+    elif mode == "2":
+        # Individual table replacement mode
         print()
-        print(f"Replacing: {schema_key}")
-        new_catalog = input(f"  New catalog (current: {old_catalog}): ").strip()
-        new_schema = input(f"  New schema (current: {old_schema}): ").strip()
-        
-        if new_catalog and new_schema:
-            print(f"  Updating {old_catalog}.{old_schema} → {new_catalog}.{new_schema}...")
-            counts = update_config_catalog_schema(
-                config_path, 
-                old_catalog, 
-                old_schema, 
-                new_catalog, 
-                new_schema
-            )
-            print(f"  ✓ Updated:")
-            print(f"     - {counts['tables']} table(s)")
-            print(f"     - {counts['sql_expressions']} SQL expression(s)")
-            print(f"     - {counts['example_queries']} example query/queries")
-            print(f"     - {counts['benchmark_questions']} benchmark question(s)")
-            print(f"     - {counts['instructions']} instruction(s)")
-            updated = True
-        elif not new_catalog and not new_schema:
-            print(f"  Skipping {schema_key}")
-        else:
-            print(f"  ⚠️  Both catalog and schema must be provided. Skipping {schema_key}")
-    
+        print("Individual table replacement mode:")
+        print("  Press Enter to keep current value")
+        print("  Type new value to replace")
+        print()
+
+        for i, table_info in enumerate(failed_tables, 1):
+            print(f"Table {i}/{len(failed_tables)}: {table_info['full_name']}")
+
+            new_catalog = input(f"  New catalog (current: {table_info['catalog']}): ").strip()
+            new_schema = input(f"  New schema (current: {table_info['schema']}): ").strip()
+            new_table = input(f"  New table (current: {table_info['table']}): ").strip()
+
+            # Use existing values if user pressed Enter
+            if not new_catalog:
+                new_catalog = table_info['catalog']
+            if not new_schema:
+                new_schema = table_info['schema']
+            if not new_table:
+                new_table = table_info['table']
+
+            # Only update if something changed
+            if (new_catalog != table_info['catalog'] or
+                new_schema != table_info['schema'] or
+                new_table != table_info['table']):
+
+                print(f"  Updating {table_info['full_name']} → {new_catalog}.{new_schema}.{new_table}...")
+                counts = update_config_catalog_schema_table(
+                    config_path,
+                    table_info['catalog'],
+                    table_info['schema'],
+                    table_info['table'],
+                    new_catalog,
+                    new_schema,
+                    new_table
+                )
+                print(f"  ✓ Updated:")
+                print(f"     - {counts['tables']} table(s)")
+                print(f"     - {counts['sql_expressions']} SQL expression(s)")
+                print(f"     - {counts['example_queries']} example query/queries")
+                print(f"     - {counts['benchmark_questions']} benchmark question(s)")
+                print(f"     - {counts['instructions']} instruction(s)")
+                print(f"     - {counts['joins']} join(s)")
+                print(f"     - {counts['join_specifications']} join specification(s)")
+                updated = True
+            else:
+                print(f"  Skipping (no changes)")
+
+            print()
+
+    else:
+        print("Invalid choice. Cancelling.")
+        return False
+
     return updated
 
 
@@ -227,6 +531,8 @@ def cmd_create(args):
             faq_section=args.faq_section,
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
+            benchmark_batch_size=args.benchmark_batch_size,
+            skip_benchmark_sql=args.skip_benchmark_sql,
             verbose=True
         )
         
@@ -279,12 +585,45 @@ def cmd_create(args):
                     print()
                     print("⚠️  Validation completed with warnings.")
                     print()
-                    # Ask user if they want to continue
-                    if not args.yes:
-                        response = input("Continue with deployment? [y/N]: ")
-                        if response.lower() not in ['y', 'yes']:
+
+                    # Show warning details
+                    warning_issues = [i for i in report.issues if i.severity == 'warning']
+                    if warning_issues:
+                        print("Warnings found:")
+                        for issue in warning_issues:
+                            print(f"  • {issue.message}")
+                            if issue.table:
+                                print(f"    Table: {issue.table}")
+                            if issue.location:
+                                print(f"    Location: {issue.location}")
+                    print()
+
+                    # Ask user if they want to fix the issues
+                    if not args.yes and validation_attempt < max_validation_attempts:
+                        print("Options:")
+                        print("  1. Fix issues (replace invalid table references)")
+                        print("  2. Continue anyway (warnings will be ignored)")
+                        print("  3. Cancel")
+                        print()
+                        choice = input("Enter choice [1/2/3]: ").strip()
+
+                        if choice == "1":
+                            # Try to fix the issues
+                            updated = prompt_catalog_schema_replacement(report, args.output)
+
+                            if updated:
+                                print()
+                                print("=" * 80)
+                                print("🔄 Configuration updated. Re-validating...")
+                                print("=" * 80)
+                                print()
+                                continue
+                            else:
+                                print("No changes made.")
+                        elif choice == "3":
                             print("Deployment cancelled.")
                             return 0
+                        # choice == "2" or any other input continues with deployment
                 
                 # Validation passed
                 break
@@ -370,6 +709,8 @@ def cmd_generate(args):
             faq_section=args.faq_section,
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
+            benchmark_batch_size=args.benchmark_batch_size,
+            skip_benchmark_sql=args.skip_benchmark_sql,
             verbose=True
         )
         
@@ -439,7 +780,7 @@ def cmd_validate(args):
                 # Prompt for catalog/schema replacement
                 if validation_attempt < max_validation_attempts:
                     updated = prompt_catalog_schema_replacement(report, args.config)
-                    
+
                     if updated:
                         print()
                         print("=" * 80)
@@ -447,15 +788,60 @@ def cmd_validate(args):
                         print("=" * 80)
                         print()
                         continue
-                
+
                 print("Next steps:")
                 print("  1. Fix the errors in your configuration")
                 print("  2. Run validation again")
                 return 1
-            else:
-                print("Next steps:")
-                print(f"  Deploy: python genie.py deploy")
-                return 0
+
+            if report.has_warnings():
+                print()
+                print("⚠️  Validation completed with warnings.")
+                print()
+
+                # Show warning details
+                warning_issues = [i for i in report.issues if i.severity == 'warning']
+                if warning_issues:
+                    print("Warnings found:")
+                    for issue in warning_issues:
+                        print(f"  • {issue.message}")
+                        if issue.table:
+                            print(f"    Table: {issue.table}")
+                        if issue.location:
+                            print(f"    Location: {issue.location}")
+                print()
+
+                # Ask user if they want to fix the issues
+                if validation_attempt < max_validation_attempts:
+                    print("Options:")
+                    print("  1. Fix issues (replace invalid table references)")
+                    print("  2. Continue anyway (warnings will be ignored)")
+                    print("  3. Cancel")
+                    print()
+                    choice = input("Enter choice [1/2/3]: ").strip()
+
+                    if choice == "1":
+                        # Try to fix the issues
+                        updated = prompt_catalog_schema_replacement(report, args.config)
+
+                        if updated:
+                            print()
+                            print("=" * 80)
+                            print("🔄 Configuration updated. Re-validating...")
+                            print("=" * 80)
+                            print()
+                            continue
+                        else:
+                            print("No changes made.")
+                    elif choice == "3":
+                        print("Validation cancelled.")
+                        return 1
+                    # choice == "2" or any other input continues
+
+            # Validation passed (or user chose to continue with warnings)
+            print("Next steps:")
+            print(f"  Deploy: python genie.py deploy --config {args.config}")
+            return 0
         
     except Exception as e:
         print()
@@ -528,24 +914,42 @@ def cmd_parse(args):
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
             verbose=True,
-            max_concurrent_pdfs=args.max_concurrent
+            max_concurrent_pdfs=args.max_concurrent,
+            force=args.force,
+            cache_file=args.cache_file,
+            no_cache=args.no_cache
         )
         
         print()
         print("=" * 80)
-        print("✓ Parsing Summary")
+        if result.get('cache_used'):
+            print("✓ Parsing Summary (from cache)")
+        else:
+            print("✓ Parsing Summary")
         print("=" * 80)
         print()
         print(f"Output file: {result['output_path']}")
         print()
-        print(f"Extracted content:")
-        print(f"  Questions: {result['questions_count']}")
-        print(f"  Tables: {result['tables_count']}")
-        print(f"  SQL Queries: {result['queries_count']}")
-        print(f"  Sections: {result['sections_count']}")
-        print()
+        
+        # Only show detailed stats if not using cache (cache doesn't track these)
+        if not result.get('cache_used'):
+            print(f"Extracted content:")
+            print(f"  Questions: {result['questions_count']}")
+            print(f"  Tables: {result['tables_count']}")
+            print(f"  SQL Queries: {result['queries_count']}")
+            print(f"  Sections: {result['sections_count']}")
+            print()
+        
         print(f"LLM enrichment: {'Yes' if result['used_llm'] else 'No'}")
         print(f"Domain: {result['domain']}")
+        
+        if result.get('cache_used'):
+            print(f"Cache status: Used (cached at {result.get('cached_timestamp', 'unknown')})")
+        elif not args.no_cache:
+            print(f"Cache status: Updated ({args.cache_file})")
+        else:
+            print(f"Cache status: Disabled")
+        
         print()
         print("Next steps:")
         print(f"  Generate config: python genie.py generate --requirements {result['output_path']}")
@@ -642,8 +1046,8 @@ Environment Variables:
     create_parser.add_argument(
         "--max-tokens",
         type=int,
-        default=16000,
-        help="Maximum tokens to generate (default: 16000)"
+        default=24000,
+        help="Maximum tokens to generate (default: 24000)"
     )
     create_parser.add_argument(
         "--temperature",
@@ -678,7 +1082,18 @@ Environment Variables:
         default="## 📊 질문 목록 (FAQ)",
         help="FAQ section title in requirements"
     )
-    
+    create_parser.add_argument(
+        "--skip-benchmark-sql",
+        action="store_true",
+        help="Skip benchmark SQL generation (for testing)"
+    )
+    create_parser.add_argument(
+        "--benchmark-batch-size",
+        type=int,
+        default=10,
+        help="Batch size for benchmark SQL generation (default: 10)"
+    )
+
     # Validation options
     create_parser.add_argument(
         "--skip-validation",
@@ -747,8 +1162,8 @@ Environment Variables:
     generate_parser.add_argument(
         "--max-tokens",
         type=int,
-        default=16000,
-        help="Maximum tokens (default: 16000)"
+        default=24000,
+        help="Maximum tokens (default: 24000)"
     )
     generate_parser.add_argument(
         "--temperature",
@@ -780,6 +1195,17 @@ Environment Variables:
         help="FAQ section title"
     )
     generate_parser.add_argument(
+        "--skip-benchmark-sql",
+        action="store_true",
+        help="Skip benchmark SQL generation (for testing)"
+    )
+    generate_parser.add_argument(
+        "--benchmark-batch-size",
+        type=int,
+        default=10,
+        help="Batch size for benchmark SQL generation (default: 10)"
+    )
+    generate_parser.add_argument(
         "--databricks-host",
         type=str,
         help="Databricks workspace URL"
@@ -789,7 +1215,7 @@ Environment Variables:
         type=str,
         help="Databricks token"
     )
-    
+
     generate_parser.set_defaults(func=cmd_generate)
     
     # =========================================================================
@@ -919,6 +1345,22 @@ Environment Variables:
         type=int,
         default=3,
         help="Maximum number of PDFs to process concurrently (default: 3)"
+    )
+    parse_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-parsing even if cache is valid"
+    )
+    parse_parser.add_argument(
+        "--cache-file",
+        type=str,
+        default=".parse_cache.json",
+        help="Cache file location (default: .parse_cache.json)"
+    )
+    parse_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable caching entirely"
     )
     
     parse_parser.set_defaults(func=cmd_parse)

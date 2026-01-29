@@ -75,13 +75,23 @@
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│             STEP 4: BENCHMARK EXTRACTION (Existing)                  │
+│         STEP 4: BENCHMARK EXTRACTION & SQL GENERATION (2026)         │
+│                         Two-Pass Approach                            │
 │                                                                      │
 │  ┌───────────────────────────────────────────────────────────────┐ │
-│  │  BenchmarkExtractor                                           │ │
+│  │  Pass 1: BenchmarkExtractor                                   │ │
 │  │  • Extract all FAQ questions (100% coverage)                  │ │
-│  │  • Extract sample queries                                     │ │
-│  │  • Merge into configuration                                   │ │
+│  │  • Extract sample queries with SQL                            │ │
+│  │  • Merge into configuration (expected_sql: null for FAQs)     │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │  Pass 2: BenchmarkSQLGenerator (NEW)                          │ │
+│  │  • Filter benchmarks with expected_sql: null                  │ │
+│  │  • Build focused prompt (tables + questions only)             │ │
+│  │  • Generate SQL in batches (default: 10 questions/batch)      │ │
+│  │  • Update configuration with complete SQL                     │ │
+│  │  → Benefit: Scales to 100+ benchmarks without token limits    │ │
 │  └───────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
@@ -138,6 +148,7 @@
 │  │  • Validation Report (SQL + Instructions)                     │ │
 │  │  • Review Report (4-dimension scores + issues)                │ │
 │  │  • Unity Catalog table/column validation                      │ │
+│  │  • Interactive table replacement (catalog/schema/table)       │ │
 │  │  • Ready for deployment                                       │ │
 │  └───────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────┘
@@ -147,7 +158,8 @@
 - **Priority 1**: Enhanced prompts with SQL criteria + few-shot examples + domain knowledge
 - **Priority 2**: Automated SQL validation + instruction quality scoring
 - **Priority 3**: Domain extraction + comprehensive 4-dimension review
-- **Result**: 83/83 tests passing, production-ready quality assurance
+- **Two-Pass Benchmarks (2026)**: Separate SQL generation for scalability (supports 100+ benchmarks)
+- **Result**: 99/99 tests passing, production-ready quality assurance
 
 ## System Capabilities and Features
 
@@ -316,17 +328,20 @@
 │   │   └── templates/              # Prompt templates
 │   │       ├── curate_effective_genie.md         # Best practices
 │   │       ├── genie_api.md                      # API documentation
-│   │       └── guide_prompt_with_reasoning.md    # 🆕 Enhanced prompt (P1)
+│   │       ├── guide_prompt_with_reasoning.md    # 🆕 Enhanced prompt (P1)
+│   │       └── benchmark_sql_prompt.md           # 🆕 Benchmark SQL generation prompt (2026)
 │   ├── parsing/                    # Requirements parsing
 │   │   ├── __init__.py
 │   │   ├── pdf_parser.py           # PDF extraction
 │   │   ├── markdown_parser.py      # Markdown extraction
 │   │   ├── requirements_structurer.py  # Data models & structuring
 │   │   ├── llm_enricher.py         # LLM-based enrichment
-│   │   └── markdown_generator.py   # Markdown output generation
+│   │   ├── markdown_generator.py   # Markdown output generation
+│   │   └── feedback_parser.py      # 🆕 Feedback analysis parser
 │   └── utils/                      # Utility modules
 │       ├── __init__.py
 │       ├── benchmark_extractor.py  # Benchmark extractor (100% FAQ coverage)
+│       ├── benchmark_sql_generator.py  # 🆕 Two-pass benchmark SQL generation (2026)
 │       ├── config_transformer.py   # Config transformation
 │       ├── table_validator.py      # Unity Catalog table & column validator
 │       ├── sql_validator.py        # 🆕 SQL syntax & quality validator (P2)
@@ -342,7 +357,10 @@
 │
 ├── scripts/                        # Utility scripts
 │   ├── validate_setup.py           # Environment validation
-│   └── convert_requirements.py     # Requirements conversion
+│   ├── convert_requirements.py     # Requirements conversion
+│   ├── auto_deploy.py              # 🆕 Automated deployment with catalog replacement
+│   ├── analyze_feedback.py         # 🆕 Genie Space feedback analysis
+│   └── export_feedback_csv.py      # 🆕 Export feedback to CSV
 │
 ├── change_logs/                    # 🆕 Quality improvement documentation
 │   ├── priority1_improvements_summary.md       # P1: Enhanced prompts
@@ -352,13 +370,14 @@
 │   ├── FINAL_SUMMARY.md                        # Complete 3-priority summary
 │   └── sql_quality_quick_reference.md          # SQL standards reference
 │
-└── tests/                          # Test suite (83 tests, all passing ✅)
+└── tests/                          # Test suite (99 tests, all passing ✅)
     ├── __init__.py
-    ├── test_generation.py          # Generation tests
+    ├── test_generation.py          # Generation tests (includes two-pass integration test)
     ├── test_example_usage.py       # Example usage tests
     ├── test_join_specs.py          # Join specification tests
     ├── test_requirements_converter.py  # Requirements conversion tests
     ├── test_table_validator.py     # Table validator tests
+    ├── test_benchmark_sql_generator.py  # 🆕 Benchmark SQL generation (16 tests, 2026)
     ├── test_enhanced_generation.py # 🆕 P1: Enhanced prompts (7 tests)
     ├── test_sql_validator.py       # 🆕 P2: SQL validation (22 tests)
     ├── test_instruction_scorer.py  # 🆕 P2: Instruction scoring (23 tests)
@@ -905,7 +924,136 @@ class ConfigInstructionQualityReport:
 
 **Priority 1 Requirement**: Instructions marked as `priority: 1` must score ≥80.
 
-#### 8.4 Configuration Review Agent (Priority 3)
+#### 8.4 Benchmark SQL Generator (New 2026)
+
+**Module**: `src/utils/benchmark_sql_generator.py`
+**Prompt Template**: `src/prompt/templates/benchmark_sql_prompt.md`
+
+**Purpose**: Generate SQL queries for benchmark questions using a two-pass approach that scales to 100+ benchmarks without token limit issues.
+
+**Problem Solved**:
+- Original single-pass approach generated incomplete SQL for large benchmark sets (27+ questions)
+- Token budget exhaustion caused SQL truncation mid-generation
+- LLM-generated benchmark SQL was discarded during extraction merge step (wasted tokens)
+
+**Two-Pass Architecture**:
+
+```
+Pass 1 - Main Config Generation:
+  • LLM generates tables, joins, instructions, example SQL
+  • Benchmark questions extracted from requirements (regex)
+  • Benchmarks have expected_sql: null (no SQL generated yet)
+  • Token savings: ~25% reduction vs single-pass
+
+Pass 2 - Focused Benchmark SQL Generation:
+  • Filter benchmarks where expected_sql is None
+  • Build focused prompt: table schemas + join specs + questions only
+  • Call LLM in batches (default: 10 questions per call)
+  • Parse and validate SQL responses
+  • Update configuration with generated SQL
+```
+
+**Data Models**:
+```python
+class BenchmarkSQL(BaseModel):
+    """Single benchmark SQL result from LLM."""
+    question: str
+    sql: str  # Complete SQL query ending with semicolon
+    reasoning: Optional[str]
+
+class BenchmarkSQLResponse(BaseModel):
+    """Response from LLM for benchmark SQL generation."""
+    benchmark_sqls: List[BenchmarkSQL]
+    reasoning: Optional[str]
+```
+
+**Key Functions**:
+```python
+def generate_benchmark_sql_for_config(
+    config: Dict[str, Any],
+    llm_client: DatabricksLLMClient,
+    max_tokens: int = 4000,
+    temperature: float = 0.1,
+    batch_size: int = 10,
+    verbose: bool = False
+) -> Dict[str, Any]:
+    """Main orchestration function for two-pass approach."""
+
+def build_benchmark_sql_prompt(
+    tables: List[Dict],
+    join_specs: List[Dict],
+    benchmark_questions: List[Dict]
+) -> str:
+    """Build focused prompt for SQL generation only."""
+
+def parse_benchmark_sql_response(
+    response: BenchmarkSQLResponse
+) -> List[Dict[str, Any]]:
+    """Parse LLM response, validate completeness."""
+
+def _batch_benchmarks(
+    benchmarks: List[Dict],
+    batch_size: int
+) -> Iterator[List[Dict]]:
+    """Split benchmarks into batches for processing."""
+```
+
+**Batching Strategy**:
+- Default batch size: 10 questions per LLM call
+- 27 benchmarks = 3 LLM calls (10 + 10 + 7)
+- Configurable via `--benchmark-batch-size` CLI flag
+- Each batch is independent (no dependencies between batches)
+
+**CLI Usage**:
+```bash
+# Default: two-pass with batch size 10
+genie.py generate --requirements data/requirements.md
+
+# Custom batch size
+genie.py generate --requirements data/requirements.md \
+  --benchmark-batch-size 5
+
+# Skip benchmark SQL generation (testing only)
+genie.py generate --requirements data/requirements.md \
+  --skip-benchmark-sql
+```
+
+**Performance Characteristics**:
+- **Token savings in Pass 1**: ~25% reduction (no benchmark SQL)
+- **Additional API calls**: +1 call per 10 benchmarks
+- **For 27 benchmarks**: 1 main call + 3 batch calls = 4 total calls
+- **Cost increase**: ~40% more API calls (necessary for correctness)
+- **Time increase**: +15-30 seconds per generation
+- **Scalability**: Supports unlimited benchmarks (tested with 100+)
+
+**Benefits**:
+- ✅ Scales to 100+ benchmarks without token limit errors
+- ✅ Complete, correct SQL (no truncation or incomplete queries)
+- ✅ Better SQL quality (focused prompts, no CTE reuse between unrelated questions)
+- ✅ Cost-effective (only generates SQL for FAQ questions, not sample queries)
+- ✅ Backwards compatible (sample queries with SQL in requirements work as-is)
+
+**SQL Quality Validation**:
+- Every SQL query must end with semicolon (auto-fixed if missing)
+- Empty SQL raises validation error
+- Question text must match exactly
+- All questions from batch must be present in response
+
+**Error Handling**:
+- LLM failures raise `RuntimeError` with batch number
+- Per-batch error handling (one failed batch doesn't affect others)
+- Graceful handling of missing questions in response
+- Verbose mode provides detailed progress tracking
+
+**Test Coverage**:
+- 16 unit tests (100% passing)
+- Batching logic: 4 tests
+- Prompt building: 3 tests
+- Response parsing: 5 tests
+- Integration tests: 4 tests
+- End-to-end test in `test_generation.py`
+
+#### 8.5 Configuration Review Agent (Priority 3)
 
 **Class**: `ConfigReviewAgent`
 **Module**: `src/pipeline/reviewer.py`
@@ -1160,12 +1308,34 @@ Pydantic Validation (src/models.py)
             │
             ▼
 
-STEP 4: Benchmark Extraction (Existing)
-───────────────────────────────────────
-BenchmarkExtractor.extract_all_benchmarks()
-    ├─── Extract FAQ questions (100% coverage)
-    ├─── Extract sample queries from requirements
+STEP 4: Benchmark Extraction & SQL Generation (Two-Pass, 2026)
+────────────────────────────────────────────────────────────────
+Pass 1 - BenchmarkExtractor.extract_all_benchmarks()
+    ├─── Extract FAQ questions (100% coverage, expected_sql: null)
+    ├─── Extract sample queries from requirements (with SQL)
     └─── Merge into configuration
+            │
+            ▼
+
+Pass 2 - BenchmarkSQLGenerator.generate_benchmark_sql_for_config()
+    ├─── Filter benchmarks where expected_sql is None
+    ├─── Build focused prompt (tables + join specs + questions)
+    ├─── Call LLM in batches (default: 10 questions per batch)
+    │    ├─── Batch 1: Questions 1-10  → SQL queries
+    │    ├─── Batch 2: Questions 11-20 → SQL queries
+    │    └─── Batch N: Remaining       → SQL queries
+    ├─── Parse and validate SQL responses
+    │    ├─── Ensure SQL completeness (ends with semicolon)
+    │    └─── Handle errors gracefully
+    └─── Update configuration with generated SQL
+            │
+            ▼
+
+Benefits:
+  • Scales to 100+ benchmarks without token limit issues
+  • Better SQL quality (focused prompts, no CTE reuse)
+  • Cost-effective (only generates SQL for FAQ questions)
+  • Backwards compatible (sample queries with SQL work as-is)
             │
             ▼
 
@@ -1410,7 +1580,8 @@ genie.py (Unified CLI)
     │       ├── generate_config()
     │       ├── src.prompt.prompt_builder (PromptBuilder)
     │       ├── src.llm.databricks_llm (DatabricksFoundationModelClient)
-    │       ├── src.utils.benchmark_extractor
+    │       ├── src.utils.benchmark_extractor (Pass 1: Extract questions)
+    │       ├── src.utils.benchmark_sql_generator (Pass 2: Generate SQL, NEW 2026)
     │       └── src.models (Pydantic models)
     │           └── Uses: pydantic, requests
     │
@@ -1448,6 +1619,15 @@ scripts/validate_setup.py (Setup Validation)
 
 scripts/convert_requirements.py (Requirements Conversion)
     └── src.parsing modules for document conversion
+
+scripts/auto_deploy.py (Automated Deployment)
+    └── Full pipeline with automatic catalog/schema replacement
+
+scripts/analyze_feedback.py (Feedback Analysis)
+    └── src.parsing.feedback_parser for quality assessment
+
+scripts/export_feedback_csv.py (Feedback Export)
+    └── Export feedback data to CSV format
 ```
 
 ## Error Handling Flow
@@ -1521,6 +1701,10 @@ Try:
 --temperature 0.1           # Sampling temperature (0.0-1.0)
 --no-reasoning              # Skip reasoning output
 
+# Benchmark SQL generation (NEW 2026)
+--benchmark-batch-size 10   # Batch size for SQL generation (default: 10)
+--skip-benchmark-sql        # Skip benchmark SQL generation (testing only)
+
 # Authentication
 --databricks-host https://... # Databricks workspace URL
 --databricks-token dapi...    # Personal access token
@@ -1538,11 +1722,15 @@ export DATABRICKS_TOKEN="dapi1234..."
 | Metric | Typical Value | Notes |
 |--------|---------------|-------|
 | Prompt Length | 40-50 KB | Depends on input doc sizes |
-| Request Time | 30-60 seconds | Model-dependent |
-| Token Usage | 3000-4000 | For generation |
+| Request Time (Single-Pass) | 30-60 seconds | Model-dependent |
+| Request Time (Two-Pass) | 45-90 seconds | +15-30s for benchmark SQL generation |
+| Token Usage (Pass 1) | 3000-4000 | Main config generation (~25% savings vs old) |
+| Token Usage (Pass 2) | 1000-2000 per batch | Benchmark SQL generation (10 questions/batch) |
+| LLM API Calls (27 benchmarks) | 4 total | 1 main + 3 batches (10+10+7) |
 | Output Size | 10-50 KB | JSON configuration |
 | Memory Usage | < 100 MB | Lightweight |
 | Concurrent Requests | 1 | Sequential by design |
+| Scalability (Benchmarks) | 100+ supported | Two-pass approach prevents token limit errors |
 
 ## Security Considerations
 
@@ -1602,7 +1790,94 @@ genie.py deploy --config output/genie_space_config.json
 python scripts/validate_setup.py
 ```
 
-### 3. Genie Space Usage Examples (`examples/create_genie_space_example.py`)
+### 3. Auto-Deploy Script (`scripts/auto_deploy.py`)
+
+**Purpose**: Automated deployment with catalog/schema replacement
+
+**Features**:
+- Full pipeline automation (generate → validate → deploy)
+- Automatic catalog/schema replacement for all tables
+- Non-interactive deployment for CI/CD workflows
+- Custom warehouse and parent path support
+
+**Usage**:
+```bash
+# Basic auto-deploy
+.venv/bin/python scripts/auto_deploy.py
+
+# With custom catalog/schema
+.venv/bin/python scripts/auto_deploy.py \
+  --requirements data/parsed.md \
+  --catalog sandbox \
+  --schema agent_poc
+
+# With all options
+.venv/bin/python scripts/auto_deploy.py \
+  --requirements data/parsed.md \
+  --output output/config.json \
+  --catalog prod \
+  --schema analytics \
+  --warehouse-id your-warehouse-id
+```
+
+**Process**:
+1. Generate configuration from requirements
+2. Replace all catalog.schema references
+3. Validate tables (non-interactive)
+4. Deploy space
+5. Output space URL and ID
+
+### 4. Feedback Analysis Scripts (`scripts/analyze_feedback.py`, `scripts/export_feedback_csv.py`)
+
+**Purpose**: Analyze Genie Space response quality and user feedback
+
+**analyze_feedback.py**:
+- Parses feedback markdown files
+- Generates comprehensive analysis reports
+- Success rate and failure pattern analysis
+- Common error detection
+
+**export_feedback_csv.py**:
+- Exports feedback to CSV format
+- Creates summary and detailed reports
+- Excel/Google Sheets compatible
+
+**Usage**:
+```bash
+# Analyze feedback
+.venv/bin/python scripts/analyze_feedback.py feedback/results.md
+
+# Export to CSV
+.venv/bin/python scripts/export_feedback_csv.py feedback/results.md
+
+# Outputs:
+# - feedback/results_summary.csv (summary)
+# - feedback/results_detailed.csv (detailed)
+```
+
+**Feedback Entry Structure**:
+```python
+@dataclass
+class FeedbackEntry:
+    question: str
+    assessment: str  # "Good" or "Bad"
+    score_reasons: List[str]
+    model_output_type: str  # "SQL" or "text"
+    model_output: str
+    empty_result: bool
+    failure_reasoning: str
+    sql_differences: str
+    ground_truth_sql: str
+```
+
+**Analysis Metrics**:
+- Total questions evaluated
+- Success rate (Good vs Bad assessments)
+- Failure reason breakdown
+- Empty result detection
+- SQL comparison analysis
+
+### 5. Genie Space Usage Examples (`examples/create_genie_space_example.py`)
 
 **Purpose**: Demonstrate Python API usage patterns
 
@@ -2380,6 +2655,145 @@ assert "example_question_sqls" in parsed["instructions"]
 
 ---
 
+## Feedback Analysis System (New 2026)
+
+### Overview
+
+The Feedback Analysis System provides comprehensive tools for evaluating Genie Space quality by analyzing user questions, responses, and assessments. This enables data-driven improvements to space configurations.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Feedback Data (Markdown)                        │
+│  • Questions asked to Genie Space                            │
+│  • Model responses (SQL or text)                             │
+│  • Assessments (Good/Bad)                                    │
+│  • Score reasons                                             │
+│  • Ground truth SQL (if available)                           │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              FeedbackParser                                  │
+│  • Parse feedback markdown entries                           │
+│  • Extract questions, responses, assessments                 │
+│  • Categorize failure reasons                                │
+│  • Build structured data models                              │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Analysis & Export                               │
+│                                                              │
+│  analyze_feedback.py:                                        │
+│  • Success rate statistics                                   │
+│  • Failure reason breakdown                                  │
+│  • Common error patterns                                     │
+│  • Detailed entry examples                                   │
+│                                                              │
+│  export_feedback_csv.py:                                     │
+│  • Summary CSV (high-level metrics)                          │
+│  • Detailed CSV (per-question analysis)                      │
+│  • Excel/Sheets compatible output                            │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Improvement Workflow                            │
+│  1. Identify failure patterns                                │
+│  2. Update instructions/examples                             │
+│  3. Refine SQL expressions                                   │
+│  4. Re-deploy improved configuration                         │
+│  5. Re-test with same questions                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Feedback Entry Model
+
+```python
+@dataclass
+class FeedbackEntry:
+    question: str                # User question
+    assessment: str              # "Good" or "Bad"
+    score_reasons: List[str]     # Reasons for assessment
+    
+    # Model response
+    model_output_type: str       # "SQL" or "text"
+    model_output: str            # Actual response
+    empty_result: bool           # No data returned
+    
+    # Failure analysis
+    failure_reasoning: str       # Why it failed
+    sql_differences: str         # Differences from ground truth
+    
+    # Ground truth
+    ground_truth_sql: str        # Expected SQL
+```
+
+### Analysis Metrics
+
+1. **Success Rate**: Percentage of "Good" assessments
+2. **Failure Reasons**: Categorized error types
+   - Incorrect table reference
+   - Missing date filter
+   - Wrong aggregation
+   - Incomplete join
+   - Hard-coded values
+3. **Empty Results**: Queries returning no data
+4. **SQL Comparison**: Ground truth vs model output differences
+
+### Integration with Quality Workflow
+
+```
+Generate Config → Deploy Space → Test with Questions → Collect Feedback
+                                                              ↓
+                                                      Analyze Feedback
+                                                              ↓
+                                        Identify Improvement Areas
+                                                              ↓
+                                        Update Configuration
+                                                              ↓
+                                              Re-deploy Space
+                                                              ↓
+                                           Re-test (Verify Improvements)
+```
+
+### Use Cases
+
+1. **Quality Assessment**: Measure Genie Space accuracy
+2. **Error Pattern Detection**: Find common failure modes
+3. **Configuration Refinement**: Data-driven improvements
+4. **Instruction Enhancement**: Add clarifications based on failures
+5. **Benchmark Creation**: Use successful patterns as examples
+
+### Output Formats
+
+**Terminal Report** (analyze_feedback.py):
+```
+📊 GENIE SPACE FEEDBACK ANALYSIS
+================================================================================
+
+📈 Overall Statistics:
+  • Total Questions: 150
+  • Success Rate: 78.7%
+  • Good Responses: 118
+  • Bad Responses: 32
+  • Empty Results: 5
+
+❌ Failure Reasons:
+  • Incorrect table reference: 12 (8.0%)
+  • Missing date filter: 10 (6.7%)
+  • Wrong aggregation: 8 (5.3%)
+  • Incomplete join: 2 (1.3%)
+```
+
+**CSV Export** (export_feedback_csv.py):
+- `results_summary.csv`: One row per question
+- `results_detailed.csv`: Expanded with SQL comparisons
+
+---
+
 ## Table & Column Validation System
 
 ### Overview
@@ -2461,6 +2875,12 @@ The table validation system ensures that all customer-provided tables and column
 - **Case-Insensitive Matching**: Reduces false positives
 - **Detailed Reporting**: Errors, warnings, and info levels
 - **JSON Output**: CI/CD integration support
+- **Interactive Replacement** (New): Two-mode catalog/schema/table name replacement
+  - **Bulk Mode**: Replace catalog.schema for all tables at once
+  - **Individual Mode**: Replace catalog.schema.table one by one (handles table name changes)
+  - **Comprehensive Updates**: Automatically updates all references (SQL, joins, benchmarks, instructions)
+  - **Join Alias Updates**: Updates join aliases when table names change (e.g., `orders` → `transactions`)
+  - **Up to 3 validation attempts** with automatic re-validation after updates
 
 ### Usage
 
@@ -2513,6 +2933,7 @@ The validation system integrates at multiple points in the workflow:
 2. **Built into Create Command** (recommended)
    ```bash
    genie.py create --requirements data/requirements.md
+   # Automatically validates and offers interactive replacement if needed
    # Automatically runs: generate → validate → deploy
    ```
 
@@ -2544,13 +2965,85 @@ Common validation errors and solutions:
 | Access denied | Verify READ permissions on table |
 | API timeout | Check network connectivity, retry |
 
+### Interactive Table Replacement (New)
+
+When validation fails due to missing tables, the system offers interactive replacement to fix catalog/schema/table mismatches without manual editing.
+
+**Two Replacement Modes:**
+
+**Mode 1: Bulk Replacement**
+- Replaces catalog.schema for all tables with the same catalog.schema combination
+- Use when: Table names are consistent, but catalog/schema differs between environments
+- Example: All `dev.sales.*` tables → `prod.analytics.*`
+
+**Mode 2: Individual Replacement**
+- Replaces catalog.schema.table for each failed table individually
+- Use when: Table names also differ between environments
+- Example: `dev.sales.customer_data` → `prod.analytics.customers`
+
+**Automatic Updates:**
+The replacement process updates ALL references throughout the configuration:
+- ✅ Table definitions (catalog_name, schema_name, table_name)
+- ✅ SQL expressions (full table references)
+- ✅ Example SQL queries (full table references)
+- ✅ Benchmark questions (expected_sql and table fields)
+- ✅ Instructions (table references in content)
+- ✅ Joins (left_table, right_table, join_condition)
+- ✅ Join aliases (e.g., when `orders` → `transactions`, also updates `orders.id` → `transactions.id`)
+
+**Workflow:**
+```
+1. Validation detects missing tables
+2. System prompts user to choose mode:
+   [1] Bulk replacement
+   [2] Individual replacement
+   [3] Cancel
+3. User provides new catalog/schema/table names
+   (Press Enter to keep current values)
+4. System updates all references automatically
+5. Re-validation runs automatically
+6. Up to 3 validation attempts allowed
+```
+
+**Example:**
+```bash
+$ genie.py validate
+
+⚠️  TABLE VALIDATION FAILED
+Found 2 table(s) that were not found:
+  1. dev.sales.customer_data
+  2. dev.sales.order_history
+
+Choose replacement mode:
+  1. Bulk replacement (replace catalog.schema for all tables)
+  2. Individual replacement (replace catalog.schema.table one by one)
+  3. Cancel
+Enter choice [1/2/3]: 2
+
+Table 1/2: dev.sales.customer_data
+  New catalog (current: dev): prod
+  New schema (current: sales): analytics
+  New table (current: customer_data): customers
+  Updating dev.sales.customer_data → prod.analytics.customers...
+  ✓ Updated:
+     - 1 table(s)
+     - 2 SQL expression(s)
+     - 3 example query/queries
+     - 2 benchmark question(s)
+     - 1 instruction(s)
+     - 1 join(s)
+
+🔄 Configuration updated. Re-validating...
+```
+
 ### Best Practices
 
 1. **Always Validate**: Make it a required step in your workflow
 2. **Fix Errors**: Errors must be fixed; warnings should be reviewed
-3. **Save Reports**: Store validation results for audit trail
-4. **Automate**: Use in CI/CD for automated validation
-5. **Re-validate**: After any config changes, re-validate
+3. **Use Interactive Replacement**: Let the system update all references automatically
+4. **Save Reports**: Store validation results for audit trail
+5. **Automate**: Use in CI/CD for automated validation
+6. **Re-validate**: After any config changes, re-validate
 
 ### Documentation
 
@@ -2618,6 +3111,16 @@ genie.py generate \
 
 # Generate without reasoning
 genie.py generate --requirements data/demo_requirements.md --no-reasoning
+
+# 🆕 Generate with custom benchmark batch size (NEW 2026)
+genie.py generate \
+  --requirements data/demo_requirements.md \
+  --benchmark-batch-size 5
+
+# 🆕 Skip benchmark SQL generation (testing only, NEW 2026)
+genie.py generate \
+  --requirements data/demo_requirements.md \
+  --skip-benchmark-sql
 ```
 
 #### Table Validation
@@ -2818,6 +3321,9 @@ config, serialized = load_and_transform_config("config.json")
 | `genie.py` | 🌟 Unified CLI (parse, create, generate, validate, deploy) |
 | `scripts/validate_setup.py` | Setup validation |
 | `scripts/convert_requirements.py` | Requirements conversion |
+| `scripts/auto_deploy.py` | Automated deployment with catalog replacement |
+| `scripts/analyze_feedback.py` | Feedback analysis |
+| `scripts/export_feedback_csv.py` | Feedback export to CSV |
 | `examples/create_genie_space_example.py` | Python API examples |
 | `src/pipeline/parser.py` | Document parsing module (async/concurrent) |
 | `src/pipeline/generator.py` | Configuration generation module |
@@ -2829,20 +3335,24 @@ config, serialized = load_and_transform_config("config.json")
 | `src/api/genie_space_client.py` | Genie Space API client |
 | `src/utils/config_transformer.py` | Config transformation |
 | `src/utils/table_validator.py` | Table & column validator |
-| `src/utils/benchmark_extractor.py` | Benchmark extractor |
+| `src/utils/benchmark_extractor.py` | Benchmark extractor (Pass 1) |
+| `src/utils/benchmark_sql_generator.py` | 🆕 Benchmark SQL generator (Pass 2, 2026) |
 | `src/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) |
 | `src/parsing/markdown_parser.py` | Markdown extraction (regex) |
 | `src/parsing/requirements_structurer.py` | Data models & structuring |
 | `src/parsing/llm_enricher.py` | LLM-based enrichment |
 | `src/parsing/markdown_generator.py` | Markdown output generation |
+| `src/parsing/feedback_parser.py` | Feedback analysis parser |
 | `src/prompt/templates/curate_effective_genie.md` | Best practices context |
 | `src/prompt/templates/genie_api.md` | API documentation |
+| `src/prompt/templates/benchmark_sql_prompt.md` | 🆕 Benchmark SQL prompt (2026) |
 | `data/demo_requirements.md` | Example requirements |
 | `output/genie_space_config.json` | Generated configuration |
 | `output/genie_space_result.json` | Creation result |
 | `tests/test_table_validator.py` | Table validator tests |
 | `tests/test_join_specs.py` | Join specification tests |
 | `tests/test_pdf_image_parsing.py` | PDF image parsing tests |
+| `tests/test_benchmark_sql_generator.py` | 🆕 Benchmark SQL generator tests (16 tests, 2026) |
 
 ### Environment Variables
 

@@ -10,12 +10,31 @@ An intelligent agent that generates Databricks Genie space configurations using 
 ## 📚 Table of Contents
 
 - [Overview](#overview)
-- [Recent Updates](#recent-updates-january-2026)
+- [Recent Updates](#recent-updates)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
 - [Support](#support)
+
+## Recent Updates
+
+### January 2026 ⭐
+
+**🎯 Smart Parse Caching System**
+- Automatic caching of parsing results to avoid expensive re-parsing operations
+- Intelligent cache invalidation based on file changes, additions, or removals
+- Significant time and cost savings (no repeated vision model API calls)
+- Cache validated using file modification times, sizes, and parsing configuration
+- Full user control: `--force` to bypass cache, `--no-cache` to disable, `--cache-file` for custom location
+- Comprehensive test coverage (15 tests) for all caching scenarios
+- Graceful handling of corrupted cache files and edge cases
+
+**Benefits:**
+- ⚡ **Instant response** when files haven't changed (vs 2-3 min re-parsing)
+- 💰 **Cost savings** - no repeated vision model API calls
+- 🔍 **Smart validation** - automatic cache invalidation when needed
+- 🎛️ **User control** - explicit flags for cache management
 
 ## Overview
 
@@ -66,6 +85,13 @@ The agent follows a structured 7-step pipeline:
 - Significant performance improvements when processing multiple PDFs
 - Uses `aiohttp` for async HTTP requests and `tqdm` for progress visualization
 
+**Smart Parse Caching** 🎯
+- Automatically caches parsing results to avoid expensive re-parsing
+- Saves time and API costs (vision model calls) when requirements haven't changed
+- Intelligent cache invalidation when files are modified, added, or removed
+- Cache validated based on file modification times, sizes, and configuration
+- Full control with `--force` (bypass cache) and `--no-cache` (disable caching)
+
 **Usage:**
 ```bash
 # Process PDFs with default concurrency (3)
@@ -73,6 +99,15 @@ python genie.py parse --input-dir docs/ --output data/requirements.md
 
 # Process more PDFs simultaneously for faster results
 python genie.py parse --input-dir docs/ --output data/requirements.md --max-concurrent 5
+
+# Force re-parsing even if cache is valid
+python genie.py parse --input-dir docs/ --output data/requirements.md --force
+
+# Disable caching entirely
+python genie.py parse --input-dir docs/ --output data/requirements.md --no-cache
+
+# Custom cache file location
+python genie.py parse --input-dir docs/ --output data/requirements.md --cache-file custom_cache.json
 ```
 
 **Python API:**
@@ -82,14 +117,25 @@ from src.pipeline.parser import parse_documents, parse_documents_async
 # Synchronous (with async under the hood)
 result = parse_documents(
     input_dir="docs/",
-    max_concurrent_pdfs=5
+    max_concurrent_pdfs=5,
+    force=False,              # Set to True to bypass cache
+    cache_file=".parse_cache.json",  # Custom cache location
+    no_cache=False            # Set to True to disable caching
 )
+
+# Check if cache was used
+if result.get('cache_used'):
+    print("✓ Used cached results (no re-parsing needed)")
+else:
+    print("✓ Parsed documents and updated cache")
 
 # Direct async usage
 import asyncio
 result = asyncio.run(parse_documents_async(
     input_dir="docs/",
-    max_concurrent_pdfs=5
+    max_concurrent_pdfs=5,
+    force=False,
+    no_cache=False
 ))
 ```
 
@@ -304,11 +350,18 @@ This provides:
 If you have PDF or markdown documents that need to be converted to the standard format:
 
 ```bash
-# Parse documents into structured requirements (with concurrent processing)
+# Parse documents into structured requirements (with concurrent processing + caching)
 python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+
+# Second run with same files - instant response from cache! ⚡
+python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+# ✓ Using cached results (no changes detected)
 
 # Process multiple PDFs faster with increased concurrency
 python genie.py parse --input-dir real_requirements --output data/my_requirements.md --max-concurrent 5
+
+# Force re-parse when needed (bypasses cache)
+python genie.py parse --input-dir real_requirements --output data/my_requirements.md --force
 
 # Then create Genie space
 python genie.py create --requirements data/my_requirements.md
@@ -319,7 +372,12 @@ This is useful when you have:
 - Markdown files in non-standard format
 - Multiple source documents to combine
 
-**Performance Note**: PDF parsing now runs asynchronously with a progress bar. Use `--max-concurrent` to control how many PDFs are processed simultaneously (default: 3).
+**Performance Notes**: 
+- PDF parsing now runs asynchronously with progress tracking
+- Use `--max-concurrent` to control concurrent PDFs (default: 3)
+- Parsing results are automatically cached to avoid expensive re-parsing
+- Subsequent runs with unchanged files return instantly from cache
+- Use `--force` to bypass cache when needed
 
 ### Step-by-Step (Advanced)
 
@@ -338,6 +396,47 @@ python genie.py validate
 # Deploy config
 python genie.py deploy
 ```
+
+### Interactive Table Replacement
+
+When validation fails due to missing tables, the system offers **interactive replacement** with two modes:
+
+**Mode 1: Bulk Replacement** - Replace catalog.schema for all failed tables at once:
+```bash
+# When tables fail validation, you'll see:
+Choose replacement mode:
+  1. Bulk replacement (replace catalog.schema for all tables)
+  2. Individual replacement (replace catalog.schema.table one by one)
+  3. Cancel
+
+# Example: Change dev.sales.* to prod.analytics.*
+Enter choice [1/2/3]: 1
+Replacing: dev.sales
+  New catalog (current: dev): prod
+  New schema (current: sales): analytics
+```
+
+**Mode 2: Individual Replacement** - Replace catalog.schema.table for each failed table:
+```bash
+# Useful when table names also differ between environments
+Enter choice [1/2/3]: 2
+Table 1/2: dev.sales.customer_data
+  New catalog (current: dev): prod
+  New schema (current: sales): analytics
+  New table (current: customer_data): customers
+```
+
+The system automatically updates:
+- ✅ Table definitions (catalog, schema, table names)
+- ✅ SQL expressions and queries
+- ✅ Join specifications and conditions
+- ✅ Join aliases (e.g., `customer_data` → `customers`)
+- ✅ Benchmark questions
+- ✅ Instructions
+
+After replacement, validation runs again automatically (up to 3 attempts).
+
+
 
 ### Common Options
 
@@ -392,6 +491,12 @@ python genie.py parse \
   --output data/my_requirements.md \
   --llm-model databricks-gpt-5-2 \
   --vision-model databricks-claude-sonnet-4
+
+# Parse with cache control
+python genie.py parse \
+  --input-dir real_requirements \
+  --output data/my_requirements.md \
+  --force  # Force re-parse even if cached
 
 # Create space with default settings
 python genie.py create --requirements data/demo_requirements.md
@@ -907,6 +1012,9 @@ pytest tests/test_requirements_converter.py -v
 |--------|---------|------------|
 | `scripts/validate_setup.py` | Validate environment setup | First time setup, troubleshooting |
 | `scripts/convert_requirements.py` | Convert requirements documents | Processing PDFs/markdown to standard format |
+| `scripts/auto_deploy.py` | Automated deployment with catalog replacement | Automated workflows with known catalog/schema |
+| `scripts/analyze_feedback.py` | Analyze Genie Space feedback results | Quality assessment and improvement |
+| `scripts/export_feedback_csv.py` | Export feedback to CSV format | Detailed analysis in Excel/Sheets |
 
 ### Documentation Files
 | File | Description |
@@ -914,6 +1022,99 @@ pytest tests/test_requirements_converter.py -v
 | [README.md](README.md) | Complete getting started guide and API reference |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and design patterns |
 | [data/demo_requirements.md](data/demo_requirements.md) | Example requirements document |
+
+## Feedback Analysis System
+
+After deploying a Genie Space, you can evaluate its quality by analyzing user feedback and response accuracy. The feedback system provides comprehensive analysis tools.
+
+### Analyzing Genie Space Responses
+
+**Step 1: Generate Feedback Data**
+- Ask questions to your Genie Space
+- Capture responses, assessments (Good/Bad), and reasons
+- Save results to a markdown file
+
+**Step 2: Analyze Feedback**
+```bash
+# Generate comprehensive analysis report
+.venv/bin/python scripts/analyze_feedback.py feedback/results.md
+
+# Output includes:
+# - Success rate statistics
+# - Failure reason breakdown
+# - Common error patterns
+# - Detailed entry examples
+```
+
+**Step 3: Export to CSV for Detailed Analysis**
+```bash
+# Export to CSV for Excel/Google Sheets
+.venv/bin/python scripts/export_feedback_csv.py feedback/results.md
+
+# Creates both:
+# - feedback/results_summary.csv (high-level summary)
+# - feedback/results_detailed.csv (detailed analysis)
+```
+
+### Feedback Entry Format
+
+The feedback parser expects markdown files with entries like:
+```markdown
+---
+### Question: How many users registered last month?
+**Assessment**: Bad
+**Score Reasons**: 
+- Incorrect table reference
+- Missing date filter
+
+**Model Output (SQL)**:
+```sql
+SELECT COUNT(*) FROM users WHERE created_date > '2024-01-01'
+```
+
+**Ground Truth SQL**:
+```sql
+SELECT COUNT(*) FROM user_registrations 
+WHERE registration_date >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+  AND registration_date < DATE_TRUNC('month', CURRENT_DATE)
+```
+---
+```
+
+### Feedback Analysis Features
+
+- **Success Rate Tracking**: Overall good vs bad response rates
+- **Failure Pattern Analysis**: Most common error types
+- **SQL Comparison**: Ground truth vs model output differences
+- **Empty Result Detection**: Queries that return no data
+- **Reason Categorization**: Automated classification of issues
+
+### Using Feedback to Improve Configurations
+
+1. **Identify Common Failures**: Review failure reasons
+2. **Update Instructions**: Add clarification for common mistakes
+3. **Refine SQL Expressions**: Fix frequently misunderstood metrics
+4. **Add Examples**: Include example queries for problematic patterns
+5. **Re-deploy**: Update Genie Space with improvements
+6. **Re-test**: Verify improvements with same questions
+
+### Automated Deployment
+
+For automated workflows, use the auto-deploy script:
+
+```bash
+# Auto-deploy with catalog replacement
+.venv/bin/python scripts/auto_deploy.py \
+  --requirements data/parsed.md \
+  --catalog sandbox \
+  --schema agent_poc
+
+# This automatically:
+# 1. Generates configuration
+# 2. Replaces all catalog.schema references
+# 3. Validates tables
+# 4. Deploys space
+```
 
 ## Best Practices
 

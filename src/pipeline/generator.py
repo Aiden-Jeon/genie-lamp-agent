@@ -25,7 +25,7 @@ def generate_config(
     endpoint: Optional[str] = None,
     context_doc: str = "src/prompt/templates/curate_effective_genie.md",
     output_doc: str = "src/prompt/templates/genie_api.md",
-    max_tokens: int = 16000,
+    max_tokens: int = 24000,
     temperature: float = 0.1,
     no_reasoning: bool = False,
     faq_section: str = "## 📊 질문 목록 (FAQ)",
@@ -37,6 +37,8 @@ def generate_config(
     extract_domain: bool = True,
     review_config: bool = True,
     review_output: Optional[str] = None,
+    benchmark_batch_size: int = 10,
+    skip_benchmark_sql: bool = False,
     verbose: bool = True
 ) -> Dict[str, Any]:
     """
@@ -216,7 +218,46 @@ def generate_config(
     if verbose:
         print(f"   ✓ Replaced {original_count} LLM-generated benchmarks")
         print(f"   ✓ Added {len(benchmarks)} directly extracted benchmarks")
-    
+
+    # =========================================================================
+    # STEP 4.5: Generate SQL for benchmarks (two-pass approach)
+    # =========================================================================
+    if not skip_benchmark_sql:
+        if verbose:
+            print("\n🔧 Generating SQL for benchmarks...")
+
+        # Filter benchmarks needing SQL
+        benchmarks_needing_sql = [
+            bm for bm in config_data["genie_space_config"]["benchmark_questions"]
+            if bm.get("expected_sql") is None
+        ]
+
+        if benchmarks_needing_sql:
+            if verbose:
+                print(f"   {len(benchmarks_needing_sql)} benchmarks need SQL generation")
+                print(f"   Using batch size: {benchmark_batch_size}")
+
+            # Generate SQL
+            from src.utils.benchmark_sql_generator import generate_benchmark_sql_for_config
+
+            config_data = generate_benchmark_sql_for_config(
+                config=config_data,
+                llm_client=llm_client,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                batch_size=benchmark_batch_size,
+                verbose=verbose
+            )
+
+            if verbose:
+                print(f"   ✓ Generated SQL for all benchmarks")
+        else:
+            if verbose:
+                print(f"   ✓ All benchmarks have SQL (from requirements)")
+    else:
+        if verbose:
+            print("\n⏭️  Skipping benchmark SQL generation (--skip-benchmark-sql)")
+
     # =========================================================================
     # STEP 5: Validate configuration quality (optional, Priority 2)
     # =========================================================================

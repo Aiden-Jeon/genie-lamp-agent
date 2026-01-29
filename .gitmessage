@@ -1,0 +1,41 @@
+feat: Add individual table name replacement support to validation
+
+Enhanced validation step to support replacing not only catalog and schema
+names, but also individual table names. This addresses scenarios where table
+names differ between environments (e.g., dev.sales.customer_data vs
+prod.analytics.customers).
+
+Key Changes:
+- Added update_config_catalog_schema_table() function for individual table replacement
+- Enhanced prompt_catalog_schema_replacement() with two-mode support:
+  1. Bulk mode: Replace catalog.schema for all tables at once
+  2. Individual mode: Replace catalog.schema.table one by one
+- Comprehensive updates across all configuration sections:
+  * Table definitions (catalog, schema, table names)
+  * SQL expressions and queries
+  * Join specifications and conditions
+  * Join aliases (e.g., orders → transactions updates orders.id → transactions.id)
+  * Benchmark questions (expected_sql and table fields)
+  * Instructions (table references in content)
+- Enhanced update_config_catalog_schema() to include joins
+- Interactive prompts with press-Enter-to-keep-current-value UX
+- Up to 3 validation attempts with automatic re-validation
+
+Testing:
+- Added comprehensive test suite in tests/test_table_name_replacement.py
+- 4 new tests covering individual updates, bulk updates, preservation, and alias updates
+- All 24 validation-related tests pass (4 new + 20 existing)
+
+Documentation:
+- Updated README.md with interactive replacement examples
+- Updated ARCHITECTURE.md with detailed feature description
+- Added change_logs/table_name_replacement.md with complete documentation
+
+Benefits:
+- Handles both simple (catalog/schema) and complex (table name) differences
+- Interactive prompts prevent accidental bulk changes
+- Automatic updates to all references (SQL, joins, benchmarks, etc.)
+- Backward compatible - existing workflows continue to work
+- Safe - updates join aliases to match new table names
+
+Co-Authored-By: Claude (databricks-claude-sonnet-4-5) <noreply@anthropic.com>

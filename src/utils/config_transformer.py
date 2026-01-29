@@ -221,6 +221,79 @@ def _convert_join_specifications_to_joins(join_specifications: List[Dict[str, An
     return joins
 
 
+def _validate_and_fix_join_table_references(
+    joins: List[Dict[str, Any]],
+    tables: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Validate that join table references match actual tables in the space.
+    Automatically corrects catalog/schema mismatches by matching on table name.
+    Skips joins that reference tables not included in the space.
+
+    Args:
+        joins: List of join specifications (internal format)
+        tables: List of table definitions from config
+
+    Returns:
+        Corrected list of join specifications (excluding joins with missing tables)
+    """
+    # Build lookup: table_name -> full_identifier
+    table_map = {}
+    for table in tables:
+        catalog = table.get("catalog_name", "")
+        schema = table.get("schema_name", "")
+        table_name = table.get("table_name", "")
+        full_identifier = f"{catalog}.{schema}.{table_name}"
+        table_map[table_name] = full_identifier
+
+    corrected_joins = []
+    for join in joins:
+        # Check if both tables exist in the space
+        left_table = join.get("left_table", "")
+        left_table_name = left_table.split(".")[-1]
+        right_table = join.get("right_table", "")
+        right_table_name = right_table.split(".")[-1]
+
+        # Skip joins that reference tables not in the space
+        if left_table_name not in table_map:
+            print(f"Warning: Skipping join - left table '{left_table}' not in space")
+            continue
+        if right_table_name not in table_map:
+            print(f"Warning: Skipping join - right table '{right_table}' not in space")
+            continue
+
+        corrected_join = join.copy()
+
+        # Fix left_table reference
+        correct_left = table_map[left_table_name]
+        if left_table != correct_left:
+            print(f"Warning: Correcting join left_table: {left_table} -> {correct_left}")
+            corrected_join["left_table"] = correct_left
+            corrected_join["left_alias"] = left_table_name
+
+        # Fix right_table reference
+        correct_right = table_map[right_table_name]
+        if right_table != correct_right:
+            print(f"Warning: Correcting join right_table: {right_table} -> {correct_right}")
+            corrected_join["right_table"] = correct_right
+            corrected_join["right_alias"] = right_table_name
+
+        # Fix join_condition to use correct table references
+        join_condition = corrected_join.get("join_condition", "")
+        if join_condition:
+            # Update join condition to replace old catalog.schema.table references
+            # with the correct ones
+            if left_table != correct_left:
+                join_condition = join_condition.replace(left_table, correct_left)
+            if right_table != correct_right:
+                join_condition = join_condition.replace(right_table, correct_right)
+            corrected_join["join_condition"] = join_condition
+
+        corrected_joins.append(corrected_join)
+
+    return corrected_joins
+
+
 def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     """
     Transform our configuration format to Databricks serialized_space format.
@@ -386,6 +459,11 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     # Convert join_specifications to joins format if present
     if join_specifications and not joins:
         joins = _convert_join_specifications_to_joins(join_specifications)
+
+    # VALIDATE AND FIX JOIN TABLE REFERENCES
+    if joins and tables:
+        joins = _validate_and_fix_join_table_references(joins, tables)
+
     if joins:
         join_specs = []
         for join in joins:

@@ -113,9 +113,24 @@ class GenieSpaceConfig(BaseModel):
     )
 
 
+class BenchmarkSQL(BaseModel):
+    """Single benchmark SQL result from LLM."""
+
+    question: str = Field(..., description="The benchmark question")
+    sql: str = Field(..., description="Complete SQL query answering the question")
+    reasoning: Optional[str] = Field(None, description="Explanation of query logic")
+
+
+class BenchmarkSQLResponse(BaseModel):
+    """Response from LLM for benchmark SQL generation."""
+
+    benchmark_sqls: List[BenchmarkSQL] = Field(..., description="List of benchmark SQL queries")
+    reasoning: Optional[str] = Field(None, description="Overall reasoning for SQL generation approach")
+
+
 class LLMResponse(BaseModel):
     """Response from the LLM containing the generated Genie space configuration."""
-    
+
     genie_space_config: GenieSpaceConfig = Field(..., description="The generated Genie space configuration")
     reasoning: Optional[str] = Field(None, description="LLM's reasoning for the configuration choices")
     confidence_score: Optional[float] = Field(None, description="Confidence score (0-1) for the configuration")

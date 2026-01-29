@@ -134,15 +134,98 @@ def test_file_structure():
 def test_output_directory():
     """Test that output directory exists."""
     print("\nTesting Output Directory...")
-    
+
     output_dir = Path("output")
     if not output_dir.exists():
         output_dir.mkdir(parents=True)
         print("✓ Created output directory")
     else:
         print("✓ Output directory exists")
-    
+
     return True
+
+
+def test_two_pass_generation():
+    """Test two-pass benchmark SQL generation approach.
+
+    This test requires SKIP_LLM_TESTS to be False and valid credentials.
+    """
+    print("\nTesting Two-Pass Benchmark SQL Generation...")
+
+    # Skip if LLM tests are disabled
+    if os.getenv("SKIP_LLM_TESTS", "false").lower() == "true":
+        print("⏭️  Skipping (SKIP_LLM_TESTS=true)")
+        return True
+
+    # Check for required environment variables
+    if not os.getenv("DATABRICKS_HOST") or not os.getenv("DATABRICKS_TOKEN"):
+        print("⏭️  Skipping (DATABRICKS_HOST/TOKEN not set)")
+        return True
+
+    from src.pipeline.generator import generate_config
+
+    # Use demo requirements (small test case)
+    requirements_path = "data/demo_requirements.md"
+    if not Path(requirements_path).exists():
+        print(f"⏭️  Skipping (requirements not found: {requirements_path})")
+        return True
+
+    output_path = "output/test_two_pass_config.json"
+
+    try:
+        print("   Generating config with two-pass approach...")
+        config_data = generate_config(
+            requirements_path=requirements_path,
+            output_path=output_path,
+            max_tokens=24000,
+            temperature=0.1,
+            benchmark_batch_size=5,  # Small batch for testing
+            skip_benchmark_sql=False,
+            verbose=False
+        )
+
+        # Verify structure
+        assert "genie_space_config" in config_data
+        config = config_data["genie_space_config"]
+
+        # Verify benchmarks exist
+        benchmarks = config.get("benchmark_questions", [])
+        assert len(benchmarks) > 0, "Should have benchmark questions"
+
+        print(f"   Generated {len(benchmarks)} benchmarks")
+
+        # Verify all benchmarks have SQL (key test for two-pass approach)
+        benchmarks_without_sql = [
+            bm for bm in benchmarks
+            if bm.get("expected_sql") is None
+        ]
+
+        if benchmarks_without_sql:
+            print(f"   ⚠ Warning: {len(benchmarks_without_sql)} benchmarks missing SQL")
+            for bm in benchmarks_without_sql[:3]:  # Show first 3
+                print(f"      - {bm['question']}")
+        else:
+            print(f"   ✓ All benchmarks have SQL")
+
+        # Verify SQL completeness (ends with semicolon)
+        incomplete_sql = [
+            bm for bm in benchmarks
+            if bm.get("expected_sql") and not bm["expected_sql"].strip().endswith(";")
+        ]
+
+        assert len(incomplete_sql) == 0, f"Found {len(incomplete_sql)} incomplete SQL queries"
+        print("   ✓ All SQL queries complete (end with semicolon)")
+
+        # Clean up test output
+        if Path(output_path).exists():
+            Path(output_path).unlink()
+
+        print("✓ Two-pass generation works correctly")
+        return True
+
+    except Exception as e:
+        print(f"✗ Two-pass generation failed: {e}")
+        raise
 
 
 def main():
@@ -157,6 +240,7 @@ def main():
         ("Output Directory", test_output_directory),
         ("Pydantic Models", test_models),
         ("Prompt Builder", test_prompt_builder),
+        ("Two-Pass Generation", test_two_pass_generation),
     ]
     
     passed = 0

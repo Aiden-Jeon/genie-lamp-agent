@@ -13,6 +13,7 @@ from src.parsing.requirements_structurer import RequirementsStructurer
 from src.parsing.llm_enricher import LLMEnricher
 from src.parsing.markdown_generator import generate_markdown
 from src.llm.databricks_llm import DatabricksFoundationModelClient
+from src.utils.parse_cache import ParseCacheManager
 
 
 async def parse_documents_async(
@@ -25,18 +26,23 @@ async def parse_documents_async(
     databricks_host: Optional[str] = None,
     databricks_token: Optional[str] = None,
     verbose: bool = True,
-    max_concurrent_pdfs: int = 3
+    max_concurrent_pdfs: int = 3,
+    force: bool = False,
+    cache_file: str = ".parse_cache.json",
+    no_cache: bool = False
 ) -> Dict[str, Any]:
     """
     Async version of parse_documents.
     Parse PDF and markdown documents into structured requirements format with concurrent processing.
     
     This function:
-    1. Extracts content from PDF files (using pdfplumber + optional LLM) - ASYNC
-    2. Extracts content from markdown files (using regex patterns)
-    3. Structures and combines the data
-    4. Optionally enriches with LLM
-    5. Generates output markdown in standard format
+    1. Checks cache validity (unless force=True or no_cache=True)
+    2. Extracts content from PDF files (using pdfplumber + optional LLM) - ASYNC
+    3. Extracts content from markdown files (using regex patterns)
+    4. Structures and combines the data
+    5. Optionally enriches with LLM
+    6. Generates output markdown in standard format
+    7. Updates cache for future runs
     
     Args:
         input_dir: Directory containing PDF and markdown files
@@ -49,6 +55,9 @@ async def parse_documents_async(
         databricks_token: Databricks personal access token
         verbose: Print progress messages
         max_concurrent_pdfs: Maximum number of PDFs to process concurrently
+        force: Force re-parsing even if cache is valid
+        cache_file: Path to cache metadata file (default: .parse_cache.json)
+        no_cache: Disable caching entirely
         
     Returns:
         dict: Parsing results with metadata:
@@ -57,6 +66,7 @@ async def parse_documents_async(
             - tables_count: Number of tables extracted
             - queries_count: Number of SQL queries extracted
             - used_llm: Whether LLM was used
+            - cache_used: Whether cached results were used
         
     Raises:
         ValueError: If input directory doesn't exist or credentials are missing (when use_llm=True)
@@ -70,6 +80,54 @@ async def parse_documents_async(
     # Ensure output directory exists
     output_path_obj = Path(output_path)
     output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+    
+    # =========================================================================
+    # CACHE CHECK: Skip parsing if cache is valid
+    # =========================================================================
+    cache_used = False
+    
+    if not no_cache and not force:
+        # Build cache config for validation
+        cache_config = {
+            "llm_model": llm_model,
+            "vision_model": vision_model,
+            "use_llm": use_llm,
+            "domain": domain
+        }
+        
+        # Check if cache is valid
+        cache_manager = ParseCacheManager(cache_file=cache_file)
+        
+        if cache_manager.is_valid(output_path, input_dir, cache_config, verbose=verbose):
+            # Cache is valid - return cached results from output file
+            if verbose:
+                print("✓ Using cached results (no changes detected)")
+                print()
+            
+            # Load cached metadata
+            cached_metadata = cache_manager.get_metadata()
+            
+            # Return results based on cached output
+            cache_used = True
+            results = {
+                "output_path": str(output_path),
+                "questions_count": 0,  # Not available from cache
+                "tables_count": 0,      # Not available from cache
+                "queries_count": 0,     # Not available from cache
+                "sections_count": 0,    # Not available from cache
+                "used_llm": use_llm,
+                "domain": domain,
+                "cache_used": True,
+                "cached_timestamp": cached_metadata.get("timestamp") if cached_metadata else None
+            }
+            
+            return results
+        elif verbose and force:
+            print("⚠️  Force re-parsing (--force flag)")
+            print()
+    elif verbose and no_cache:
+        print("⚠️  Cache disabled (--no-cache flag)")
+        print()
     
     # Initialize LLM clients if needed
     llm_client = None
@@ -175,6 +233,25 @@ async def parse_documents_async(
     if verbose:
         print(f"   ✓ Generated {len(markdown)} characters of markdown")
     
+    # =========================================================================
+    # UPDATE CACHE: Save metadata for future runs
+    # =========================================================================
+    if not no_cache:
+        cache_config = {
+            "llm_model": llm_model,
+            "vision_model": vision_model,
+            "use_llm": use_llm,
+            "domain": domain
+        }
+        
+        cache_manager = ParseCacheManager(cache_file=cache_file)
+        if cache_manager.save(output_path, input_dir, cache_config):
+            if verbose:
+                print(f"   ✓ Cache updated: {cache_file}")
+        else:
+            if verbose:
+                print(f"   ⚠️  Failed to update cache")
+    
     # Return results
     results = {
         "output_path": str(output_path),
@@ -183,7 +260,8 @@ async def parse_documents_async(
         "queries_count": len(doc.all_queries),
         "sections_count": len(doc.sections),
         "used_llm": use_llm and llm_client is not None,
-        "domain": domain
+        "domain": domain,
+        "cache_used": False
     }
     
     return results
@@ -199,18 +277,23 @@ def parse_documents(
     databricks_host: Optional[str] = None,
     databricks_token: Optional[str] = None,
     verbose: bool = True,
-    max_concurrent_pdfs: int = 3
+    max_concurrent_pdfs: int = 3,
+    force: bool = False,
+    cache_file: str = ".parse_cache.json",
+    no_cache: bool = False
 ) -> Dict[str, Any]:
     """
     Synchronous wrapper for async document parsing.
     Parse PDF and markdown documents into structured requirements format with concurrent processing.
     
     This function:
-    1. Extracts content from PDF files (using pdfplumber + optional LLM) - CONCURRENT
-    2. Extracts content from markdown files (using regex patterns)
-    3. Structures and combines the data
-    4. Optionally enriches with LLM
-    5. Generates output markdown in standard format
+    1. Checks cache validity (unless force=True or no_cache=True)
+    2. Extracts content from PDF files (using pdfplumber + optional LLM) - CONCURRENT
+    3. Extracts content from markdown files (using regex patterns)
+    4. Structures and combines the data
+    5. Optionally enriches with LLM
+    6. Generates output markdown in standard format
+    7. Updates cache for future runs
     
     Args:
         input_dir: Directory containing PDF and markdown files
@@ -223,6 +306,9 @@ def parse_documents(
         databricks_token: Databricks personal access token
         verbose: Print progress messages
         max_concurrent_pdfs: Maximum number of PDFs to process concurrently (default: 3)
+        force: Force re-parsing even if cache is valid
+        cache_file: Path to cache metadata file (default: .parse_cache.json)
+        no_cache: Disable caching entirely
         
     Returns:
         dict: Parsing results with metadata:
@@ -231,6 +317,7 @@ def parse_documents(
             - tables_count: Number of tables extracted
             - queries_count: Number of SQL queries extracted
             - used_llm: Whether LLM was used
+            - cache_used: Whether cached results were used
         
     Raises:
         ValueError: If input directory doesn't exist or credentials are missing (when use_llm=True)
@@ -246,7 +333,10 @@ def parse_documents(
         databricks_host=databricks_host,
         databricks_token=databricks_token,
         verbose=verbose,
-        max_concurrent_pdfs=max_concurrent_pdfs
+        max_concurrent_pdfs=max_concurrent_pdfs,
+        force=force,
+        cache_file=cache_file,
+        no_cache=no_cache
     ))
 
 

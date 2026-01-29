@@ -12,14 +12,8 @@ Based on the input requirements, you should:
    - Focus on commonly used business terms, metrics, and calculations
    - Don't force a specific number - quality and relevance over quantity
 5. Write clear, specific instructions to guide Genie's behavior
-6. Create benchmark questions for testing the space
-   - **CRITICAL**: If the requirements document contains a FAQ or question list section (e.g., "## 📊 질문 목록 (FAQ)"), you MUST extract ALL questions from that section as benchmark questions
-   - Preserve the exact original phrasing of each question without modification
-   - Include all numbered questions in sequential order (e.g., 1-27)
-   - Do NOT skip conversational, broad, or exploratory questions
-   - Do NOT add constraints or modifications not present in the original (e.g., don't add "Top 5", time periods, etc. unless already specified)
-   - For each benchmark question, optionally provide expected_sql if you can infer the appropriate SQL pattern
-   - If no FAQ section exists, create representative benchmark questions based on the requirements
+
+**Note**: Benchmark questions are extracted and processed separately by the system.
 
 Follow these principles:
 - Keep the space focused and start small (aim for 5 or fewer tables initially)
@@ -105,15 +99,6 @@ Please generate a complete GenieSpaceConfig JSON object based on the requirement
       "description": "string (optional)",
       "type": "metric|filter|dimension"
     }}
-  ],
-  "benchmark_questions": [
-    {{
-      "question": "string (preserve exact original phrasing from FAQ section)",
-      "expected_sql": "string (optional - provide if SQL pattern is clear)",
-      "expected_accuracy": "string (optional - High/Medium-High/Medium/Low)"
-    }}
-    // IMPORTANT: Include ALL questions from any FAQ or question list section in the requirements
-    // Do not create a subset - extract every numbered question completely
   ],
   "warehouse_id": "string (optional)",
   "enable_data_sampling": true

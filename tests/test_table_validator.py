@@ -196,16 +196,36 @@ class TestTableValidator:
             databricks_host="https://test.databricks.com",
             databricks_token="token"
         )
-        
+
         sql = """
         SELECT * FROM catalog1.schema1.table1 t1
         JOIN catalog2.schema2.table2 t2 ON t1.id = t2.id
         """
-        
+
         tables = validator._extract_tables_from_sql(sql)
-        
+
         assert "catalog1.schema1.table1" in tables
         assert "catalog2.schema2.table2" in tables
+
+    def test_extract_tables_from_sql_with_backticks(self):
+        """Test extracting table names with backticks from SQL."""
+        validator = TableValidator(
+            databricks_host="https://test.databricks.com",
+            databricks_token="token"
+        )
+
+        # Test various backtick formats
+        sql = """
+        SELECT * FROM `main.log_steam.partner_traffic`
+        JOIN `catalog2`.`schema2`.`table2` ON t1.id = t2.id
+        JOIN catalog3.schema3.table3 t3 ON t1.id = t3.id
+        """
+
+        tables = validator._extract_tables_from_sql(sql)
+
+        assert "main.log_steam.partner_traffic" in tables
+        assert "catalog2.schema2.table2" in tables
+        assert "catalog3.schema3.table3" in tables
     
     def test_build_alias_map(self):
         """Test building alias map from configuration."""
@@ -393,6 +413,151 @@ class TestIntegration:
             assert "demo.retail.transactions" in report.tables_valid
             assert not report.has_errors()
         
+        finally:
+            # Cleanup
+            Path(config_path).unlink(missing_ok=True)
+
+
+    @patch('src.utils.table_validator.requests.get')
+    def test_validate_benchmark_queries(self, mock_get):
+        """Test validating tables referenced in benchmark questions."""
+        # Create test configuration with benchmark questions
+        config = {
+            "genie_space_config": {
+                "tables": [
+                    {
+                        "catalog_name": "demo",
+                        "schema_name": "retail",
+                        "table_name": "transactions"
+                    },
+                    {
+                        "catalog_name": "demo",
+                        "schema_name": "retail",
+                        "table_name": "articles"
+                    }
+                ],
+                "benchmark_questions": [
+                    {
+                        "question": "What is the total revenue?",
+                        "expected_sql": "SELECT SUM(total_amount) FROM demo.retail.transactions;"
+                    },
+                    {
+                        "question": "How many products do we have?",
+                        "expected_sql": "SELECT COUNT(*) FROM demo.retail.articles;"
+                    },
+                    {
+                        "question": "Show me sales by product",
+                        "expected_sql": "SELECT a.product_name, SUM(t.amount) FROM demo.retail.transactions t JOIN demo.retail.articles a ON t.article_id = a.id;"
+                    }
+                ]
+            }
+        }
+
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(config, f)
+            config_path = f.name
+
+        try:
+            # Mock API responses for table validation
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {
+                "full_name": "demo.retail.transactions",
+                "columns": [
+                    {"name": "total_amount", "type_text": "DECIMAL"},
+                    {"name": "amount", "type_text": "DECIMAL"},
+                    {"name": "article_id", "type_text": "INT"}
+                ]
+            }
+            mock_get.return_value = mock_response
+
+            # Run validation
+            validator = TableValidator(
+                databricks_host="https://test.databricks.com",
+                databricks_token="token"
+            )
+
+            report = validator.validate_config(config_path)
+
+            # Verify benchmark validation section exists
+            validation_sections = [
+                issue for issue in report.issues
+                if issue.type == "validation_section" and "benchmark" in issue.message.lower()
+            ]
+            assert len(validation_sections) == 1
+            assert "3 benchmark questions" in validation_sections[0].message
+
+            # Should not have any errors if tables are valid
+            assert not report.has_errors()
+
+        finally:
+            # Cleanup
+            Path(config_path).unlink(missing_ok=True)
+
+    @patch('src.utils.table_validator.requests.get')
+    def test_validate_benchmark_queries_with_invalid_table(self, mock_get):
+        """Test validating benchmark questions with invalid table references."""
+        # Create test configuration with benchmark referencing invalid table
+        config = {
+            "genie_space_config": {
+                "tables": [
+                    {
+                        "catalog_name": "demo",
+                        "schema_name": "retail",
+                        "table_name": "transactions"
+                    }
+                ],
+                "benchmark_questions": [
+                    {
+                        "question": "What is the total revenue?",
+                        "expected_sql": "SELECT SUM(total_amount) FROM demo.retail.transactions;"
+                    },
+                    {
+                        "question": "How many products?",
+                        "expected_sql": "SELECT COUNT(*) FROM demo.retail.invalid_table;"
+                    }
+                ]
+            }
+        }
+
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(config, f)
+            config_path = f.name
+
+        try:
+            # Mock API responses - transactions exists, invalid_table does not
+            def get_side_effect(*args, **kwargs):
+                mock_response = Mock()
+                if "transactions" in args[0]:
+                    mock_response.status_code = 200
+                    mock_response.json.return_value = {
+                        "full_name": "demo.retail.transactions",
+                        "columns": [{"name": "total_amount", "type_text": "DECIMAL"}]
+                    }
+                else:
+                    mock_response.status_code = 404
+                return mock_response
+
+            mock_get.side_effect = get_side_effect
+
+            # Run validation
+            validator = TableValidator(
+                databricks_host="https://test.databricks.com",
+                databricks_token="token"
+            )
+
+            report = validator.validate_config(config_path)
+
+            # Should have warning for invalid table in benchmark
+            benchmark_warnings = [
+                issue for issue in report.issues
+                if issue.type == "table_reference_invalid" and "benchmark" in issue.location.lower()
+            ]
+            assert len(benchmark_warnings) >= 1
+            assert any("invalid_table" in issue.table for issue in benchmark_warnings if issue.table)
+
         finally:
             # Cleanup
             Path(config_path).unlink(missing_ok=True)

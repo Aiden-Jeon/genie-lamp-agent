@@ -226,6 +226,54 @@ class DatabricksLLMClient:
         img_bytes = buffered.getvalue()
         return base64.b64encode(img_bytes).decode('utf-8')
     
+    def generate_structured(
+        self,
+        prompt: str,
+        response_model: type,
+        max_tokens: int = 4000,
+        temperature: float = 0.1,
+        **kwargs
+    ):
+        """
+        Generate structured output from the LLM using a Pydantic model.
+        
+        Args:
+            prompt: The prompt to send to the model
+            response_model: Pydantic model class to parse the response into
+            max_tokens: Maximum number of tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional parameters
+            
+        Returns:
+            Instance of response_model with parsed data
+            
+        Raises:
+            ValidationError: If the LLM response doesn't match the expected schema
+            json.JSONDecodeError: If the LLM response is not valid JSON
+        """
+        # Generate the response
+        response_text = self.generate(prompt, max_tokens, temperature, **kwargs)
+        
+        # Try to extract JSON from the response (in case there's extra text)
+        response_text = response_text.strip()
+        
+        # Find JSON object in the response
+        start_idx = response_text.find('{')
+        end_idx = response_text.rfind('}')
+        
+        if start_idx == -1 or end_idx == -1:
+            raise ValueError(
+                f"No JSON object found in LLM response. Response length: {len(response_text)} chars."
+            )
+        
+        json_text = response_text[start_idx:end_idx + 1]
+        
+        # Parse JSON
+        response_data = json.loads(json_text)
+        
+        # Validate and parse with Pydantic
+        return response_model(**response_data)
+    
     def generate_genie_config(
         self,
         prompt: str,

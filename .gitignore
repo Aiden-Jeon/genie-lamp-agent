@@ -35,6 +35,9 @@ env/
 output/
 *.json
 
+# Cache
+.parse_cache.json
+
 # IDE
 .vscode/
 .idea/
