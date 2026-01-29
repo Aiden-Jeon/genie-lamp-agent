@@ -13,6 +13,10 @@ Based on the input requirements, you should:
    - **Measures**: Aggregations (e.g., "SUM(revenue)", "COUNT(DISTINCT customer_id)", "AVG(price)")
    - Create 5-15 snippets total, focusing on commonly used business terms and calculations
    - Quality and relevance over quantity
+   - **Add optional instructions**: For complex or ambiguous metrics, provide a brief instruction (1-3 sentences) that explains:
+     - **What should this measure/expression do?** (its purpose, e.g., "Calculates total revenue across all completed orders")
+     - **How should it behave?** (usage guidance, e.g., "Use for monthly revenue tracking. Groups by transaction date.")
+     - **What should it avoid?** (caveats/exclusions, e.g., "Excludes refunded orders and test transactions. Do not use for forecasting.")
 5. Write clear, specific instructions to guide Genie's behavior
 
 **Note**: Benchmark questions are extracted and processed separately by the system.
@@ -375,19 +379,42 @@ Please generate a complete GenieSpaceConfig JSON object based on the requirement
       {{{{
         "alias": "string (internal alias, e.g., 'order_year')",
         "sql": "string (dimension/calculated field, e.g., 'YEAR(orders.order_date)')",
-        "display_name": "string (user-friendly name, e.g., 'year')",
-        "synonyms": ["string"] (optional, alternative names)
+        "display_name": "string (user-friendly name, e.g., 'Order Year')",
+        "synonyms": ["string"] (optional, alternative names),
+        "instruction": "string (optional - explain what it does, how to use it, and what to avoid. e.g., 'Extracts the calendar year from order date for trend analysis. Use when grouping by year. Do not use for fiscal year calculations.')"
       }}}}
     ],
     "measures": [
       {{{{
         "alias": "string (internal alias, e.g., 'total_revenue')",
         "sql": "string (aggregation, e.g., 'SUM(orders.order_amount)')",
-        "display_name": "string (user-friendly name, e.g., 'total revenue')",
-        "synonyms": ["string"] (optional, alternative names like 'revenue', 'total sales')
+        "display_name": "string (user-friendly name, e.g., 'Total Revenue')",
+        "synonyms": ["string"] (optional, alternative names like 'revenue', 'total sales'),
+        "instruction": "string (optional - explain what it does, how to use it, and what to avoid. e.g., 'Calculates total revenue from completed orders. Use for revenue reporting and trend analysis. Excludes refunds, cancelled orders, and test transactions. Do not use for cash flow analysis.')"
       }}}}
     ]
   }}}},
+  
+  // Example SQL snippets with instructions:
+  // "expressions": [
+  //   {{{{
+  //     "alias": "customer_cohort_month",
+  //     "sql": "DATE_TRUNC('month', customers.first_purchase_date)",
+  //     "display_name": "Customer Cohort Month",
+  //     "synonyms": ["cohort", "signup month"],
+  //     "instruction": "Extracts the month of customer's first purchase for cohort grouping. Use when analyzing customer cohorts by signup/acquisition period. Do not use for monthly revenue attribution."
+  //   }}}}
+  // ],
+  // "measures": [
+  //   {{{{
+  //     "alias": "active_user_count",
+  //     "sql": "COUNT(DISTINCT CASE WHEN users.last_activity_date >= DATE_SUB(CURRENT_DATE(), 30) THEN users.user_id END)",
+  //     "display_name": "Active Users (30d)",
+  //     "synonyms": ["MAU", "active customers"],
+  //     "instruction": "Counts distinct users with any activity in the last 30 days. Use for monthly active user (MAU) reporting and engagement metrics. Excludes deleted accounts and system users. Do not use for daily active user (DAU) calculations."
+  //   }}}}
+  // ]
+  
   "warehouse_id": "string (optional)",
   "enable_data_sampling": true
 }}}}

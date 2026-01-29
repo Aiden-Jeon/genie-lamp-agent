@@ -20,9 +20,26 @@ Follow this workflow when the user requests deployment:
 ```
 
 This will:
-- Parse all PDF and markdown files in `real_requirements/`
+- **Check parse cache first** - if files haven't changed since last parse, uses cached results (fast!)
+- Parse all PDF and markdown files in `real_requirements/` (only if needed)
 - Extract FAQ questions, table specifications, and business context
 - Output structured requirements to `data/parsed.md`
+- Save cache metadata to `.parse_cache.json` for future runs
+
+**Cache behavior:**
+- By default, caching is enabled
+- Re-parsing only happens if:
+  - Input files changed (mtime or size)
+  - Output file was modified or deleted
+  - Parsing config changed (model, domain)
+- To force re-parsing: add `--force` flag
+- To disable caching: add `--no-cache` flag
+
+**Check cache status:**
+```bash
+# View cache metadata (if exists)
+cat .parse_cache.json | jq '.'
+```
 
 ### 2. Create Genie Configuration Script
 
@@ -238,6 +255,15 @@ If parsing fails:
 2. Verify environment variables are set correctly
 3. Check for corrupt or unsupported file formats
 
+### Parse Cache Not Working
+
+If you notice parsing is re-running when it shouldn't:
+1. Check if `.parse_cache.json` exists in project root
+2. Verify output file `data/parsed.md` exists and hasn't been manually modified
+3. Check if input files in `real_requirements/` were modified (cache tracks mtime and size)
+4. If cache seems stuck, force re-parse: `.venv/bin/python genie.py parse --input-dir real_requirements --output data/parsed.md --force`
+5. If you want to see cache validation details, the parse command prints cache status when `verbose=True` (default)
+
 ### Validation Failures
 
 If validation still fails after 3 attempts:
@@ -315,13 +341,28 @@ cat output/genie_space_result.json | jq '.space_url'
 cat output/genie_space_config.json | jq '.space_name'
 ```
 
+### Verify Parse Cache
+
+```bash
+# Check cache metadata
+cat .parse_cache.json | jq '{timestamp: .timestamp, input_files: (.input_files | length), output: .output_path}'
+
+# Force cache refresh
+.venv/bin/python genie.py parse --input-dir real_requirements --output data/parsed.md --force
+
+# Test cache (should skip parsing if nothing changed)
+.venv/bin/python genie.py parse --input-dir real_requirements --output data/parsed.md
+```
+
 ## Best Practices
 
 1. **Always parse first**: Use `parse` command to convert documents to structured format
-2. **Check parsed output**: Review `data/parsed.md` before generation
-3. **Verify catalog exists**: Ensure `sandbox.agent_poc` schema exists in Unity Catalog
-4. **Test with demo data**: Test the workflow with demo requirements first
-5. **Save outputs**: Keep `output/` directory for debugging and audit trails
+2. **Let cache work**: Don't use `--force` unless necessary - cache is smart and detects changes automatically
+3. **Check parsed output**: Review `data/parsed.md` before generation
+4. **Verify catalog exists**: Ensure `sandbox.agent_poc` schema exists in Unity Catalog
+5. **Test with demo data**: Test the workflow with demo requirements first
+6. **Save outputs**: Keep `output/` directory for debugging and audit trails
+7. **Monitor cache**: Check `.parse_cache.json` to see when documents were last parsed
 
 ## References
 

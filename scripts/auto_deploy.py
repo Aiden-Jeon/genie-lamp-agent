@@ -23,18 +23,7 @@ def auto_deploy(
     auto_replace_catalog: str = "sandbox",
     auto_replace_schema: str = "agent_poc"
 ):
-    """Run full deployment with automatic catalog replacement.
-
-    Args:
-        requirements_path: Path to parsed requirements markdown
-        output_path: Where to save generated configuration
-        result_output: Where to save deployment result
-        auto_replace_catalog: Catalog name to use for replacement
-        auto_replace_schema: Schema name to use for replacement
-
-    Returns:
-        0 on success, 1 on failure
-    """
+    """Run full deployment with automatic catalog replacement."""
 
     print("=" * 80)
     print("🧞 Automated Genie Deployment")
@@ -45,20 +34,15 @@ def auto_deploy(
     print("📝 Step 1/3: Generating configuration...")
     print("-" * 80)
 
-    try:
-        config_data = generate_config(
-            requirements_path=requirements_path,
-            output_path=output_path,
-            verbose=True
-        )
+    config_data = generate_config(
+        requirements_path=requirements_path,
+        output_path=output_path,
+        verbose=True
+    )
 
-        print()
-        print("✓ Configuration generated!")
-        print()
-    except Exception as e:
-        print()
-        print(f"❌ Generation failed: {e}")
-        return 1
+    print()
+    print("✓ Configuration generated!")
+    print()
 
     # Step 2: Validate with automatic replacement
     print("✓ Step 2/3: Validating with automatic catalog replacement...")
@@ -68,15 +52,10 @@ def auto_deploy(
     for attempt in range(1, max_attempts + 1):
         print(f"\nValidation attempt {attempt}/{max_attempts}")
 
-        try:
-            report = validate_config(
-                config_path=output_path,
-                verbose=True
-            )
-        except Exception as e:
-            print()
-            print(f"❌ Validation error: {e}")
-            return 1
+        report = validate_config(
+            config_path=output_path,
+            verbose=True
+        )
 
         if report.has_errors():
             # Check for table_not_found errors
@@ -104,13 +83,13 @@ def auto_deploy(
 
                 # Replace each failed catalog.schema
                 import json
-                import genie
+                from genie import update_config_catalog_schema
 
                 for schema_key in failed_schemas.keys():
                     old_catalog, old_schema = schema_key.split('.')
                     print(f"  Replacing {old_catalog}.{old_schema} → {auto_replace_catalog}.{auto_replace_schema}")
 
-                    counts = genie.update_config_catalog_schema(
+                    counts = update_config_catalog_schema(
                         output_path,
                         old_catalog,
                         old_schema,
@@ -120,7 +99,6 @@ def auto_deploy(
 
                     print(f"    Updated: {counts['tables']} tables, {counts['sql_expressions']} SQL expressions")
                     print(f"             {counts['example_queries']} queries, {counts['benchmark_questions']} benchmarks")
-                    print(f"             {counts['instructions']} instructions")
 
                 print()
                 continue
@@ -141,15 +119,10 @@ def auto_deploy(
     print("🚀 Step 3/3: Deploying Genie space...")
     print("-" * 80)
 
-    try:
-        result = deploy_space(
-            config_path=output_path,
-            verbose=True
-        )
-    except Exception as e:
-        print()
-        print(f"❌ Deployment failed: {e}")
-        return 1
+    result = deploy_space(
+        config_path=output_path,
+        verbose=True
+    )
 
     # Save result
     result_path = Path(result_output)
@@ -175,48 +148,4 @@ def auto_deploy(
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Automated Genie deployment with catalog replacement"
-    )
-    parser.add_argument(
-        "--requirements",
-        type=str,
-        default="data/parsed.md",
-        help="Path to parsed requirements (default: data/parsed.md)"
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="output/genie_space_config.json",
-        help="Output path for configuration (default: output/genie_space_config.json)"
-    )
-    parser.add_argument(
-        "--result-output",
-        type=str,
-        default="output/genie_space_result.json",
-        help="Output path for result (default: output/genie_space_result.json)"
-    )
-    parser.add_argument(
-        "--catalog",
-        type=str,
-        default="sandbox",
-        help="Replacement catalog name (default: sandbox)"
-    )
-    parser.add_argument(
-        "--schema",
-        type=str,
-        default="agent_poc",
-        help="Replacement schema name (default: agent_poc)"
-    )
-
-    args = parser.parse_args()
-
-    sys.exit(auto_deploy(
-        requirements_path=args.requirements,
-        output_path=args.output,
-        result_output=args.result_output,
-        auto_replace_catalog=args.catalog,
-        auto_replace_schema=args.schema
-    ))
+    sys.exit(auto_deploy())

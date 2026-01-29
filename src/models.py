@@ -43,6 +43,7 @@ class GenieSpaceSQLExpression(BaseModel):
     sql: str = Field(..., description="SQL expression (e.g., 'YEAR(orders.order_date)')")
     display_name: str = Field(..., description="User-friendly name for the expression")
     synonyms: Optional[List[str]] = Field(None, description="Alternative names for the expression")
+    instruction: Optional[str] = Field(None, description="Guidance on when and how to use this expression")
 
 
 class GenieSpaceSQLMeasure(BaseModel):
@@ -52,6 +53,7 @@ class GenieSpaceSQLMeasure(BaseModel):
     sql: str = Field(..., description="SQL aggregation expression (e.g., 'SUM(orders.order_amount)')")
     display_name: str = Field(..., description="User-friendly name for the measure")
     synonyms: Optional[List[str]] = Field(None, description="Alternative names for the measure")
+    instruction: Optional[str] = Field(None, description="Guidance on when and how to use this measure")
 
 
 class GenieSpaceSQLSnippets(BaseModel):

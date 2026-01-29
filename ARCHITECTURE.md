@@ -574,8 +574,13 @@ GenieSpaceConfig
 │   └── content, priority
 ├── example_sql_queries: List[GenieSpaceExampleSQL]
 │   └── question, sql_query, description
-├── sql_expressions: List[GenieSpaceSQLExpression]
-│   └── name, expression, type, description
+├── sql_snippets: Optional[GenieSpaceSQLSnippets]
+│   ├── filters: List[GenieSpaceSQLFilter]
+│   │   └── sql, display_name, synonyms
+│   ├── expressions: List[GenieSpaceSQLExpression]
+│   │   └── alias, sql, display_name, synonyms, instruction
+│   └── measures: List[GenieSpaceSQLMeasure]
+│       └── alias, sql, display_name, synonyms, instruction
 └── benchmark_questions: List[GenieSpaceBenchmark]
     └── question, expected_sql
 
@@ -1295,7 +1300,10 @@ Pydantic Validation (src/models.py)
     │    │    ├─── tables: List[GenieSpaceTable]
     │    │    ├─── instructions: List[GenieSpaceInstruction]
     │    │    ├─── example_sql_queries: List[GenieSpaceExampleSQL]
-    │    │    ├─── sql_expressions: List[GenieSpaceSQLExpression]
+    │    │    ├─── sql_snippets: Optional[GenieSpaceSQLSnippets]
+    │    │    │    ├─── filters: List[GenieSpaceSQLFilter]
+    │    │    │    ├─── expressions: List[GenieSpaceSQLExpression] (with instruction support)
+    │    │    │    └─── measures: List[GenieSpaceSQLMeasure] (with instruction support)
     │    │    └─── benchmark_questions: List[GenieSpaceBenchmark]
     │    ├─── reasoning: Optional[str]
     │    └─── confidence_score: Optional[float]

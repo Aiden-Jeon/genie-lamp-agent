@@ -635,6 +635,14 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
                 if "synonyms" in expr:
                     expr_item["synonyms"] = expr["synonyms"] if isinstance(expr["synonyms"], list) else [expr["synonyms"]]
                 
+                # Add instruction if present (must be an array)
+                if "instruction" in expr:
+                    instruction = expr["instruction"]
+                    if isinstance(instruction, str):
+                        expr_item["instruction"] = [instruction]
+                    elif isinstance(instruction, list):
+                        expr_item["instruction"] = instruction
+                
                 expr_list.append(expr_item)
             
             # Sort by ID (required by Databricks API)
@@ -654,6 +662,14 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
                 }
                 if "synonyms" in measure:
                     measure_item["synonyms"] = measure["synonyms"] if isinstance(measure["synonyms"], list) else [measure["synonyms"]]
+                
+                # Add instruction if present (must be an array)
+                if "instruction" in measure:
+                    instruction = measure["instruction"]
+                    if isinstance(instruction, str):
+                        measure_item["instruction"] = [instruction]
+                    elif isinstance(instruction, list):
+                        measure_item["instruction"] = instruction
                 
                 measure_list.append(measure_item)
             
