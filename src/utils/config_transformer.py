@@ -165,7 +165,8 @@ def _convert_join_specifications_to_joins(join_specifications: List[Dict[str, An
         "right_table": "catalog.schema.table2",
         "join_type": "INNER|LEFT|RIGHT|FULL",
         "join_condition": "table1.col = table2.col",
-        "description": "..."
+        "description": "...",
+        "instruction": "..."
     }
 
     Internal format (for serialization):
@@ -176,7 +177,8 @@ def _convert_join_specifications_to_joins(join_specifications: List[Dict[str, An
         "right_alias": "table2",
         "join_condition": "table1.col = table2.col",
         "relationship_type": "FROM_RELATIONSHIP_TYPE_MANY_TO_ONE",
-        "comment": "..."
+        "comment": "...",
+        "instruction": "..."
     }
     """
     # Map join types to relationship types
@@ -196,6 +198,7 @@ def _convert_join_specifications_to_joins(join_specifications: List[Dict[str, An
         join_type = spec.get("join_type", "INNER").upper()
         join_condition = spec.get("join_condition", "")
         description = spec.get("description", "")
+        instruction = spec.get("instruction", "")
 
         # Extract table names for aliases
         left_alias = left_table.split('.')[-1] if left_table else ""
@@ -215,6 +218,9 @@ def _convert_join_specifications_to_joins(join_specifications: List[Dict[str, An
 
         if description:
             join["comment"] = description
+
+        if instruction:
+            join["instruction"] = instruction
 
         joins.append(join)
 
@@ -444,7 +450,8 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     #     "left_alias.column = right_alias.column\n",
     #     "--rt=FROM_RELATIONSHIP_TYPE_XXX--"
     #   ],
-    #   "comment": ["Description of the join relationship"]
+    #   "comment": ["Description of the join relationship"],
+    #   "instruction": ["When to use this join"]
     # }
     # Valid relationship types:
     # - FROM_RELATIONSHIP_TYPE_ONE_TO_ONE
@@ -515,6 +522,14 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
                     join_spec["comment"] = [comment]
                 elif isinstance(comment, list):
                     join_spec["comment"] = comment
+            
+            # Add instruction if present (must be an array)
+            if "instruction" in join:
+                instruction = join["instruction"]
+                if isinstance(instruction, str):
+                    join_spec["instruction"] = [instruction]
+                elif isinstance(instruction, list):
+                    join_spec["instruction"] = instruction
             
             join_specs.append(join_spec)
         

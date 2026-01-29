@@ -199,6 +199,64 @@ def test_invalid_relationship_type():
         print(f"✓ Correctly rejected invalid relationship type: {e}")
 
 
+def test_join_spec_with_instruction():
+    """Test that join specs with instruction field are transformed correctly."""
+    print("\n" + "=" * 80)
+    print("TEST: Join Spec with Instruction Field")
+    print("=" * 80)
+    
+    config = {
+        "space_name": "Test Space",
+        "warehouse_id": "test_warehouse",
+        "tables": [
+            {
+                "catalog_name": "sandbox",
+                "schema_name": "agent_poc",
+                "table_name": "message"
+            },
+            {
+                "catalog_name": "sandbox",
+                "schema_name": "agent_poc",
+                "table_name": "reaction"
+            }
+        ],
+        "join_specifications": [
+            {
+                "left_table": "sandbox.agent_poc.message",
+                "right_table": "sandbox.agent_poc.reaction",
+                "join_type": "LEFT",
+                "join_condition": "message.message_id = reaction.message_id",
+                "description": "A Discord message can have zero or more reactions. Use LEFT JOIN to keep messages with no reactions.",
+                "instruction": "Use this join when users ask about message engagement or reactions"
+            }
+        ]
+    }
+    
+    # Transform to serialized format
+    serialized = transform_to_serialized_space(config)
+    serialized_obj = json.loads(serialized)
+    
+    # Validate join spec format
+    join_specs = serialized_obj["instructions"]["join_specs"]
+    assert len(join_specs) == 1
+    
+    join_spec = join_specs[0]
+    
+    # Validate instruction field is present and correctly formatted
+    assert "instruction" in join_spec
+    assert isinstance(join_spec["instruction"], list)
+    assert len(join_spec["instruction"]) == 1
+    assert join_spec["instruction"][0] == "Use this join when users ask about message engagement or reactions"
+    
+    # Validate comment field is also present
+    assert "comment" in join_spec
+    assert isinstance(join_spec["comment"], list)
+    
+    print("✓ Join spec with instruction field is correctly transformed")
+    print("\nTransformed join spec:")
+    print(json.dumps(join_spec, indent=2))
+
+
 def main():
     """Run all tests."""
     print("\n" + "=" * 80)
@@ -210,6 +268,7 @@ def main():
         test_join_spec_transformation()
         test_multiple_join_specs()
         test_invalid_relationship_type()
+        test_join_spec_with_instruction()
         
         print("\n" + "=" * 80)
         print("✓ ALL TESTS PASSED")

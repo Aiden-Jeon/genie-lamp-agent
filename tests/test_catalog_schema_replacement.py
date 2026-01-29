@@ -41,12 +41,21 @@ def test_update_config_catalog_schema_updates_instructions():
                     "content": "Discord 리액션 분석 시에는 반드시 `main.log_discord.message` LEFT JOIN `main.log_discord.reaction` ON `message.message_id = reaction.message_id`를 사용합니다."
                 }
             ],
-            "sql_expressions": [
-                {
-                    "name": "total_messages",
-                    "expression": "SELECT COUNT(*) FROM main.log_discord.message"
-                }
-            ],
+            "sql_snippets": {
+                "measures": [
+                    {
+                        "alias": "total_messages",
+                        "sql": "COUNT(*)",
+                        "display_name": "total messages"
+                    }
+                ],
+                "filters": [
+                    {
+                        "sql": "main.log_discord.message.game_code = 'inzoi'",
+                        "display_name": "INZOI messages"
+                    }
+                ]
+            },
             "example_sql_queries": [
                 {
                     "question": "How many messages?",
@@ -81,7 +90,7 @@ def test_update_config_catalog_schema_updates_instructions():
         # Verify counts
         assert counts['tables'] == 1, "Should update 1 table"
         assert counts['instructions'] == 2, "Should update 2 instructions"
-        assert counts['sql_expressions'] == 1, "Should update 1 SQL expression"
+        assert counts['sql_expressions'] == 1, "Should update 1 SQL snippet (filter)"
         assert counts['example_queries'] == 1, "Should update 1 example query"
         assert counts['benchmark_questions'] == 1, "Should update 1 benchmark question"
 
@@ -187,12 +196,14 @@ def test_update_config_catalog_schema_no_instructions():
             "tables": [
                 {"catalog_name": "main", "schema_name": "log_discord", "table_name": "message"}
             ],
-            "sql_expressions": [
-                {
-                    "name": "total",
-                    "expression": "SELECT COUNT(*) FROM main.log_discord.message"
-                }
-            ]
+            "sql_snippets": {
+                "filters": [
+                    {
+                        "sql": "main.log_discord.message.game_code = 'inzoi'",
+                        "display_name": "INZOI filter"
+                    }
+                ]
+            }
         }
     }
 
@@ -212,7 +223,7 @@ def test_update_config_catalog_schema_no_instructions():
 
         assert counts['tables'] == 1
         assert counts['instructions'] == 0  # No instructions to update
-        assert counts['sql_expressions'] == 1
+        assert counts['sql_expressions'] == 1  # 1 filter updated
 
     finally:
         Path(temp_path).unlink(missing_ok=True)

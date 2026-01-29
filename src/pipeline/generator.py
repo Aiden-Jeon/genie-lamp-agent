@@ -293,7 +293,13 @@ def generate_config(
                 print(f"     - With warnings: {summary['queries_with_warnings']}")
 
                 # Show first few errors if any
-                all_reports = sql_results["example_queries"] + sql_results["sql_expressions"]
+                all_reports = sql_results["example_queries"]
+                # Add SQL snippets reports (filters, expressions, measures)
+                if "sql_snippets" in sql_results:
+                    all_reports.extend(sql_results["sql_snippets"].get("filters", []))
+                    all_reports.extend(sql_results["sql_snippets"].get("expressions", []))
+                    all_reports.extend(sql_results["sql_snippets"].get("measures", []))
+                
                 errors_shown = 0
                 for report in all_reports:
                     if not report.is_valid and errors_shown < 3:

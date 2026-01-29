@@ -294,12 +294,15 @@ class TestSQLValidator:
                     "sql_query": "SELECT * FROM nonexistent"
                 }
             ],
-            "sql_expressions": [
-                {
-                    "name": "total_revenue",
-                    "expression": "SUM(amount)"
-                }
-            ]
+            "sql_snippets": {
+                "measures": [
+                    {
+                        "alias": "total_revenue",
+                        "sql": "SUM(amount)",
+                        "display_name": "total revenue"
+                    }
+                ]
+            }
         }
 
         results = validator.validate_config_sql(config)
@@ -307,7 +310,7 @@ class TestSQLValidator:
         assert results["summary"]["total_queries"] == 3
         assert results["summary"]["queries_with_errors"] >= 1
         assert len(results["example_queries"]) == 2
-        assert len(results["sql_expressions"]) == 1
+        assert len(results["sql_snippets"]["measures"]) == 1
 
 
 class TestValidateJoinSpecifications:

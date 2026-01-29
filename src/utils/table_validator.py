@@ -430,82 +430,124 @@ class TableValidator:
                     location="tables"
                 )
         
-        # Extract and validate columns from SQL expressions
-        self._validate_sql_expressions(genie_config, table_map, report)
+        # Extract and validate columns from SQL snippets
+        self._validate_sql_snippets(genie_config, table_map, report)
         self._validate_example_queries(genie_config, table_map, report)
         self._validate_benchmark_queries(genie_config, table_map, report)
 
         return report
     
-    def _validate_sql_expressions(
+    def _validate_sql_snippets(
         self,
         genie_config: Dict[str, Any],
         table_map: Dict[str, Any],
         report: ValidationReport
     ):
-        """Validate columns referenced in sql_expressions."""
-        sql_expressions = genie_config.get("sql_expressions", [])
+        """Validate columns referenced in sql_snippets (filters, expressions, measures)."""
+        sql_snippets = genie_config.get("sql_snippets", {})
         
-        if not sql_expressions:
+        if not sql_snippets:
             return
-        
-        report.add_issue(
-            severity="info",
-            type="validation_section",
-            message=f"Validating columns in {len(sql_expressions)} SQL expressions"
-        )
         
         # Build alias map from table definitions
         alias_map = self._build_alias_map(genie_config)
         
-        for expr in sql_expressions:
-            expr_name = expr.get("name", "unnamed")
-            expression = expr.get("expression", "")
-            
-            # Extract column references
-            columns = self.extract_columns_from_sql(expression, alias_map)
-            
-            for col_ref in columns:
-                # Parse table.column
-                if '.' in col_ref:
-                    parts = col_ref.rsplit('.', 1)
-                    full_table = parts[0]
-                    column = parts[1]
+        # Validate filters
+        filters = sql_snippets.get("filters", [])
+        if filters:
+            report.add_issue(
+                severity="info",
+                type="validation_section",
+                message=f"Validating columns in {len(filters)} SQL filters"
+            )
+            for filt in filters:
+                display_name = filt.get("display_name", "unnamed")
+                sql = filt.get("sql", "")
+                self._validate_sql_string(sql, display_name, "sql_snippets.filters", alias_map, table_map, report)
+        
+        # Validate expressions (dimensions)
+        expressions = sql_snippets.get("expressions", [])
+        if expressions:
+            report.add_issue(
+                severity="info",
+                type="validation_section",
+                message=f"Validating columns in {len(expressions)} SQL expressions"
+            )
+            for expr in expressions:
+                alias = expr.get("alias", "unnamed")
+                sql = expr.get("sql", "")
+                self._validate_sql_string(sql, alias, "sql_snippets.expressions", alias_map, table_map, report)
+        
+        # Validate measures (aggregations)
+        measures = sql_snippets.get("measures", [])
+        if measures:
+            report.add_issue(
+                severity="info",
+                type="validation_section",
+                message=f"Validating columns in {len(measures)} SQL measures"
+            )
+            for measure in measures:
+                alias = measure.get("alias", "unnamed")
+                sql = measure.get("sql", "")
+                self._validate_sql_string(sql, alias, "sql_snippets.measures", alias_map, table_map, report)
+    
+    def _validate_sql_string(
+        self,
+        sql: str,
+        name: str,
+        location_prefix: str,
+        alias_map: Dict[str, str],
+        table_map: Dict[str, Any],
+        report: ValidationReport
+    ):
+        """Helper method to validate a SQL string."""
+        if not sql:
+            return
+        
+        # Extract column references
+        columns = self.extract_columns_from_sql(sql, alias_map)
+        
+        for col_ref in columns:
+            # Parse table.column
+            if '.' in col_ref:
+                parts = col_ref.rsplit('.', 1)
+                full_table = parts[0]
+                column = parts[1]
+                
+                # Parse table name
+                table_parts = full_table.split('.')
+                if len(table_parts) == 3:
+                    catalog, schema, table = table_parts
                     
-                    # Parse table name
-                    table_parts = full_table.split('.')
-                    if len(table_parts) == 3:
-                        catalog, schema, table = table_parts
+                    # Track column check
+                    if full_table not in report.columns_checked:
+                        report.columns_checked[full_table] = []
+                    if column not in report.columns_checked[full_table]:
+                        report.columns_checked[full_table].append(column)
+                    
+                    # Validate column
+                    if full_table in report.tables_valid:
+                        col_results = self.validate_columns(catalog, schema, table, [column])
                         
-                        # Track column check
-                        if full_table not in report.columns_checked:
-                            report.columns_checked[full_table] = []
-                        if column not in report.columns_checked[full_table]:
-                            report.columns_checked[full_table].append(column)
-                        
-                        # Validate column
-                        if full_table in report.tables_valid:
-                            col_results = self.validate_columns(catalog, schema, table, [column])
+                        if col_results.get(column, False):
+                            if full_table not in report.columns_valid:
+                                report.columns_valid[full_table] = []
+                            if column not in report.columns_valid[full_table]:
+                                report.columns_valid[full_table].append(column)
+                        else:
+                            if full_table not in report.columns_invalid:
+                                report.columns_invalid[full_table] = []
+                            if column not in report.columns_invalid[full_table]:
+                                report.columns_invalid[full_table].append(column)
                             
-                            if col_results.get(column, False):
-                                if full_table not in report.columns_valid:
-                                    report.columns_valid[full_table] = []
-                                if column not in report.columns_valid[full_table]:
-                                    report.columns_valid[full_table].append(column)
-                            else:
-                                if full_table not in report.columns_invalid:
-                                    report.columns_invalid[full_table] = []
-                                if column not in report.columns_invalid[full_table]:
-                                    report.columns_invalid[full_table].append(column)
-                                
-                                report.add_issue(
-                                    severity="error",
-                                    type="column_not_found",
-                                    message=f"Column not found in table",
-                                    table=full_table,
-                                    column=column,
-                                    location=f"sql_expressions[{expr_name}]"
-                                )
+                            report.add_issue(
+                                severity="error",
+                                type="column_not_found",
+                                message=f"Column not found in table",
+                                table=full_table,
+                                column=column,
+                                location=f"{location_prefix}[{name}]"
+                            )
     
     def _validate_example_queries(
         self,

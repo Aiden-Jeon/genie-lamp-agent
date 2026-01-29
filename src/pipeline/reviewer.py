@@ -212,7 +212,13 @@ class ConfigReviewAgent:
             report.sql_validation_score = max(0, report.sql_validation_score)
 
         # Add issues for SQL errors
-        all_reports = sql_results["example_queries"] + sql_results["sql_expressions"]
+        all_reports = sql_results["example_queries"]
+        # Add SQL snippets reports (filters, expressions, measures)
+        if "sql_snippets" in sql_results:
+            all_reports.extend(sql_results["sql_snippets"].get("filters", []))
+            all_reports.extend(sql_results["sql_snippets"].get("expressions", []))
+            all_reports.extend(sql_results["sql_snippets"].get("measures", []))
+        
         for i, sql_report in enumerate(all_reports):
             if not sql_report.is_valid:
                 for error in sql_report.get_errors():
@@ -342,7 +348,14 @@ class ConfigReviewAgent:
         tables = config.get("tables", [])
         example_queries = config.get("example_sql_queries", [])
         benchmarks = config.get("benchmark_questions", [])
-        sql_expressions = config.get("sql_expressions", [])
+        
+        # Count SQL snippets (filters, expressions, measures)
+        sql_snippets = config.get("sql_snippets", {})
+        num_sql_snippets = (
+            len(sql_snippets.get("filters", [])) +
+            len(sql_snippets.get("expressions", [])) +
+            len(sql_snippets.get("measures", []))
+        )
 
         num_tables = len(tables)
 
@@ -366,19 +379,19 @@ class ConfigReviewAgent:
                 suggestion="Add more benchmark questions for testing (aim for 10-20)"
             ))
 
-        # Check for SQL expressions (metrics/filters)
-        if len(sql_expressions) == 0:
+        # Check for SQL snippets (filters/expressions/measures)
+        if num_sql_snippets == 0:
             report.add_issue(ReviewIssue(
                 severity="info",
                 category="coverage",
-                message="No SQL expressions (metrics/filters/dimensions) defined",
-                suggestion="Consider defining common metrics and filters as SQL expressions"
+                message="No SQL snippets (filters/expressions/measures) defined",
+                suggestion="Consider defining common filters, dimensions, and metrics as SQL snippets"
             ))
 
         # Calculate coverage score
         example_score = min(100, (len(example_queries) / max(1, num_tables * 2)) * 100)
         benchmark_score = min(100, (len(benchmarks) / 10) * 100)
-        expression_score = min(100, (len(sql_expressions) / 5) * 100)
+        expression_score = min(100, (num_sql_snippets / 5) * 100)
 
         report.coverage_score = (example_score * 0.5 + benchmark_score * 0.3 + expression_score * 0.2)
 

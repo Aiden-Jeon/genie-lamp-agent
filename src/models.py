@@ -28,13 +28,38 @@ class GenieSpaceExampleSQL(BaseModel):
     description: Optional[str] = Field(None, description="Additional description or context")
 
 
-class GenieSpaceSQLExpression(BaseModel):
-    """Represents a SQL expression for metrics, filters, or dimensions."""
+class GenieSpaceSQLFilter(BaseModel):
+    """Represents a SQL filter (WHERE condition)."""
     
-    name: str = Field(..., description="Name of the metric/filter/dimension")
-    expression: str = Field(..., description="SQL expression")
-    description: Optional[str] = Field(None, description="Description of what this represents")
-    type: str = Field(..., description="Type: 'metric', 'filter', or 'dimension'")
+    sql: str = Field(..., description="SQL filter expression (e.g., 'table.price > 100')")
+    display_name: str = Field(..., description="User-friendly name for the filter")
+    synonyms: Optional[List[str]] = Field(None, description="Alternative names for the filter")
+
+
+class GenieSpaceSQLExpression(BaseModel):
+    """Represents a SQL expression (dimension/calculated field)."""
+    
+    alias: str = Field(..., description="Internal alias for the expression")
+    sql: str = Field(..., description="SQL expression (e.g., 'YEAR(orders.order_date)')")
+    display_name: str = Field(..., description="User-friendly name for the expression")
+    synonyms: Optional[List[str]] = Field(None, description="Alternative names for the expression")
+
+
+class GenieSpaceSQLMeasure(BaseModel):
+    """Represents a SQL measure (aggregation)."""
+    
+    alias: str = Field(..., description="Internal alias for the measure")
+    sql: str = Field(..., description="SQL aggregation expression (e.g., 'SUM(orders.order_amount)')")
+    display_name: str = Field(..., description="User-friendly name for the measure")
+    synonyms: Optional[List[str]] = Field(None, description="Alternative names for the measure")
+
+
+class GenieSpaceSQLSnippets(BaseModel):
+    """Container for all SQL snippets (filters, expressions, measures)."""
+    
+    filters: List[GenieSpaceSQLFilter] = Field(default_factory=list, description="SQL filters (WHERE conditions)")
+    expressions: List[GenieSpaceSQLExpression] = Field(default_factory=list, description="SQL expressions (dimensions/calculated fields)")
+    measures: List[GenieSpaceSQLMeasure] = Field(default_factory=list, description="SQL measures (aggregations)")
 
 
 class GenieSpaceBenchmark(BaseModel):
@@ -53,6 +78,7 @@ class GenieSpaceJoinSpec(BaseModel):
     join_type: str = Field(..., description="Join type: INNER, LEFT, RIGHT, or FULL")
     join_condition: str = Field(..., description="Join condition (e.g., 'left_table.id = right_table.foreign_id')")
     description: Optional[str] = Field(None, description="Explanation of the relationship between tables")
+    instruction: Optional[str] = Field(None, description="Guidance on when and how to use this join")
 
 
 class GenieSpaceConfig(BaseModel):
@@ -69,7 +95,7 @@ class GenieSpaceConfig(BaseModel):
     # Instructions and examples
     instructions: List[GenieSpaceInstruction] = Field(default_factory=list, description="Plain text instructions")
     example_sql_queries: List[GenieSpaceExampleSQL] = Field(default_factory=list, description="Example SQL queries")
-    sql_expressions: List[GenieSpaceSQLExpression] = Field(default_factory=list, description="SQL expressions for metrics/filters/dimensions")
+    sql_snippets: Optional[GenieSpaceSQLSnippets] = Field(None, description="SQL snippets (filters, expressions, measures)")
 
     # Testing
     benchmark_questions: List[GenieSpaceBenchmark] = Field(default_factory=list, description="Benchmark questions for testing")

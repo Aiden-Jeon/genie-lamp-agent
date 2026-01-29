@@ -374,7 +374,11 @@ class SQLValidator:
         """
         results = {
             "example_queries": [],
-            "sql_expressions": [],
+            "sql_snippets": {
+                "filters": [],
+                "expressions": [],
+                "measures": []
+            },
             "summary": {
                 "total_queries": 0,
                 "valid_queries": 0,
@@ -401,18 +405,50 @@ class SQLValidator:
                 if report.get_warnings():
                     results["summary"]["queries_with_warnings"] += 1
 
-        # Validate SQL expressions
+        # Validate SQL snippets (filters, expressions, measures)
         if check_expressions:
-            expressions = config.get("sql_expressions", [])
-            for i, expr in enumerate(expressions):
-                sql = expr.get("expression", "")
-                name = expr.get("name", f"Expression #{i+1}")
-
-                # SQL expressions are fragments, so we need to be more lenient
-                # Just check for basic syntax issues
+            sql_snippets = config.get("sql_snippets", {})
+            
+            # Validate filters
+            filters = sql_snippets.get("filters", [])
+            for i, filt in enumerate(filters):
+                sql = filt.get("sql", "")
+                name = filt.get("display_name", f"Filter #{i+1}")
                 report = self.validate_sql(sql, query_name=name)
-                results["sql_expressions"].append(report)
-
+                results["sql_snippets"]["filters"].append(report)
+                
+                results["summary"]["total_queries"] += 1
+                if report.is_valid:
+                    results["summary"]["valid_queries"] += 1
+                else:
+                    results["summary"]["queries_with_errors"] += 1
+                if report.get_warnings():
+                    results["summary"]["queries_with_warnings"] += 1
+            
+            # Validate expressions
+            expressions = sql_snippets.get("expressions", [])
+            for i, expr in enumerate(expressions):
+                sql = expr.get("sql", "")
+                name = expr.get("alias", f"Expression #{i+1}")
+                report = self.validate_sql(sql, query_name=name)
+                results["sql_snippets"]["expressions"].append(report)
+                
+                results["summary"]["total_queries"] += 1
+                if report.is_valid:
+                    results["summary"]["valid_queries"] += 1
+                else:
+                    results["summary"]["queries_with_errors"] += 1
+                if report.get_warnings():
+                    results["summary"]["queries_with_warnings"] += 1
+            
+            # Validate measures
+            measures = sql_snippets.get("measures", [])
+            for i, measure in enumerate(measures):
+                sql = measure.get("sql", "")
+                name = measure.get("alias", f"Measure #{i+1}")
+                report = self.validate_sql(sql, query_name=name)
+                results["sql_snippets"]["measures"].append(report)
+                
                 results["summary"]["total_queries"] += 1
                 if report.is_valid:
                     results["summary"]["valid_queries"] += 1

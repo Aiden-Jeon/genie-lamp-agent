@@ -79,11 +79,26 @@ def update_config_catalog_schema_table(
             table_def["table_name"] = new_table
             updated_count += 1
 
-    # Update SQL expressions - replace full table references
+    # Update SQL snippets - replace full table references
     sql_expr_count = 0
-    for expr in genie_config.get("sql_expressions", []):
-        if "expression" in expr and old_full_table in expr["expression"]:
-            expr["expression"] = expr["expression"].replace(old_full_table, new_full_table)
+    sql_snippets = genie_config.get("sql_snippets", {})
+    
+    # Update filters
+    for filt in sql_snippets.get("filters", []):
+        if "sql" in filt and old_full_table in filt["sql"]:
+            filt["sql"] = filt["sql"].replace(old_full_table, new_full_table)
+            sql_expr_count += 1
+    
+    # Update expressions
+    for expr in sql_snippets.get("expressions", []):
+        if "sql" in expr and old_full_table in expr["sql"]:
+            expr["sql"] = expr["sql"].replace(old_full_table, new_full_table)
+            sql_expr_count += 1
+    
+    # Update measures
+    for measure in sql_snippets.get("measures", []):
+        if "sql" in measure and old_full_table in measure["sql"]:
+            measure["sql"] = measure["sql"].replace(old_full_table, new_full_table)
             sql_expr_count += 1
 
     # Update example queries - replace full table references
@@ -225,13 +240,29 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
             table_def["schema_name"] = new_schema
             updated_count += 1
 
-    # Update SQL expressions
+    # Update SQL snippets
     sql_expr_count = 0
-    for expr in genie_config.get("sql_expressions", []):
-        old_prefix = f"{old_catalog}.{old_schema}."
-        new_prefix = f"{new_catalog}.{new_schema}."
-        if "expression" in expr and old_prefix in expr["expression"]:
-            expr["expression"] = expr["expression"].replace(old_prefix, new_prefix)
+    old_prefix = f"{old_catalog}.{old_schema}."
+    new_prefix = f"{new_catalog}.{new_schema}."
+    
+    sql_snippets = genie_config.get("sql_snippets", {})
+    
+    # Update filters
+    for filt in sql_snippets.get("filters", []):
+        if "sql" in filt and old_prefix in filt["sql"]:
+            filt["sql"] = filt["sql"].replace(old_prefix, new_prefix)
+            sql_expr_count += 1
+    
+    # Update expressions
+    for expr in sql_snippets.get("expressions", []):
+        if "sql" in expr and old_prefix in expr["sql"]:
+            expr["sql"] = expr["sql"].replace(old_prefix, new_prefix)
+            sql_expr_count += 1
+    
+    # Update measures
+    for measure in sql_snippets.get("measures", []):
+        if "sql" in measure and old_prefix in measure["sql"]:
+            measure["sql"] = measure["sql"].replace(old_prefix, new_prefix)
             sql_expr_count += 1
 
     # Update example queries
@@ -726,7 +757,16 @@ def cmd_generate(args):
         print(f"  Tables: {len(config['tables'])}")
         print(f"  Instructions: {len(config['instructions'])}")
         print(f"  Example SQL Queries: {len(config['example_sql_queries'])}")
-        print(f"  SQL Expressions: {len(config.get('sql_expressions', []))}")
+        
+        # Count SQL snippets
+        sql_snippets = config.get('sql_snippets', {})
+        num_sql_snippets = (
+            len(sql_snippets.get('filters', [])) +
+            len(sql_snippets.get('expressions', [])) +
+            len(sql_snippets.get('measures', []))
+        )
+        print(f"  SQL Snippets: {num_sql_snippets} (filters, expressions, measures)")
+        
         print(f"  Benchmark Questions: {len(config['benchmark_questions'])}")
         print()
         print(f"Configuration saved to: {args.output}")

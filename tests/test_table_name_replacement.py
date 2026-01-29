@@ -39,12 +39,15 @@ def sample_config():
                     "description": "Product data"
                 }
             ],
-            "sql_expressions": [
-                {
-                    "name": "total_amount",
-                    "expression": "SUM(old_catalog.old_schema.orders.amount)"
-                }
-            ],
+            "sql_snippets": {
+                "measures": [
+                    {
+                        "alias": "total_amount",
+                        "sql": "SUM(old_catalog.old_schema.orders.amount)",
+                        "display_name": "total amount"
+                    }
+                ]
+            },
             "example_sql_queries": [
                 {
                     "question": "What are the total orders?",
@@ -142,8 +145,8 @@ def test_update_individual_table_name(sample_config):
         assert orders_table["catalog_name"] == "old_catalog"
         assert orders_table["schema_name"] == "old_schema"
 
-        # Check SQL expression is unchanged (doesn't reference customers)
-        assert "old_catalog.old_schema.orders" in genie_config["sql_expressions"][0]["expression"]
+        # Check SQL snippet is unchanged (doesn't reference customers)
+        assert "old_catalog.old_schema.orders" in genie_config["sql_snippets"]["measures"][0]["sql"]
 
         # Check example query is updated
         query_with_customers = next(
@@ -215,8 +218,8 @@ def test_update_catalog_schema_bulk(sample_config):
                 assert table["catalog_name"] == "other_catalog"
                 assert table["schema_name"] == "other_schema"
 
-        # Check SQL expression is updated
-        assert "new_catalog.new_schema.orders" in genie_config["sql_expressions"][0]["expression"]
+        # Check SQL snippet is updated
+        assert "new_catalog.new_schema.orders" in genie_config["sql_snippets"]["measures"][0]["sql"]
 
         # Check all example queries are updated
         for query in genie_config["example_sql_queries"]:

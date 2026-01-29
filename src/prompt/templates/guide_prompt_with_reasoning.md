@@ -7,10 +7,12 @@ Based on the input requirements, you should:
 1. Identify the key tables needed for the Genie space
 2. Extract important business questions that should be supported
 3. Create example SQL queries that demonstrate how to answer common questions
-4. Define SQL expressions for key metrics, filters, and dimensions
-   - Create as many SQL expressions as are relevant to your data (typically 5-15)
-   - Focus on commonly used business terms, metrics, and calculations
-   - Don't force a specific number - quality and relevance over quantity
+4. Define SQL snippets for reusable components:
+   - **Filters**: WHERE conditions (e.g., "table.price > 100", "status = 'active'")
+   - **Expressions**: Dimensions/calculated fields (e.g., "YEAR(order_date)", "CONCAT(first_name, ' ', last_name)")
+   - **Measures**: Aggregations (e.g., "SUM(revenue)", "COUNT(DISTINCT customer_id)", "AVG(price)")
+   - Create 5-15 snippets total, focusing on commonly used business terms and calculations
+   - Quality and relevance over quantity
 5. Write clear, specific instructions to guide Genie's behavior
 
 **Note**: Benchmark questions are extracted and processed separately by the system.
@@ -240,7 +242,8 @@ For **every pair of tables** that need to be joined together, you MUST document 
       "right_table": "catalog.schema.table2",
       "join_type": "INNER",
       "join_condition": "table1.foreign_key_column = table2.primary_key_column",
-      "description": "Explanation of the relationship (e.g., 'Each transaction belongs to one customer')"
+      "description": "Explanation of the relationship (e.g., 'Each transaction belongs to one customer')",
+      "instruction": "When to use this join (e.g., 'Use this join when analyzing transaction data with customer context')"
     }}
   ]
 }}
@@ -252,11 +255,26 @@ For **every pair of tables** that need to be joined together, you MUST document 
 - **RIGHT JOIN**: Rarely used, prefer LEFT JOIN with swapped tables
 - **FULL OUTER JOIN**: Only for specific merge scenarios
 
+### Join Instruction Field (REQUIRED):
+The `instruction` field provides guidance on **when and how to use this join**. This helps Genie decide which joins to apply for different types of questions.
+
+**Good instruction examples:**
+- ✅ "Use this join when users ask about message engagement or reactions"
+- ✅ "Use this join when analyzing customer purchase history or transaction details"
+- ✅ "Use this join to enrich products with category information for product analysis questions"
+- ✅ "Use LEFT JOIN to keep all messages, even those without reactions"
+
+**Bad instruction examples (too vague):**
+- ❌ "how should join this?"
+- ❌ "join when needed"
+- ❌ "use this join"
+
 ### Why Join Specifications Are Critical:
 - Genie uses these to understand table relationships
 - Prevents Cartesian products and incorrect joins
 - Documents the data model explicitly
 - Improves SQL generation accuracy significantly
+- **Instructions guide Genie on when to apply specific joins based on the user's question**
 
 ### Example Join Specifications:
 ```json
@@ -267,21 +285,24 @@ For **every pair of tables** that need to be joined together, you MUST document 
       "right_table": "main.retail.customers",
       "join_type": "INNER",
       "join_condition": "transactions.customer_id = customers.customer_id",
-      "description": "Each transaction is associated with exactly one customer. Use INNER JOIN because all transactions must have a valid customer."
+      "description": "Each transaction is associated with exactly one customer. Use INNER JOIN because all transactions must have a valid customer.",
+      "instruction": "Use this join when analyzing customer behavior, customer demographics, or any customer-related transaction analysis"
     }},
     {{
       "left_table": "main.retail.transactions",
       "right_table": "main.retail.products",
       "join_type": "INNER",
       "join_condition": "transactions.product_id = products.product_id",
-      "description": "Each transaction references one product. Use INNER JOIN to ensure product details are available."
+      "description": "Each transaction references one product. Use INNER JOIN to ensure product details are available.",
+      "instruction": "Use this join when users ask about product performance, product categories, or need product details in transaction analysis"
     }},
     {{
       "left_table": "main.retail.customers",
       "right_table": "main.retail.transactions",
       "join_type": "LEFT",
       "join_condition": "customers.customer_id = transactions.customer_id",
-      "description": "When analyzing all customers (including those without purchases), use LEFT JOIN to include customers with no transactions."
+      "description": "When analyzing all customers (including those without purchases), use LEFT JOIN to include customers with no transactions.",
+      "instruction": "Use this join when analyzing all customers including those who haven't made purchases yet. Use LEFT JOIN to preserve all customer records"
     }}
   ]
 }}
@@ -322,10 +343,12 @@ Please generate a complete GenieSpaceConfig JSON object based on the requirement
       "right_table": "catalog.schema.table2",
       "join_type": "INNER|LEFT|RIGHT|FULL",
       "join_condition": "table1.column = table2.column",
-      "description": "string (explanation of the relationship)"
+      "description": "string (explanation of the relationship)",
+      "instruction": "string (when to use this join - e.g., 'Use this join when analyzing X with Y context')"
     }}
     // CRITICAL: Include join specs for EVERY pair of related tables
     // This is essential for SQL correctness
+    // REQUIRED: Add instruction field to guide when to use each join
   ],
   "instructions": [
     {{{{
@@ -340,14 +363,31 @@ Please generate a complete GenieSpaceConfig JSON object based on the requirement
       "description": "string (optional)"
     }}}}
   ],
-  "sql_expressions": [
-    {{{{
-      "name": "string",
-      "expression": "string (MUST reference only existing columns with correct syntax)",
-      "description": "string (optional)",
-      "type": "metric|filter|dimension"
-    }}}}
-  ],
+  "sql_snippets": {{{{
+    "filters": [
+      {{{{
+        "sql": "string (WHERE condition, e.g., 'table.price > 100')",
+        "display_name": "string (user-friendly name)",
+        "synonyms": ["string"] (optional, alternative names)
+      }}}}
+    ],
+    "expressions": [
+      {{{{
+        "alias": "string (internal alias, e.g., 'order_year')",
+        "sql": "string (dimension/calculated field, e.g., 'YEAR(orders.order_date)')",
+        "display_name": "string (user-friendly name, e.g., 'year')",
+        "synonyms": ["string"] (optional, alternative names)
+      }}}}
+    ],
+    "measures": [
+      {{{{
+        "alias": "string (internal alias, e.g., 'total_revenue')",
+        "sql": "string (aggregation, e.g., 'SUM(orders.order_amount)')",
+        "display_name": "string (user-friendly name, e.g., 'total revenue')",
+        "synonyms": ["string"] (optional, alternative names like 'revenue', 'total sales')
+      }}}}
+    ]
+  }}}},
   "warehouse_id": "string (optional)",
   "enable_data_sampling": true
 }}}}
