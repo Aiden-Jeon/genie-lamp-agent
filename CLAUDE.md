@@ -76,7 +76,6 @@ Requirements Doc → LLM Generation → Validation → Deployment
 
 4. **Validation & Utilities** (`src/utils/`)
    - **table_validator.py**: Unity Catalog table/column verification
-   - **benchmark_extractor.py**: Extracts FAQ questions from requirements as benchmarks (100% coverage)
    - **config_transformer.py**: Converts user-friendly format to Databricks `serialized_space` format
 
 5. **API Integration** (`src/api/`)
@@ -121,8 +120,8 @@ User-friendly JSON → `serialized_space` format transformation happens automati
 - SQL expressions (metrics/dimensions)
 - Benchmark questions
 
-### Benchmark Extraction Strategy
-FAQ questions are extracted **directly** from requirements without LLM filtering to ensure 100% coverage. The `benchmark_extractor.py` uses regex patterns to find all questions.
+### Benchmark Loading Strategy
+Benchmarks are loaded from external JSON files (`benchmarks/benchmarks.json`) using the `benchmark_loader.py` module. This allows for curated, high-quality benchmark questions with expected SQL queries. The system automatically searches for benchmark files relative to the requirements path and loads them if available.
 
 ### Async PDF Parsing
 PDF parsing runs asynchronously with concurrent processing:
@@ -235,7 +234,9 @@ Templates are markdown files in `src/prompt/templates/`:
 
 ### Requirements Document Format
 Standard format includes:
-- **FAQ Section**: Business questions (extracted as benchmarks)
 - **Table Section**: Table names with sample queries
 - **Business Context**: Domain-specific requirements
+- **FAQ Section**: Business questions (optional, for reference)
 - Supports both markdown and PDF input (parsed to standard format)
+
+Note: Benchmarks are loaded from separate JSON files (`benchmarks/benchmarks.json`), not extracted from requirements documents.

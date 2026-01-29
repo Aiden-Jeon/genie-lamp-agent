@@ -22,17 +22,32 @@ from .api import GenieSpaceClient, create_genie_space_from_file
 
 # Utils
 from .utils import (
-    extract_benchmarks_from_requirements,
-    extract_sample_queries_as_benchmarks,
-    extract_benchmarks_from_multiple_sections,
-    extract_all_benchmarks,
-    merge_benchmarks_into_config,
-    validate_benchmarks,
     transform_to_serialized_space,
     create_join_spec,
+    ParseCacheManager,
+)
+
+# Benchmark utilities
+from .benchmark import (
+    extract_benchmarks_from_requirements,
+    load_benchmarks_from_json,
+    load_benchmarks_auto,
+)
+
+# Validation utilities
+from .validation import (
     TableValidator,
     ValidationReport,
     ValidationIssue,
+    SQLValidator,
+    InstructionQualityScorer,
+)
+
+# Extractor utilities
+from .extractor import (
+    extract_domain_knowledge,
+    extract_sample_queries_as_examples,
+    extract_tables_from_requirements,
 )
 
 __all__ = [
@@ -53,15 +68,21 @@ __all__ = [
     "GenieSpaceClient",
     "create_genie_space_from_file",
     # Utils
-    "extract_benchmarks_from_requirements",
-    "extract_sample_queries_as_benchmarks",
-    "extract_benchmarks_from_multiple_sections",
-    "extract_all_benchmarks",
-    "merge_benchmarks_into_config",
-    "validate_benchmarks",
     "transform_to_serialized_space",
     "create_join_spec",
+    "ParseCacheManager",
+    # Benchmark
+    "extract_benchmarks_from_requirements",
+    "load_benchmarks_from_json",
+    "load_benchmarks_auto",
+    # Validation
     "TableValidator",
     "ValidationReport",
     "ValidationIssue",
+    "SQLValidator",
+    "InstructionQualityScorer",
+    # Extractor
+    "extract_domain_knowledge",
+    "extract_sample_queries_as_examples",
+    "extract_tables_from_requirements",
 ]

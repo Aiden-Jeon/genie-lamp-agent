@@ -558,7 +558,6 @@ def cmd_create(args):
             output_doc=args.output_doc,
             max_tokens=args.max_tokens,
             temperature=args.temperature,
-            faq_section=args.faq_section,
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
             benchmark_batch_size=args.benchmark_batch_size,
@@ -735,7 +734,6 @@ def cmd_generate(args):
             output_doc=args.output_doc,
             max_tokens=args.max_tokens,
             temperature=args.temperature,
-            faq_section=args.faq_section,
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
             benchmark_batch_size=args.benchmark_batch_size,
@@ -1110,12 +1108,6 @@ Environment Variables:
     
     # Benchmark extraction
     create_parser.add_argument(
-        "--faq-section",
-        type=str,
-        default="## 📊 질문 목록 (FAQ)",
-        help="FAQ section title in requirements"
-    )
-    create_parser.add_argument(
         "--skip-benchmark-sql",
         action="store_true",
         help="Skip benchmark SQL generation (for testing)"
@@ -1215,12 +1207,6 @@ Environment Variables:
         type=str,
         default="src/prompt/templates/genie_api.md",
         help="Output format document path"
-    )
-    generate_parser.add_argument(
-        "--faq-section",
-        type=str,
-        default="## 📊 질문 목록 (FAQ)",
-        help="FAQ section title"
     )
     generate_parser.add_argument(
         "--skip-benchmark-sql",

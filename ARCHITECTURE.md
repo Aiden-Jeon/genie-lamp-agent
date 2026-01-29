@@ -338,18 +338,31 @@
 │   │   ├── llm_enricher.py         # LLM-based enrichment
 │   │   ├── markdown_generator.py   # Markdown output generation
 │   │   └── feedback_parser.py      # 🆕 Feedback analysis parser
+│   ├── benchmark/                  # 🆕 Benchmark extraction & SQL generation
+│   │   ├── __init__.py
+│   │   ├── benchmark_extractor.py  # Benchmark extractor (100% FAQ coverage)
+│   │   ├── benchmark_loader.py     # Load benchmarks from JSON files
+│   │   └── benchmark_sql_generator.py  # Two-pass benchmark SQL generation (2026)
+│   ├── extractor/                  # 🆕 Domain & content extraction
+│   │   ├── __init__.py
+│   │   ├── domain_extractor.py     # Domain knowledge extractor (P3)
+│   │   ├── example_extractor.py    # Example SQL query extractor
+│   │   └── table_extractor.py      # Table information extractor
+│   ├── validation/                 # 🆕 Validation & scoring
+│   │   ├── __init__.py
+│   │   ├── sql_validator.py        # SQL syntax & quality validator (P2)
+│   │   ├── instruction_scorer.py   # Instruction quality scorer (P2)
+│   │   └── table_validator.py      # Unity Catalog table & column validator
 │   └── utils/                      # Utility modules
 │       ├── __init__.py
-│       ├── benchmark_extractor.py  # Benchmark extractor (100% FAQ coverage)
-│       ├── benchmark_sql_generator.py  # 🆕 Two-pass benchmark SQL generation (2026)
 │       ├── config_transformer.py   # Config transformation
-│       ├── table_validator.py      # Unity Catalog table & column validator
-│       ├── sql_validator.py        # 🆕 SQL syntax & quality validator (P2)
-│       ├── instruction_scorer.py   # 🆕 Instruction quality scorer (P2)
-│       └── domain_extractor.py     # 🆕 Domain knowledge extractor (P3)
+│       └── parse_cache.py          # Parse result caching
 │
-├── data/                           # Input requirements
-│   └── demo_requirements.md        # Example requirements
+├── sample/                         # 🆕 Sample data and examples
+│   ├── inputs/                     # Sample input requirements
+│   │   └── demo_requirements.md    # Fashion retail demo requirements
+│   └── benchmarks/                 # Sample benchmark questions
+│       └── benchmarks.json         # Structured benchmark questions
 │
 ├── output/                         # Generated files (gitignored)
 │   ├── genie_space_config.json     # Generated config
@@ -370,26 +383,94 @@
 │   ├── FINAL_SUMMARY.md                        # Complete 3-priority summary
 │   └── sql_quality_quick_reference.md          # SQL standards reference
 │
-└── tests/                          # Test suite (99 tests, all passing ✅)
+└── tests/                          # Test suite (all passing ✅)
     ├── __init__.py
-    ├── test_generation.py          # Generation tests (includes two-pass integration test)
+    ├── conftest.py                 # Pytest fixtures and configuration
+    ├── test_generation.py          # Generation tests
+    ├── test_generation_domain.py   # Domain-aware generation tests
     ├── test_example_usage.py       # Example usage tests
     ├── test_join_specs.py          # Join specification tests
     ├── test_requirements_converter.py  # Requirements conversion tests
+    ├── test_requirements_domain.py # Domain extraction from requirements
     ├── test_table_validator.py     # Table validator tests
-    ├── test_benchmark_sql_generator.py  # 🆕 Benchmark SQL generation (16 tests, 2026)
-    ├── test_enhanced_generation.py # 🆕 P1: Enhanced prompts (7 tests)
-    ├── test_sql_validator.py       # 🆕 P2: SQL validation (22 tests)
-    ├── test_instruction_scorer.py  # 🆕 P2: Instruction scoring (23 tests)
-    ├── test_domain_extractor.py    # 🆕 P3: Domain extraction (17 tests)
-    └── test_reviewer.py            # 🆕 P3: Config review (14 tests)
+    ├── test_benchmark_extraction.py    # Benchmark extraction tests
+    ├── test_benchmark_integration.py   # Benchmark integration tests
+    ├── test_benchmark_loader.py        # Benchmark loader tests
+    ├── test_benchmark_sql_generator.py # Benchmark SQL generation tests
+    ├── test_enhanced_generation.py # P1: Enhanced prompts tests
+    ├── test_sql_validator.py       # P2: SQL validation tests
+    ├── test_instruction_scorer.py  # P2: Instruction scoring tests
+    ├── test_domain_extractor.py    # P3: Domain extraction tests
+    ├── test_example_extractor.py   # Example query extraction tests
+    └── test_reviewer.py            # P3: Config review tests
 ```
 
 **Key Changes in Structure:**
 - 🌟 **genie.py**: Unified CLI (main entry point) that combines parse, generate, validate, and deploy
 - 🌟 **src/pipeline/**: Orchestration layer with generator, validator, deployer, and parser modules
-  - **parser.py**: New async/concurrent document parsing module with progress tracking
+  - **parser.py**: Async/concurrent document parsing module with progress tracking and caching
 - **src/parsing/**: Complete requirements parsing pipeline (PDF, Markdown, structuring, enrichment)
+- 🆕 **src/benchmark/**: Benchmark extraction, loading, and SQL generation (modular)
+- 🆕 **src/extractor/**: Domain knowledge, example queries, and table extraction (modular)
+- 🆕 **src/validation/**: SQL validation, instruction scoring, and table validation (modular)
+- 🆕 **sample/**: Sample data directory with demo requirements and benchmarks
+
+### Modular Reorganization (2026)
+
+The codebase has been refactored into a more modular structure for better maintainability and clarity:
+
+**Before (monolithic `src/utils/`):**
+```
+src/utils/
+├── benchmark_extractor.py
+├── benchmark_sql_generator.py
+├── domain_extractor.py
+├── example_extractor.py
+├── table_extractor.py
+├── sql_validator.py
+├── instruction_scorer.py
+├── table_validator.py
+├── config_transformer.py
+└── parse_cache.py
+```
+
+**After (organized by domain):**
+```
+src/
+├── benchmark/              # Benchmark-related functionality
+│   ├── benchmark_extractor.py
+│   ├── benchmark_loader.py
+│   └── benchmark_sql_generator.py
+├── extractor/              # Content extraction
+│   ├── domain_extractor.py
+│   ├── example_extractor.py
+│   └── table_extractor.py
+├── validation/             # Validation and scoring
+│   ├── sql_validator.py
+│   ├── instruction_scorer.py
+│   └── table_validator.py
+└── utils/                  # True utilities
+    ├── config_transformer.py
+    └── parse_cache.py
+```
+
+**Benefits:**
+- **Clear Separation of Concerns**: Each directory has a single responsibility
+- **Easier Navigation**: Related modules are grouped together
+- **Better Testability**: Modular structure makes testing easier
+- **Improved Maintainability**: Changes are localized to specific domains
+- **Logical Imports**: `from src.benchmark import ...`, `from src.validation import ...`
+
+**Sample Data Organization:**
+```
+sample/
+├── inputs/                 # Sample requirements
+│   └── demo_requirements.md
+└── benchmarks/             # Sample benchmarks
+    └── benchmarks.json
+```
+
+This provides a clear separation between production code and example/demo data.
 
 ## Output Schema
 
@@ -488,7 +569,7 @@ This improves instruction clarity and makes configurations more maintainable.
 **Components**:
 - `src/prompt/templates/curate_effective_genie.md`: Best practices and principles
 - `src/prompt/templates/genie_api.md`: API documentation and schema information
-- `data/demo_requirements.md`: Actual business requirements
+- `sample/inputs/demo_requirements.md`: Example business requirements (Fashion Retail Analytics demo)
 
 **Format**: Markdown documents with structured information
 
@@ -761,7 +842,7 @@ This section describes the three-priority quality assurance system that ensures 
 #### 8.1 Domain Knowledge Extractor (Priority 3)
 
 **Class**: `DomainKnowledgeExtractor`
-**Module**: `src/utils/domain_extractor.py`
+**Module**: `src/extractor/domain_extractor.py`
 
 **Purpose**: Extract structured domain knowledge from requirements documents to provide explicit context to the LLM.
 
@@ -828,7 +909,7 @@ class DomainKnowledge:
 #### 8.2 SQL Validator (Priority 2)
 
 **Class**: `SQLValidator`
-**Module**: `src/utils/sql_validator.py`
+**Module**: `src/validation/sql_validator.py`
 
 **Purpose**: Comprehensive SQL syntax, table/column validation, and quality checking.
 
@@ -875,7 +956,7 @@ Score = 100 - (errors × 10) - (warnings × 2)
 #### 8.3 Instruction Quality Scorer (Priority 2)
 
 **Class**: `InstructionQualityScorer`
-**Module**: `src/utils/instruction_scorer.py`
+**Module**: `src/validation/instruction_scorer.py`
 
 **Purpose**: Score instruction quality across 3 dimensions to ensure clear, specific, well-structured guidance.
 
@@ -1244,7 +1325,7 @@ PromptBuilder.build_prompt_with_reasoning(domain_knowledge)
     ├─── Read src/prompt/templates/genie_api.md
     │        (API schema, output format, examples)
     │
-    ├─── Read data/demo_requirements.md
+    ├─── Read sample/inputs/demo_requirements.md
     │        (Business requirements, tables, questions)
     │
     ├─── 🆕 Inject extracted domain knowledge as structured context
@@ -2011,7 +2092,7 @@ genie.py create --requirements data/requirements.md
 ```bash
 # Generate config and create space in one command
 genie.py create \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --model databricks-gpt-5-2 \
   --max-tokens 16000
 ```
@@ -2315,11 +2396,11 @@ Common errors and solutions:
 
 ```bash
 # Single command for end-to-end generation and creation
-genie.py create --requirements data/demo_requirements.md
+genie.py create --requirements sample/inputs/demo_requirements.md
 
 # With custom options
 genie.py create \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --model databricks-gpt-5-2 \
   --max-tokens 16000 \
   --temperature 0.1 \
@@ -2624,7 +2705,7 @@ assert "example_question_sqls" in parsed["instructions"]
    python scripts/validate_setup.py
    
    # 3. Develop and test
-   genie.py generate --requirements data/demo_requirements.md
+   genie.py generate --requirements sample/inputs/demo_requirements.md
    
    # 4. Validate tables and columns (CRITICAL STEP)
    genie.py validate
@@ -3106,14 +3187,14 @@ genie.py parse --input-dir docs/ --output data/requirements.md --no-llm
 ```bash
 # Generate with foundation model (recommended)
 genie.py generate \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --model databricks-gpt-5-2 \
   --max-tokens 16000 \
   --output output/genie_space_config.json
 
 # Generate with custom endpoint
 genie.py generate \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --endpoint my-llm-endpoint \
   --output output/genie_space_config.json
 
@@ -3122,12 +3203,12 @@ genie.py generate --requirements data/demo_requirements.md --no-reasoning
 
 # 🆕 Generate with custom benchmark batch size (NEW 2026)
 genie.py generate \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --benchmark-batch-size 5
 
 # 🆕 Skip benchmark SQL generation (testing only, NEW 2026)
 genie.py generate \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --skip-benchmark-sql
 ```
 
@@ -3156,7 +3237,7 @@ genie.py deploy \
   --parent-path /Workspace/Users/your.email@domain.com/genie_spaces
 
 # End-to-end automated workflow (recommended)
-genie.py create --requirements data/demo_requirements.md
+genie.py create --requirements sample/inputs/demo_requirements.md
 ```
 
 ### Key Python API Patterns
@@ -3193,7 +3274,7 @@ from src.pipeline import generate_config
 
 # Generate configuration using pipeline function
 config = generate_config(
-    requirements_path="data/demo_requirements.md",
+    requirements_path="sample/inputs/demo_requirements.md",
     output_path="output/genie_space_config.json",
     model="databricks-gpt-5-2",
     max_tokens=16000,
@@ -3207,7 +3288,7 @@ from src.llm.databricks_llm import DatabricksFoundationModelClient
 builder = PromptBuilder(
     context_doc_path="src/prompt/templates/curate_effective_genie.md",
     output_doc_path="src/prompt/templates/genie_api.md",
-    input_data_path="data/demo_requirements.md"
+    input_data_path="sample/inputs/demo_requirements.md"
 )
 prompt = builder.build_prompt_with_reasoning()
 
@@ -3342,8 +3423,15 @@ config, serialized = load_and_transform_config("config.json")
 | `src/llm/databricks_llm.py` | Databricks LLM client |
 | `src/api/genie_space_client.py` | Genie Space API client |
 | `src/utils/config_transformer.py` | Config transformation |
-| `src/utils/table_validator.py` | Table & column validator |
-| `src/utils/benchmark_extractor.py` | Benchmark extractor (Pass 1) |
+| `src/validation/table_validator.py` | Table & column validator |
+| `src/benchmark/benchmark_extractor.py` | Benchmark extractor (Pass 1) |
+| `src/benchmark/benchmark_loader.py` | Benchmark JSON loader |
+| `src/benchmark/benchmark_sql_generator.py` | Benchmark SQL generator (Pass 2) |
+| `src/extractor/domain_extractor.py` | Domain knowledge extractor |
+| `src/extractor/example_extractor.py` | Example SQL query extractor |
+| `src/extractor/table_extractor.py` | Table information extractor |
+| `src/validation/sql_validator.py` | SQL syntax & quality validator |
+| `src/validation/instruction_scorer.py` | Instruction quality scorer |
 | `src/utils/benchmark_sql_generator.py` | 🆕 Benchmark SQL generator (Pass 2, 2026) |
 | `src/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) |
 | `src/parsing/markdown_parser.py` | Markdown extraction (regex) |
@@ -3354,7 +3442,8 @@ config, serialized = load_and_transform_config("config.json")
 | `src/prompt/templates/curate_effective_genie.md` | Best practices context |
 | `src/prompt/templates/genie_api.md` | API documentation |
 | `src/prompt/templates/benchmark_sql_prompt.md` | 🆕 Benchmark SQL prompt (2026) |
-| `data/demo_requirements.md` | Example requirements |
+| `sample/inputs/demo_requirements.md` | Example requirements (Fashion Retail Analytics) |
+| `sample/benchmarks/benchmarks.json` | Example benchmark questions |
 | `output/genie_space_config.json` | Generated configuration |
 | `output/genie_space_result.json` | Creation result |
 | `tests/test_table_validator.py` | Table validator tests |
@@ -3400,7 +3489,7 @@ VISION_MODEL=databricks-claude-sonnet-4         # Vision model for PDF parsing
 |-----------|---------|-------------|
 | `--model` | `databricks-gpt-5-2` | Foundation model to use |
 | `--endpoint` | None | Custom serving endpoint |
-| `--input-data` | `data/demo_requirements.md` | Requirements document |
+| `--input-data` | `sample/inputs/demo_requirements.md` | Requirements document |
 | `--output` | `output/genie_space_config.json` | Output file path |
 | `--max-tokens` | 16000 | Maximum tokens to generate |
 | `--temperature` | 0.1 | Sampling temperature (0.0-1.0) |

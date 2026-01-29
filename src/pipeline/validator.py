@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from src.utils.table_validator import TableValidator, ValidationReport
+from src.validation import TableValidator
+from src.validation.table_validator import ValidationReport
 
 
 def validate_config(

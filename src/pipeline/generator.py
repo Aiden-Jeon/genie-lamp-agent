@@ -7,14 +7,16 @@ from typing import Optional, Dict, Any
 
 from src.prompt.prompt_builder import PromptBuilder
 from src.llm.databricks_llm import DatabricksFoundationModelClient, DatabricksLLMClient
-from src.utils.example_extractor import (
+from src.extractor import (
     extract_sample_queries_as_examples,
     merge_examples_into_config_dict,
-    validate_examples
+    validate_examples,
+    extract_domain_knowledge,
+    extract_tables_from_requirements,
+    merge_llm_and_rule_based_tables
 )
-from src.utils.sql_validator import SQLValidator
-from src.utils.instruction_scorer import InstructionQualityScorer
-from src.utils.domain_extractor import extract_domain_knowledge
+from src.validation import SQLValidator, InstructionQualityScorer
+from src.benchmark import load_benchmarks_auto
 from src.pipeline.reviewer import ConfigReviewAgent
 
 
@@ -27,7 +29,6 @@ def generate_config(
     output_doc: str = "src/prompt/templates/genie_api.md",
     max_tokens: int = 24000,
     temperature: float = 0.1,
-    faq_section: str = "## 📊 질문 목록 (FAQ)",
     databricks_host: Optional[str] = None,
     databricks_token: Optional[str] = None,
     validate_sql: bool = True,
@@ -47,7 +48,7 @@ def generate_config(
     1. Generates the configuration using LLM (for tables, instructions, etc.)
     2. Extracts SQL examples DIRECTLY from requirements document (bypassing LLM)
     3. Replaces LLM-generated examples with extracted examples
-    4. Keeps benchmark_questions empty
+    4. Loads benchmark_questions from benchmarks/benchmarks.json (if available)
     5. Saves the final configuration
     
     Args:
@@ -59,7 +60,6 @@ def generate_config(
         output_doc: Path to output format document (API docs)
         max_tokens: Maximum tokens to generate
         temperature: Sampling temperature (0.0-1.0)
-        faq_section: FAQ section title to extract benchmarks from
         databricks_host: Databricks workspace URL
         databricks_token: Databricks personal access token
         validate_sql: Run SQL validation on generated queries
@@ -170,6 +170,40 @@ def generate_config(
         print(f"   LLM-Generated Example SQL Queries: {len(config['example_sql_queries'])}")
     
     # =========================================================================
+    # STEP 2.5: Hybrid Table Merging (Rule-based + LLM)
+    # =========================================================================
+    if verbose:
+        print("\n🔀 Hybrid table extraction (rule-based + LLM)...")
+    
+    # Extract tables using rule-based patterns
+    rule_based_tables = extract_tables_from_requirements(
+        requirements_path=requirements_path,
+        default_catalog="main",
+        verbose=verbose
+    )
+    
+    # Merge LLM-selected tables with rule-based extracted tables
+    llm_table_count = len(config_data["genie_space_config"]["tables"])
+    
+    merged_tables = merge_llm_and_rule_based_tables(
+        llm_tables=config_data["genie_space_config"]["tables"],
+        rule_based_tables=rule_based_tables,
+        max_tables=25,  # Genie limit
+        prioritize_llm=True  # LLM tables have better descriptions
+    )
+    
+    # Update config with merged tables
+    config_data["genie_space_config"]["tables"] = merged_tables
+    
+    if verbose:
+        added_count = len(merged_tables) - llm_table_count
+        print(f"   LLM selected: {llm_table_count} tables")
+        print(f"   Rule-based found: {len(rule_based_tables)} tables")
+        print(f"   Merged total: {len(merged_tables)} tables")
+        if added_count > 0:
+            print(f"   ✓ Added {added_count} tables that LLM missed")
+    
+    # =========================================================================
     # STEP 3: Extract SQL examples directly from requirements
     # =========================================================================
     if verbose:
@@ -209,16 +243,26 @@ def generate_config(
         print(f"   ✓ Added {len(examples)} extracted SQL examples")
     
     # =========================================================================
-    # STEP 5: Clear benchmark_questions (keep empty as per requirements)
+    # STEP 5: Load benchmark_questions from JSON file (if available)
     # =========================================================================
     if verbose:
-        print("\n🗑️  Clearing benchmark_questions...")
+        print("\n📊 Loading benchmark questions...")
     
-    original_benchmark_count = len(config_data["genie_space_config"].get("benchmark_questions", []))
-    config_data["genie_space_config"]["benchmark_questions"] = []
+    # Try to load benchmarks from benchmarks/benchmarks.json
+    benchmarks = load_benchmarks_auto(requirements_path, verbose=verbose)
     
-    if verbose:
-        print(f"   ✓ Cleared {original_benchmark_count} benchmarks (keeping section empty)")
+    if benchmarks:
+        config_data["genie_space_config"]["benchmark_questions"] = benchmarks
+        if verbose:
+            print(f"   ✓ Loaded {len(benchmarks)} benchmark questions from JSON file")
+    else:
+        # No benchmarks file found, keep empty
+        original_benchmark_count = len(config_data["genie_space_config"].get("benchmark_questions", []))
+        config_data["genie_space_config"]["benchmark_questions"] = []
+        if verbose:
+            print(f"   ℹ No benchmarks file found, keeping section empty")
+            if original_benchmark_count > 0:
+                print(f"   ✓ Cleared {original_benchmark_count} LLM-generated benchmarks")
 
     # =========================================================================
     # STEP 6: Validate configuration quality (optional, Priority 2)

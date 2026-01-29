@@ -14,8 +14,8 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.utils.sql_validator import SQLValidator, validate_join_specifications
-from src.utils.instruction_scorer import InstructionQualityScorer
+from src.validation import SQLValidator, InstructionQualityScorer
+from src.validation.sql_validator import validate_join_specifications
 from src.models import GenieSpaceTable
 
 

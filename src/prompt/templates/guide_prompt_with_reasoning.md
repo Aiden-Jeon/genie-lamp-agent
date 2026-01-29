@@ -23,7 +23,7 @@ Based on the input requirements, you should:
 - Leave both `example_sql_queries` and `benchmark_questions` as empty arrays
 
 Follow these principles:
-- Keep the space focused and start small (aim for 5 or fewer tables initially)
+- Keep the space focused but comprehensive (aim for 5-15 tables depending on requirements scope - include all tables needed to answer the key questions in the FAQ)
 - Prioritize SQL expressions and example SQL over text instructions
 - Write clear, specific instructions (avoid vague guidance)
 - Ensure consistency across all instruction types

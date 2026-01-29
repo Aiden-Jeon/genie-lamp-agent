@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Optional
-from src.utils.domain_extractor import DomainKnowledge
+from src.extractor.domain_extractor import DomainKnowledge
 
 
 class PromptBuilder:

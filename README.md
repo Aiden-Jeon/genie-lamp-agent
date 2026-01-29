@@ -42,7 +42,7 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 
 **Key Benefits:**
 - 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
-- ✅ **Complete Test Coverage**: Direct benchmark extraction ensures comprehensive FAQ coverage
+- ✅ **Complete Test Coverage**: Load curated benchmarks from JSON files for comprehensive testing
 - 🔍 **Smart Validation**: Multi-layer validation (SQL syntax + instruction quality + comprehensive review)
 - 🎯 **Best Practices Built-in**: Leverages Databricks Genie best practices automatically
 - 🤖 **LLM-Powered**: Uses Databricks foundation models for intelligent configuration generation
@@ -63,7 +63,7 @@ The agent follows a structured 7-step pipeline:
 1. **Domain Extraction**: Automatically extracts table relationships, business metrics, and common filters
 2. **Enhanced Prompt Building**: Injects domain knowledge + SQL quality criteria + few-shot examples
 3. **LLM Generation**: Uses Databricks foundation models to generate intelligent configurations
-4. **Benchmark Extraction**: Directly extracts all FAQ questions as benchmarks (100% coverage)
+4. **Benchmark Loading**: Loads benchmark questions from `benchmarks/benchmarks.json` (if available)
 5. **SQL Validation**: Syntax checks, table references, join patterns, and quality scoring
 6. **Comprehensive Review**: 4-dimension quality assessment with actionable feedback
 7. **Output**: Produces a production-ready Genie space configuration with quality report
@@ -182,7 +182,7 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
 - **Databricks Integration**: Direct integration with Databricks serving endpoints and foundation models
 - **Schema Validation**: Automatic validation of LLM output against schema
 - **Table & Column Validation**: Verify that all referenced tables and columns exist in Unity Catalog
-- **Direct Benchmark Extraction**: Extract 100% of FAQ questions as benchmarks (no LLM filtering)
+- **Benchmark Loading**: Load curated benchmark questions from external JSON files
 - **Reasoning**: Optional reasoning output to understand configuration choices
 - **Markdown-Formatted Instructions**: Generate well-structured instructions using markdown (headings, lists, bold, code blocks) for better readability and organization
 
@@ -311,13 +311,13 @@ Or provide them as command-line arguments (see Usage).
 Create a Genie space from requirements in **one command**:
 
 ```bash
-python genie.py create --requirements data/demo_requirements.md
+python genie.py create --requirements sample/inputs/demo_requirements.md
 ```
 
 **That's it!** This single command will:
 1. ✅ Extract domain knowledge from requirements (relationships, metrics, filters)
 2. ✅ Generate configuration using LLM with enhanced prompts
-3. ✅ Extract all FAQ questions as benchmarks (100% coverage)
+3. ✅ Load benchmark questions from external JSON files (if available)
 4. ✅ Validate SQL syntax, table references, and instruction quality
 5. ✅ Run comprehensive 4-dimension quality review
 6. ✅ Validate tables and columns exist in Unity Catalog
@@ -331,7 +331,7 @@ For best results, enable all validation and review features:
 
 ```bash
 python genie.py create \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --validate-sql \
   --validate-instructions \
   --review-config \
@@ -442,13 +442,13 @@ After replacement, validation runs again automatically (up to 3 attempts).
 
 ```bash
 # Use different model
-python genie.py create --requirements data/demo.md --model llama-3-1-70b
+python genie.py create --requirements sample/inputs/demo_requirements.md --model llama-3-1-70b
 
 # Skip validation (faster, but risky)
-python genie.py create --requirements data/demo.md --skip-validation
+python genie.py create --requirements sample/inputs/demo_requirements.md --skip-validation
 
 # Custom output path
-python genie.py create --requirements data/demo.md --output my_config.json
+python genie.py create --requirements sample/inputs/demo_requirements.md --output my_config.json
 
 # See all options
 python genie.py create --help
@@ -499,15 +499,15 @@ python genie.py parse \
   --force  # Force re-parse even if cached
 
 # Create space with default settings
-python genie.py create --requirements data/demo_requirements.md
+python genie.py create --requirements sample/inputs/demo_requirements.md
 
 # Use another model
 python genie.py create \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --model databricks-claude-sonnet-4-5
 
 # Generate only (for review before deployment)
-python genie.py generate --requirements data/demo_requirements.md
+python genie.py generate --requirements sample/inputs/demo_requirements.md
 # Review: cat output/genie_space_config.json
 python genie.py validate
 python genie.py deploy
@@ -518,12 +518,12 @@ python genie.py create --requirements data/parsed.md
 
 # Skip validation (faster, but risky)
 python genie.py create \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --skip-validation
 
 # Custom output paths
 python genie.py create \
-  --requirements data/demo_requirements.md \
+  --requirements sample/inputs/demo_requirements.md \
   --output my_config.json \
   --result-output my_result.json
 ```
@@ -545,7 +545,7 @@ python genie.py deploy --help
 When you run `python genie.py create --requirements <path>`:
 
 1. **Generate Configuration** - LLM creates table specs, instructions, SQL examples
-2. **Extract Benchmarks** - All FAQ questions extracted directly (100% coverage)
+2. **Load Benchmarks** - Load benchmark questions from JSON files (if available)
 3. **Validate Tables** - Checks Unity Catalog for table/column existence
 4. **Deploy Space** - Creates Genie space via API
 
@@ -613,7 +613,7 @@ from src.pipeline import generate_config, validate_config, deploy_space
 
 # Generate configuration with full quality validation
 config = generate_config(
-    requirements_path="data/demo_requirements.md",
+    requirements_path="sample/inputs/demo_requirements.md",
     output_path="output/config.json",
     model="databricks-gpt-5-2",
 
@@ -657,13 +657,13 @@ For more control, use the underlying components directly:
 ```python
 from src.prompt.prompt_builder import PromptBuilder
 from src.llm.databricks_llm import DatabricksFoundationModelClient
-from src.utils.benchmark_extractor import extract_all_benchmarks
+from src.benchmark.benchmark_extractor import extract_all_benchmarks
 
 # Build prompt
 builder = PromptBuilder(
     context_doc_path="src/prompt/templates/curate_effective_genie.md",
     output_doc_path="src/prompt/templates/genie_api.md",
-    input_data_path="data/demo_requirements.md"
+    input_data_path="sample/inputs/demo_requirements.md"
 )
 prompt = builder.build_prompt_with_reasoning()
 
@@ -672,7 +672,7 @@ client = DatabricksFoundationModelClient(model_name="databricks-gpt-5-2")
 response = client.generate_genie_config(prompt)
 
 # Extract benchmarks
-benchmarks = extract_all_benchmarks("data/demo_requirements.md")
+benchmarks = extract_all_benchmarks("sample/inputs/demo_requirements.md")
 
 # Access configuration
 config = response.genie_space_config
@@ -774,7 +774,80 @@ The system supports a user-friendly configuration format that includes:
 - **Instructions**: Text instructions guiding the AI (with markdown formatting support)
 - **Example SQL Queries**: Example questions with SQL answers
 - **SQL Expressions**: Reusable metric and dimension definitions
-- **Benchmarks**: Test questions for validation
+- **Benchmarks**: Test questions for validation (loaded from `benchmarks/benchmarks.json`)
+
+### Sample Data Structure
+
+The project includes a `sample/` directory with example data to help you get started:
+
+```
+sample/
+├── inputs/                          # Sample requirements documents
+│   └── demo_requirements.md         # Fashion Retail Analytics demo
+└── benchmarks/                      # Sample benchmark questions
+    └── benchmarks.json              # 27 categorized FAQ questions
+```
+
+**Fashion Retail Analytics Demo:**
+- Complete requirements document with FAQ, table specs, and sample queries
+- Covers 7 tables: transactions, customers, articles, product sales, etc.
+- Includes 27 business questions categorized by type (KPI, Sentiment, Cross-Analysis)
+- Ready to use with: `python genie.py create --requirements sample/inputs/demo_requirements.md`
+
+## Benchmark Questions
+
+The system automatically loads benchmark questions from a structured JSON file if present. This allows you to maintain high-quality test questions with expected SQL queries separately from your requirements documents.
+
+**Directory Structure:**
+```
+your_project/
+├── inputs/                          # Original requirements documents
+│   ├── requirements.pdf
+│   └── specifications.md
+└── benchmarks/                      # Benchmark questions
+    └── benchmarks.json              # Structured benchmark file
+```
+
+**Benchmark JSON Format:**
+```json
+[
+  {
+    "question": "지난 주 가장 많이 팔린 제품은 무엇인가요?",
+    "category": "KPI & Sales Analysis",
+    "difficulty": "easy",
+    "tags": ["sales", "product", "ranking"]
+  },
+  {
+    "question": "긍정/부정 리뷰 동향이 있었는데, 반응이 많은 상세 내용을 요약해서 추출해줘",
+    "category": "Sentiment & Trend Analysis",
+    "difficulty": "hard",
+    "tags": ["sentiment", "review", "summary"]
+  }
+]
+```
+
+**Required Fields:**
+- `question`: The benchmark question (required)
+
+**Optional Fields:**
+- `category`: Question category (e.g., "KPI & Sales Analysis", "Sentiment & Trend Analysis")
+- `difficulty`: Difficulty level ("easy", "medium", "hard")
+- `tags`: Array of relevant tags for filtering
+- `expected_sql`: Expected SQL query for validation
+- `korean_question`: Korean translation (or use `question` directly)
+- `source_file`: Source document reference
+
+**Loading Behavior:**
+- System searches for `benchmarks/benchmarks.json` relative to your requirements path
+- If found, benchmarks are automatically loaded into the generated Genie config
+- If not found, benchmark section remains empty
+- Benchmarks preserve the `expected_sql` field for later validation
+
+**Example:**
+```bash
+# Generate config - benchmarks auto-loaded from real_requirements/benchmarks/benchmarks.json
+python genie.py generate --requirements real_requirements/inputs/requirements.pdf
+```
 
 **Markdown-Formatted Instructions**: The system now recommends using markdown formatting in instruction content for better structure and readability:
 - Use `##` for section headings to organize related instructions
@@ -1021,7 +1094,8 @@ pytest tests/test_requirements_converter.py -v
 |------|-------------|
 | [README.md](README.md) | Complete getting started guide and API reference |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture and design patterns |
-| [data/demo_requirements.md](data/demo_requirements.md) | Example requirements document |
+| [sample/inputs/demo_requirements.md](sample/inputs/demo_requirements.md) | Example requirements document |
+| [sample/benchmarks/benchmarks.json](sample/benchmarks/benchmarks.json) | Example benchmark questions |
 
 ## Feedback Analysis System
 
