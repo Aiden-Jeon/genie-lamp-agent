@@ -115,7 +115,7 @@ def test_file_structure():
         "src/api/__init__.py",
         "src/api/genie_space_client.py",
         "src/utils/__init__.py",
-        "main.py",
+        "genie.py",  # Main CLI entry point
         "requirements.txt",
         "README.md",
         "src/prompt/templates/curate_effective_genie.md",

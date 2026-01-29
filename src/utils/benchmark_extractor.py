@@ -92,12 +92,10 @@ def extract_sample_queries_as_benchmarks(
 ) -> List[Dict[str, Any]]:
     """
     Extract sample SQL queries from requirements document as benchmarks.
-    
-    This function looks for sections with BOTH **Sample Questions:** and **Sample Query:**
-    patterns. Each sample question is paired with the SQL query from that section to create
-    benchmarks with expected_sql.
-    
-    Pattern:
+
+    This function supports two formats:
+
+    Format 1 (original): Sections with **Sample Questions:** and **Sample Query:**
         ## Section Title
         **Table:** table_name
         **Sample Questions:**
@@ -107,14 +105,23 @@ def extract_sample_queries_as_benchmarks(
         ```sql
         SELECT ...
         ```
-    
+
+    Format 2 (Korean requirements): Subsections with question in header and **예시 쿼리:** marker
+        ### N. Question text here
+        **필요한 테이블:**
+        ...
+        **예시 쿼리:**
+        ```sql
+        SELECT ...
+        ```
+
     Args:
         requirements_path: Path to the requirements document
-        
+
     Returns:
         List of benchmark dictionaries with expected_sql filled in.
         One benchmark per sample question in each section.
-        
+
     Example:
         >>> benchmarks = extract_sample_queries_as_benchmarks("data/parsed_requirements.md")
         >>> benchmarks[0]
@@ -127,35 +134,85 @@ def extract_sample_queries_as_benchmarks(
         }
     """
     doc_path = Path(requirements_path)
-    
+
     if not doc_path.exists():
         raise FileNotFoundError(f"Requirements file not found: {doc_path}")
-    
+
     with open(doc_path, 'r', encoding='utf-8') as f:
         content = f.read()
-    
+
     benchmarks = []
     lines = content.split('\n')
-    
+
     i = 0
     while i < len(lines):
         line = lines[i]
-        
-        # Look for section headers (## Title)
+
+        # FORMAT 2: Look for subsection headers (### N. Question text)
+        # Example: ### 3. 전체 소셜 플랫폼에서 반응이 가장 많은 주제는 무엇인가요?
+        subsection_match = re.match(r'^###\s+\d+\.\s+(.+)$', line.strip())
+        if subsection_match:
+            question_text = subsection_match.group(1)
+            sample_sql = None
+            table_names = []
+
+            # Look for **예시 쿼리:** (Example Query in Korean) in the following lines
+            j = i + 1
+            while j < len(lines) and not lines[j].startswith('###'):
+                # Check for example query marker (Korean: 예시 쿼리)
+                if '**예시 쿼리:**' in lines[j] or '**Sample Query:**' in lines[j]:
+                    # Found example query marker - extract SQL
+                    sql_lines = []
+                    k = j + 1
+
+                    # Skip to the start of SQL block
+                    while k < len(lines) and not lines[k].strip().startswith('```sql'):
+                        k += 1
+
+                    if k < len(lines):
+                        k += 1  # Skip the ```sql line
+
+                        # Extract SQL until we hit the closing ```
+                        while k < len(lines) and not lines[k].strip().startswith('```'):
+                            sql_lines.append(lines[k])
+                            k += 1
+
+                        # Build the SQL query
+                        if sql_lines:
+                            sample_sql = '\n'.join(sql_lines)
+
+                    break  # Found and processed the example query
+
+                j += 1
+
+            # Create benchmark if we found SQL
+            if sample_sql:
+                benchmarks.append({
+                    "question": question_text,
+                    "expected_sql": sample_sql,
+                    "expected_accuracy": "High",  # Sample queries should have high accuracy
+                    "table": None,  # Table info is in metadata, not extracted
+                    "source": "sample_query"
+                })
+
+            i += 1
+            continue
+
+        # FORMAT 1: Look for section headers (## Title)
         if line.startswith('## ') and not line.startswith('###'):
             section_title = line.replace('##', '').strip()
-            
+
             # Extract metadata and check for Sample Questions
             table_name = None
             sample_questions = []
             sample_sql = None
-            
+
             j = i + 1
             while j < len(lines) and not lines[j].startswith('##'):
                 # Extract table name
                 if lines[j].startswith('**Table:**'):
                     table_name = lines[j].replace('**Table:**', '').strip()
-                
+
                 # Extract Sample Questions
                 elif lines[j].startswith('**Sample Questions:**'):
                     # Extract all numbered questions following this marker
@@ -173,33 +230,33 @@ def extract_sample_queries_as_benchmarks(
                             break
                         else:
                             k += 1
-                
+
                 # Extract Sample Query
                 elif lines[j].startswith('**Sample Query:**'):
                     # Found a sample query - extract the SQL
                     sql_lines = []
                     k = j + 1
-                    
+
                     # Skip to the start of SQL block
                     while k < len(lines) and not lines[k].strip().startswith('```sql'):
                         k += 1
-                    
+
                     if k < len(lines):
                         k += 1  # Skip the ```sql line
-                        
+
                         # Extract SQL until we hit the closing ```
                         while k < len(lines) and not lines[k].strip().startswith('```'):
                             sql_lines.append(lines[k])
                             k += 1
-                        
+
                         # Build the SQL query
                         if sql_lines:
                             sample_sql = '\n'.join(sql_lines)
-                    
+
                     break  # Found and processed the sample query for this section
-                
+
                 j += 1
-            
+
             # Create benchmarks only if we have BOTH sample questions AND sample SQL
             if sample_questions and sample_sql:
                 for question in sample_questions:
@@ -210,9 +267,9 @@ def extract_sample_queries_as_benchmarks(
                         "table": table_name,
                         "source": "sample_query"
                     })
-        
+
         i += 1
-    
+
     return benchmarks
 
 
@@ -374,7 +431,9 @@ def extract_all_benchmarks(
     Extract all benchmarks from requirements document.
     
     This combines FAQ questions and sample SQL queries into a complete
-    benchmark suite.
+    benchmark suite, with automatic deduplication. When a question appears
+    in both FAQ and sample queries, the sample query version (with SQL) is
+    preferred.
     
     Args:
         requirements_path: Path to the requirements document
@@ -383,10 +442,12 @@ def extract_all_benchmarks(
         faq_section_title: Title of the FAQ section
         
     Returns:
-        Combined list of all benchmarks
+        Combined list of all benchmarks (deduplicated)
     """
     all_benchmarks = []
+    seen_questions = {}  # question_text -> benchmark dict
     
+    # First, add FAQ questions
     if include_faq:
         faq_benchmarks = extract_benchmarks_from_requirements(
             requirements_path,
@@ -394,13 +455,22 @@ def extract_all_benchmarks(
         )
         for bm in faq_benchmarks:
             bm['source'] = 'faq'
-        all_benchmarks.extend(faq_benchmarks)
+            question = bm['question']
+            seen_questions[question] = bm
     
+    # Then, add sample queries (overwrite FAQs with same question)
+    # Sample queries are preferred because they have expected_sql
     if include_sample_queries:
         sample_query_benchmarks = extract_sample_queries_as_benchmarks(
             requirements_path
         )
-        all_benchmarks.extend(sample_query_benchmarks)
+        for bm in sample_query_benchmarks:
+            question = bm['question']
+            # Sample queries override FAQ entries with same question
+            seen_questions[question] = bm
+    
+    # Convert back to list
+    all_benchmarks = list(seen_questions.values())
     
     return all_benchmarks
 

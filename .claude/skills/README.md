@@ -38,6 +38,42 @@ Claude will:
 6. Create commit with proper formatting
 ```
 
+### genie-deploy
+
+Automated Genie space deployment from real_requirements with automatic catalog replacement.
+
+**Triggers:** When you ask to "deploy genie", "create a genie space from real requirements", or "run automated deployment"
+
+**Features:**
+- Parses documents from `real_requirements/` directory
+- Generates Genie space configuration using LLM
+- Validates tables against Unity Catalog
+- **Automatically replaces** failed catalog.schema with `sandbox.agent_poc`
+- Retries validation up to 3 times
+- Deploys to Databricks workspace
+
+**Example Usage:**
+```
+User: "deploy genie from real requirements"
+
+Claude will:
+1. Parse PDFs/markdown from real_requirements/
+2. Generate structured requirements
+3. Create Genie configuration
+4. Validate tables (auto-replace with sandbox.agent_poc)
+5. Deploy the Genie space
+6. Return space ID and URL
+```
+
+**Script:** `scripts/auto_deploy.py`
+
+**Key Configuration:**
+- Input: `real_requirements/` directory
+- Parsed output: `data/parsed.md`
+- Config output: `output/genie_space_config.json`
+- Result output: `output/genie_space_result.json`
+- Auto-replacement: `sandbox.agent_poc`
+
 ## Installing Skills
 
 ### Option 1: Symlink to Claude Code skills directory (Recommended)
@@ -48,18 +84,22 @@ This makes the skills available globally in Claude Code:
 # Create symlink for genie-commit
 ln -s "$(pwd)/.claude/skills/genie-commit" ~/.codex/skills/genie-commit
 
+# Create symlink for genie-deploy
+ln -s "$(pwd)/.claude/skills/genie-deploy" ~/.codex/skills/genie-deploy
+
 # Verify
-ls -la ~/.codex/skills/genie-commit
+ls -la ~/.codex/skills/genie-*
 ```
 
 ### Option 2: Copy to Claude Code skills directory
 
 ```bash
-# Copy the skill
+# Copy the skills
 cp -r .claude/skills/genie-commit ~/.codex/skills/
+cp -r .claude/skills/genie-deploy ~/.codex/skills/
 
 # Verify
-ls -la ~/.codex/skills/genie-commit
+ls -la ~/.codex/skills/genie-*
 ```
 
 ### After Installation

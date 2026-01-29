@@ -74,12 +74,12 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
         old_prefix = f"{old_catalog}.{old_schema}."
         new_prefix = f"{new_catalog}.{new_schema}."
         updated_this_benchmark = False
-        
+
         # Update expected_sql field (may be null for FAQ items)
         if "expected_sql" in benchmark and benchmark["expected_sql"] and old_prefix in benchmark["expected_sql"]:
             benchmark["expected_sql"] = benchmark["expected_sql"].replace(old_prefix, new_prefix)
             updated_this_benchmark = True
-        
+
         # Update table field (contains backtick-quoted table names)
         if "table" in benchmark and benchmark["table"]:
             old_table_ref = f"`{old_catalog}.{old_schema}."
@@ -87,24 +87,34 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
             if old_table_ref in benchmark["table"]:
                 benchmark["table"] = benchmark["table"].replace(old_table_ref, new_table_ref)
                 updated_this_benchmark = True
-        
+
         if updated_this_benchmark:
             benchmark_count += 1
+
+    # Update instructions
+    instruction_count = 0
+    for instruction in genie_config.get("instructions", []):
+        old_prefix = f"{old_catalog}.{old_schema}."
+        new_prefix = f"{new_catalog}.{new_schema}."
+        if "content" in instruction and old_prefix in instruction["content"]:
+            instruction["content"] = instruction["content"].replace(old_prefix, new_prefix)
+            instruction_count += 1
     
     # Save back to file
     if "genie_space_config" in config:
         config["genie_space_config"] = genie_config
     else:
         config = genie_config
-    
+
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
-    
+
     return {
         'tables': updated_count,
         'sql_expressions': sql_expr_count,
         'example_queries': example_query_count,
-        'benchmark_questions': benchmark_count
+        'benchmark_questions': benchmark_count,
+        'instructions': instruction_count
     }
 
 
@@ -182,6 +192,7 @@ def prompt_catalog_schema_replacement(report, config_path: str) -> bool:
             print(f"     - {counts['sql_expressions']} SQL expression(s)")
             print(f"     - {counts['example_queries']} example query/queries")
             print(f"     - {counts['benchmark_questions']} benchmark question(s)")
+            print(f"     - {counts['instructions']} instruction(s)")
             updated = True
         elif not new_catalog and not new_schema:
             print(f"  Skipping {schema_key}")

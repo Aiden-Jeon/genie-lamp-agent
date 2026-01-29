@@ -8,6 +8,9 @@ Based on the input requirements, you should:
 2. Extract important business questions that should be supported
 3. Create example SQL queries that demonstrate how to answer common questions
 4. Define SQL expressions for key metrics, filters, and dimensions
+   - Create as many SQL expressions as are relevant to your data (typically 5-15)
+   - Focus on commonly used business terms, metrics, and calculations
+   - Don't force a specific number - quality and relevance over quantity
 5. Write clear, specific instructions to guide Genie's behavior
 6. Create benchmark questions for testing the space
    - **CRITICAL**: If the requirements document contains a FAQ or question list section (e.g., "## 📊 질문 목록 (FAQ)"), you MUST extract ALL questions from that section as benchmark questions
