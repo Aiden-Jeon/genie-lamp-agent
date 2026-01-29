@@ -558,7 +558,6 @@ def cmd_create(args):
             output_doc=args.output_doc,
             max_tokens=args.max_tokens,
             temperature=args.temperature,
-            no_reasoning=args.no_reasoning,
             faq_section=args.faq_section,
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
@@ -736,7 +735,6 @@ def cmd_generate(args):
             output_doc=args.output_doc,
             max_tokens=args.max_tokens,
             temperature=args.temperature,
-            no_reasoning=args.no_reasoning,
             faq_section=args.faq_section,
             databricks_host=args.databricks_host,
             databricks_token=args.databricks_token,
@@ -1095,11 +1093,6 @@ Environment Variables:
         default=0.1,
         help="Sampling temperature 0.0-1.0 (default: 0.1)"
     )
-    create_parser.add_argument(
-        "--no-reasoning",
-        action="store_true",
-        help="Skip reasoning in LLM output"
-    )
     
     # Template paths
     create_parser.add_argument(
@@ -1210,11 +1203,6 @@ Environment Variables:
         type=float,
         default=0.1,
         help="Temperature 0.0-1.0 (default: 0.1)"
-    )
-    generate_parser.add_argument(
-        "--no-reasoning",
-        action="store_true",
-        help="Skip reasoning"
     )
     generate_parser.add_argument(
         "--context-doc",

@@ -1162,7 +1162,7 @@ Issues Found:
 - **Professional Appearance**: Consistent formatting across configurations
 
 **Implementation**:
-- Template files (`guide_prompt.md`, `guide_prompt_with_reasoning.md`) now include markdown formatting guidance
+- Template file (`guide_prompt_with_reasoning.md`) includes markdown formatting guidance
 - LLM automatically generates markdown-formatted instructions
 - No manual formatting required from users
 

@@ -7,10 +7,10 @@ from typing import Optional, Dict, Any
 
 from src.prompt.prompt_builder import PromptBuilder
 from src.llm.databricks_llm import DatabricksFoundationModelClient, DatabricksLLMClient
-from src.utils.benchmark_extractor import (
-    extract_all_benchmarks,
-    merge_benchmarks_into_config,
-    validate_benchmarks
+from src.utils.example_extractor import (
+    extract_sample_queries_as_examples,
+    merge_examples_into_config_dict,
+    validate_examples
 )
 from src.utils.sql_validator import SQLValidator
 from src.utils.instruction_scorer import InstructionQualityScorer
@@ -27,7 +27,6 @@ def generate_config(
     output_doc: str = "src/prompt/templates/genie_api.md",
     max_tokens: int = 24000,
     temperature: float = 0.1,
-    no_reasoning: bool = False,
     faq_section: str = "## 📊 질문 목록 (FAQ)",
     databricks_host: Optional[str] = None,
     databricks_token: Optional[str] = None,
@@ -42,13 +41,14 @@ def generate_config(
     verbose: bool = True
 ) -> Dict[str, Any]:
     """
-    Generate Genie space configuration with direct benchmark extraction.
+    Generate Genie space configuration with direct example SQL extraction.
     
     This function:
-    1. Generates the configuration using LLM (for tables, instructions, examples, etc.)
-    2. Extracts benchmarks DIRECTLY from requirements document (bypassing LLM)
-    3. Merges the extracted benchmarks into the configuration
-    4. Saves the final configuration
+    1. Generates the configuration using LLM (for tables, instructions, etc.)
+    2. Extracts SQL examples DIRECTLY from requirements document (bypassing LLM)
+    3. Replaces LLM-generated examples with extracted examples
+    4. Keeps benchmark_questions empty
+    5. Saves the final configuration
     
     Args:
         requirements_path: Path to requirements document
@@ -59,7 +59,6 @@ def generate_config(
         output_doc: Path to output format document (API docs)
         max_tokens: Maximum tokens to generate
         temperature: Sampling temperature (0.0-1.0)
-        no_reasoning: Skip reasoning in LLM output
         faq_section: FAQ section title to extract benchmarks from
         databricks_host: Databricks workspace URL
         databricks_token: Databricks personal access token
@@ -69,6 +68,8 @@ def generate_config(
         extract_domain: Extract domain knowledge from requirements
         review_config: Run comprehensive config review
         review_output: Optional path to save review report
+        benchmark_batch_size: (Deprecated) No longer used
+        skip_benchmark_sql: (Deprecated) No longer used
         verbose: Print progress messages
         
     Returns:
@@ -119,11 +120,8 @@ def generate_config(
         output_doc_path=output_doc,
         input_data_path=requirements_path
     )
-
-    if no_reasoning:
-        prompt = builder.build_prompt()
-    else:
-        prompt = builder.build_prompt_with_reasoning(domain_knowledge=domain_knowledge)
+    
+    prompt = builder.build_prompt(domain_knowledge=domain_knowledge)
     
     if verbose:
         print(f"   Prompt: {len(prompt)} characters")
@@ -169,97 +167,61 @@ def generate_config(
         print(f"\n   Space Name: {config['space_name']}")
         print(f"   Tables: {len(config['tables'])}")
         print(f"   Instructions: {len(config['instructions'])}")
-        print(f"   Example SQL Queries: {len(config['example_sql_queries'])}")
-        print(f"   LLM-Generated Benchmarks: {len(config.get('benchmark_questions', []))}")
+        print(f"   LLM-Generated Example SQL Queries: {len(config['example_sql_queries'])}")
     
     # =========================================================================
-    # STEP 3: Extract benchmarks directly from requirements
-    # =========================================================================
-    if verbose:
-        print("\n📊 Extracting benchmarks from requirements...")
-    
-    benchmarks = extract_all_benchmarks(
-        requirements_path=requirements_path,
-        include_faq=True,
-        include_sample_queries=True,
-        faq_section_title=faq_section
-    )
-    
-    # Count by type
-    faq_count = sum(1 for bm in benchmarks if bm.get('source') == 'faq')
-    sample_query_count = sum(1 for bm in benchmarks if bm.get('source') == 'sample_query')
-    
-    if verbose:
-        print(f"   ✓ Extracted {len(benchmarks)} benchmarks")
-        print(f"     - FAQ questions: {faq_count}")
-        print(f"     - Sample queries: {sample_query_count}")
-    
-    # Validate benchmarks
-    report = validate_benchmarks(benchmarks)
-    if verbose:
-        print(f"   Validation: {report['valid_count']}/{report['total_count']} valid")
-        if report['issues']:
-            print(f"   ⚠ {len(report['issues'])} validation issues")
-    
-    # =========================================================================
-    # STEP 4: Merge benchmarks into configuration
+    # STEP 3: Extract SQL examples directly from requirements
     # =========================================================================
     if verbose:
-        print("\n🔗 Merging benchmarks into configuration...")
+        print("\n📊 Extracting SQL examples from requirements...")
     
-    original_count = len(config_data["genie_space_config"].get("benchmark_questions", []))
-    
-    config_data = merge_benchmarks_into_config(
-        config=config_data,
-        benchmarks=benchmarks,
-        replace=True
-    )
+    examples = extract_sample_queries_as_examples(requirements_path=requirements_path)
     
     if verbose:
-        print(f"   ✓ Replaced {original_count} LLM-generated benchmarks")
-        print(f"   ✓ Added {len(benchmarks)} directly extracted benchmarks")
-
-    # =========================================================================
-    # STEP 4.5: Generate SQL for benchmarks (two-pass approach)
-    # =========================================================================
-    if not skip_benchmark_sql:
-        if verbose:
-            print("\n🔧 Generating SQL for benchmarks...")
-
-        # Filter benchmarks needing SQL
-        benchmarks_needing_sql = [
-            bm for bm in config_data["genie_space_config"]["benchmark_questions"]
-            if bm.get("expected_sql") is None
-        ]
-
-        if benchmarks_needing_sql:
-            if verbose:
-                print(f"   {len(benchmarks_needing_sql)} benchmarks need SQL generation")
-                print(f"   Using batch size: {benchmark_batch_size}")
-
-            # Generate SQL
-            from src.utils.benchmark_sql_generator import generate_benchmark_sql_for_config
-
-            config_data = generate_benchmark_sql_for_config(
-                config=config_data,
-                llm_client=llm_client,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                batch_size=benchmark_batch_size,
-                verbose=verbose
-            )
-
-            if verbose:
-                print(f"   ✓ Generated SQL for all benchmarks")
+        print(f"   ✓ Extracted {len(examples)} SQL examples from sample queries")
+    
+    # Validate examples
+    issues = validate_examples(examples)
+    if verbose:
+        if issues:
+            print(f"   ⚠️  {len(issues)} validation issues found")
+            for issue in issues[:3]:
+                print(f"       - {issue}")
         else:
-            if verbose:
-                print(f"   ✓ All benchmarks have SQL (from requirements)")
-    else:
-        if verbose:
-            print("\n⏭️  Skipping benchmark SQL generation (--skip-benchmark-sql)")
+            print(f"   ✓ All examples are valid")
+    
+    # =========================================================================
+    # STEP 4: Replace LLM examples with extracted examples
+    # =========================================================================
+    if verbose:
+        print("\n🔗 Replacing LLM-generated examples with extracted examples...")
+    
+    original_example_count = len(config_data["genie_space_config"].get("example_sql_queries", []))
+    
+    config_data = merge_examples_into_config_dict(
+        config=config_data,
+        examples=examples,
+        replace=True  # Replace LLM-generated examples
+    )
+    
+    if verbose:
+        print(f"   ✓ Replaced {original_example_count} LLM-generated examples")
+        print(f"   ✓ Added {len(examples)} extracted SQL examples")
+    
+    # =========================================================================
+    # STEP 5: Clear benchmark_questions (keep empty as per requirements)
+    # =========================================================================
+    if verbose:
+        print("\n🗑️  Clearing benchmark_questions...")
+    
+    original_benchmark_count = len(config_data["genie_space_config"].get("benchmark_questions", []))
+    config_data["genie_space_config"]["benchmark_questions"] = []
+    
+    if verbose:
+        print(f"   ✓ Cleared {original_benchmark_count} benchmarks (keeping section empty)")
 
     # =========================================================================
-    # STEP 5: Validate configuration quality (optional, Priority 2)
+    # STEP 6: Validate configuration quality (optional, Priority 2)
     # =========================================================================
     validation_results = {}
 
@@ -387,7 +349,7 @@ def generate_config(
                 print(f"   ✓ Validation report saved")
 
     # =========================================================================
-    # STEP 6: Comprehensive config review (optional, Priority 3)
+    # STEP 7: Comprehensive config review (optional, Priority 3)
     # =========================================================================
     review_report = None
     if review_config:
@@ -475,7 +437,7 @@ def generate_config(
                 print("   Continuing without review...")
 
     # =========================================================================
-    # STEP 7: Save final configuration
+    # STEP 8: Save final configuration
     # =========================================================================
     if verbose:
         print(f"\n💾 Saving configuration to {output_path}...")

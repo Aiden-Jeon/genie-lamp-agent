@@ -5,9 +5,7 @@ You are an expert in creating Databricks Genie spaces. Your task is to analyze t
 Based on the input requirements, you should:
 
 1. Identify the key tables needed for the Genie space
-2. Extract important business questions that should be supported
-3. Create example SQL queries that demonstrate how to answer common questions
-4. Define SQL snippets for reusable components:
+2. Define SQL snippets for reusable components:
    - **Filters**: WHERE conditions (e.g., "table.price > 100", "status = 'active'")
    - **Expressions**: Dimensions/calculated fields (e.g., "YEAR(order_date)", "CONCAT(first_name, ' ', last_name)")
    - **Measures**: Aggregations (e.g., "SUM(revenue)", "COUNT(DISTINCT customer_id)", "AVG(price)")
@@ -17,9 +15,12 @@ Based on the input requirements, you should:
      - **What should this measure/expression do?** (its purpose, e.g., "Calculates total revenue across all completed orders")
      - **How should it behave?** (usage guidance, e.g., "Use for monthly revenue tracking. Groups by transaction date.")
      - **What should it avoid?** (caveats/exclusions, e.g., "Excludes refunded orders and test transactions. Do not use for forecasting.")
-5. Write clear, specific instructions to guide Genie's behavior
+3. Write clear, specific instructions to guide Genie's behavior
 
-**Note**: Benchmark questions are extracted and processed separately by the system.
+**IMPORTANT NOTES**:
+- **Do NOT generate example_sql_queries** - These are extracted separately from requirements documents
+- **Do NOT generate benchmark_questions** - These are also extracted and processed separately by the system
+- Leave both `example_sql_queries` and `benchmark_questions` as empty arrays
 
 Follow these principles:
 - Keep the space focused and start small (aim for 5 or fewer tables initially)
@@ -360,13 +361,13 @@ Please generate a complete GenieSpaceConfig JSON object based on the requirement
       "priority": "integer (1=critical data correctness, 2=important business rules, 3+=optional guidance)"
     }}}}
   ],
-  "example_sql_queries": [
-    {{{{
-      "question": "string",
-      "sql_query": "string (MUST follow SQL quality requirements above - explicit joins, correct columns, proper formatting)",
-      "description": "string (optional)"
-    }}}}
-  ],
+  "example_sql_queries": [],
+  // DO NOT GENERATE example_sql_queries - they are extracted separately from requirements
+  // Leave this as an empty array
+  
+  "benchmark_questions": [],
+  // DO NOT GENERATE benchmark_questions - they are handled separately
+  // Leave this as an empty array
   "sql_snippets": {{{{
     "filters": [
       {{{{

@@ -30,7 +30,7 @@ def main():
         input_data_path="data/demo_requirements.md"
     )
     
-    prompt = builder.build_prompt_with_reasoning()
+    prompt = builder.build_prompt()
     print(f"✓ Prompt built ({len(prompt)} characters)")
     print()
     

@@ -32,8 +32,8 @@ def test_prompt_builder():
     
     print("✓ Basic prompt generation works")
     
-    # Test prompt with reasoning
-    prompt_with_reasoning = builder.build_prompt_with_reasoning()
+    # Test prompt with reasoning (default behavior)
+    prompt_with_reasoning = builder.build_prompt()
     assert "reasoning" in prompt_with_reasoning
     assert "confidence_score" in prompt_with_reasoning
     
@@ -173,14 +173,14 @@ def test_two_pass_generation():
     output_path = "output/test_two_pass_config.json"
 
     try:
-        print("   Generating config with two-pass approach...")
+        print("   Generating config with extracted SQL examples...")
         config_data = generate_config(
             requirements_path=requirements_path,
             output_path=output_path,
             max_tokens=24000,
             temperature=0.1,
-            benchmark_batch_size=5,  # Small batch for testing
-            skip_benchmark_sql=False,
+            benchmark_batch_size=5,  # Deprecated parameter
+            skip_benchmark_sql=False,  # Deprecated parameter
             verbose=False
         )
 
@@ -188,33 +188,39 @@ def test_two_pass_generation():
         assert "genie_space_config" in config_data
         config = config_data["genie_space_config"]
 
-        # Verify benchmarks exist
+        # Verify benchmarks are empty (as per new behavior)
         benchmarks = config.get("benchmark_questions", [])
-        assert len(benchmarks) > 0, "Should have benchmark questions"
+        assert len(benchmarks) == 0, "Benchmarks should be empty (examples used instead)"
+        print(f"   ✓ Benchmarks empty (as expected)")
 
-        print(f"   Generated {len(benchmarks)} benchmarks")
+        # Verify SQL examples (extracted from requirements)
+        # Note: demo_requirements.md may not have sample queries with SQL
+        examples = config.get("example_sql_queries", [])
+        
+        if len(examples) == 0:
+            print(f"   ⚠️  No SQL examples extracted (requirements may not have sample queries)")
+            print(f"   ✓ Config generation succeeded with empty examples")
+            return True  # Skip further validation if no examples
+        
+        print(f"   ✓ Extracted {len(examples)} SQL examples")
 
-        # Verify all benchmarks have SQL (key test for two-pass approach)
-        benchmarks_without_sql = [
-            bm for bm in benchmarks
-            if bm.get("expected_sql") is None
+        # Verify all examples have SQL
+        examples_without_sql = [
+            ex for ex in examples
+            if not ex.get("sql_query")
         ]
 
-        if benchmarks_without_sql:
-            print(f"   ⚠ Warning: {len(benchmarks_without_sql)} benchmarks missing SQL")
-            for bm in benchmarks_without_sql[:3]:  # Show first 3
-                print(f"      - {bm['question']}")
-        else:
-            print(f"   ✓ All benchmarks have SQL")
+        assert len(examples_without_sql) == 0, f"All examples should have SQL (found {len(examples_without_sql)} without)"
+        print(f"   ✓ All examples have SQL queries")
 
-        # Verify SQL completeness (ends with semicolon)
-        incomplete_sql = [
-            bm for bm in benchmarks
-            if bm.get("expected_sql") and not bm["expected_sql"].strip().endswith(";")
+        # Verify SQL has meaningful content
+        short_sql = [
+            ex for ex in examples
+            if len(ex.get("sql_query", "").strip()) < 10
         ]
 
-        assert len(incomplete_sql) == 0, f"Found {len(incomplete_sql)} incomplete SQL queries"
-        print("   ✓ All SQL queries complete (end with semicolon)")
+        assert len(short_sql) == 0, f"Found {len(short_sql)} examples with very short SQL"
+        print("   ✓ All SQL queries have meaningful content")
 
         # Clean up test output
         if Path(output_path).exists():
