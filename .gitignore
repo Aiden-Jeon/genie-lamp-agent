@@ -36,6 +36,7 @@ output/
 
 # Cache
 .parse_cache.json
+.last_test_run
 
 # IDE
 .vscode/

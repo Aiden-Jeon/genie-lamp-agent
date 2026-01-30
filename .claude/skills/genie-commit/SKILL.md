@@ -13,6 +13,9 @@ Follow this workflow when the user requests a commit:
 
 ### 1. Pre-commit Status Check
 
+**Note:** The pre-commit hook validates that tests were run recently (< 120 min).
+If the hook fails, run `scripts/run_smoke.sh` first.
+
 Run these commands in parallel to understand the current state:
 
 ```bash
@@ -23,20 +26,7 @@ git diff
 
 Analyze what files have changed and their purpose in the project.
 
-### 2. Run Tests (Required)
-
-**ALWAYS run tests before committing** using the virtual environment:
-
-```bash
-.venv/bin/python -m pytest tests/ -v
-```
-
-If tests fail:
-- Show the user which tests failed
-- Ask if they want to fix the tests first or proceed anyway
-- If proceeding, note test failures in commit message
-
-### 3. Determine Commit Type
+### 2. Determine Commit Type
 
 Based on the changed files, classify the commit:
 
@@ -74,7 +64,7 @@ Based on the changed files, classify the commit:
   - Configuration changes
   - Build script updates
 
-### 4. Craft Commit Message
+### 3. Craft Commit Message
 
 Format: `<type>: <description>`
 
@@ -95,7 +85,7 @@ docs: Enhance README with GitHub integration and fix broken references
 test: Add integration tests for table validator
 ```
 
-### 5. Stage and Commit
+### 4. Stage and Commit
 
 Stage specific files (avoid `git add -A` to prevent accidentally committing sensitive files):
 
@@ -118,7 +108,7 @@ EOF
 )"
 ```
 
-### 6. Verify Commit
+### 5. Verify Commit
 
 After committing, verify success:
 
