@@ -1,0 +1,130 @@
+/**
+ * Main application page with 5-step workflow.
+ */
+
+'use client';
+
+import { useState } from 'react';
+import { Stepper } from '@/components/Stepper';
+import { ParseStep } from '@/components/ParseStep';
+import { GenerateStep } from '@/components/GenerateStep';
+import { ValidateStep } from '@/components/ValidateStep';
+import { DeployStep } from '@/components/DeployStep';
+
+export default function Home() {
+  const [sessionId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return crypto.randomUUID();
+    }
+    return '';
+  });
+
+  const [currentStep, setCurrentStep] = useState(1);
+  const [workflowState, setWorkflowState] = useState<any>({});
+
+  const steps = ['Upload', 'Parse', 'Generate', 'Validate', 'Deploy'];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="container mx-auto p-8 max-w-6xl">
+        <header className="mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Genie Lamp Agent
+          </h1>
+          <p className="text-gray-600">
+            Generate Databricks Genie Spaces from natural language requirements
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Session: {sessionId}</p>
+        </header>
+
+        <Stepper currentStep={currentStep} steps={steps} />
+
+        <div className="bg-white rounded-lg shadow-lg p-8 mt-8">
+          {currentStep === 1 && (
+            <ParseStep
+              sessionId={sessionId}
+              onComplete={(result) => {
+                setWorkflowState((s: any) => ({ ...s, parseResult: result }));
+                setCurrentStep(2);
+              }}
+            />
+          )}
+
+          {currentStep === 2 && (
+            <GenerateStep
+              sessionId={sessionId}
+              requirementsPath={workflowState.parseResult?.output_path}
+              onComplete={(result) => {
+                setWorkflowState((s: any) => ({ ...s, generateResult: result }));
+                setCurrentStep(3);
+              }}
+            />
+          )}
+
+          {currentStep === 3 && (
+            <ValidateStep
+              sessionId={sessionId}
+              configPath={workflowState.generateResult?.output_path}
+              onComplete={(result) => {
+                setWorkflowState((s: any) => ({ ...s, validateResult: result }));
+                setCurrentStep(4);
+              }}
+            />
+          )}
+
+          {currentStep === 4 && (
+            <DeployStep
+              sessionId={sessionId}
+              configPath={workflowState.generateResult?.output_path}
+              onComplete={(result) => {
+                setWorkflowState((s: any) => ({ ...s, deployResult: result }));
+                setCurrentStep(5);
+              }}
+            />
+          )}
+
+          {currentStep === 5 && (
+            <div className="text-center">
+              <div className="bg-green-50 p-8 rounded-lg border border-green-200">
+                <h2 className="text-3xl font-bold text-green-800 mb-4">
+                  ✅ Deployment Complete!
+                </h2>
+                <div className="space-y-3">
+                  <p className="text-gray-700">
+                    <span className="font-semibold">Space ID:</span>{' '}
+                    <code className="bg-gray-100 px-2 py-1 rounded">
+                      {workflowState.deployResult?.space_id}
+                    </code>
+                  </p>
+                  <a
+                    href={workflowState.deployResult?.space_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Open Genie Space →
+                  </a>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setCurrentStep(1);
+                  setWorkflowState({});
+                  window.location.reload();
+                }}
+                className="mt-6 px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Start New Workflow
+              </button>
+            </div>
+          )}
+        </div>
+
+        <footer className="mt-8 text-center text-sm text-gray-500">
+          <p>Powered by Databricks Foundation Models</p>
+        </footer>
+      </div>
+    </div>
+  );
+}

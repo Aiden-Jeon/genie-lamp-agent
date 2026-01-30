@@ -1,0 +1,31 @@
+# Asset Bundle configuration for Genie Lamp Agent
+
+bundle:
+  name: genie-lamp-agent
+
+resources:
+  apps:
+    genie_lamp_app:
+      name: genie-lamp-agent
+      description: "Generate Databricks Genie Spaces from natural language requirements"
+
+      # Source code path (current directory)
+      source_code_path: .
+
+      # Permissions
+      permissions:
+        - level: CAN_USE
+          group_name: users
+
+# Target environments
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${DATABRICKS_HOST}
+
+  prod:
+    mode: production
+    workspace:
+      host: ${DATABRICKS_HOST}

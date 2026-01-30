@@ -1,0 +1,37 @@
+# Runtime configuration for Genie Lamp Agent
+command:
+  - uvicorn
+  - backend.main:app
+  - --host
+  - '0.0.0.0'
+  - --port
+  - '8000'
+
+env:
+  # Databricks workspace connection
+  - name: DATABRICKS_HOST
+    value: "{{workspace.host}}"
+
+  - name: DATABRICKS_SERVER_HOSTNAME
+    value: "{{workspace.server_hostname}}"
+
+  # Secrets from Databricks Secrets scope
+  - name: DATABRICKS_TOKEN
+    valueFrom:
+      secretRef:
+        scope: genie-lamp
+        key: service-token
+
+  - name: DATABRICKS_HTTP_PATH
+    valueFrom:
+      secretRef:
+        scope: genie-lamp
+        key: sql-warehouse-http-path
+
+  # Frontend build location
+  - name: FRONTEND_BUILD_DIR
+    value: "/app/frontend/.next"
+
+  # Python unbuffered output
+  - name: PYTHONUNBUFFERED
+    value: "1"

@@ -1571,8 +1571,9 @@ GenieSpaceClient.create_space()
 Save Creation Result
     │
     ├─── Extract space_id from response
-    ├─── Generate space_url
-    │       https://{host}/genie/spaces/{space_id}
+    ├─── Generate space_url (UI URL)
+    │       https://{host}/genie/rooms/{space_id}?o={org_id}
+    │       Note: API uses /genie/spaces/, UI uses /genie/rooms/
     │
     └─── Write to output/genie_space_result.json
             {

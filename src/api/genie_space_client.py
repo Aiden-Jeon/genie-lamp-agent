@@ -29,26 +29,29 @@ class GenieSpaceClient:
     ):
         """
         Initialize the Genie Space client.
-        
+
         Args:
             databricks_host: Databricks workspace URL (defaults to DATABRICKS_HOST env var)
             databricks_token: Databricks personal access token (defaults to DATABRICKS_TOKEN env var)
         """
         self.databricks_host = databricks_host or os.getenv("DATABRICKS_HOST")
         self.databricks_token = databricks_token or os.getenv("DATABRICKS_TOKEN")
-        
+
         if not self.databricks_host:
             raise ValueError("databricks_host must be provided or DATABRICKS_HOST env var must be set")
         if not self.databricks_token:
             raise ValueError("databricks_token must be provided or DATABRICKS_TOKEN env var must be set")
-        
+
         # Clean up host URL
         self.databricks_host = self.databricks_host.rstrip('/')
         if not self.databricks_host.startswith('http'):
             self.databricks_host = f"https://{self.databricks_host}"
-        
+
         # Genie Spaces API endpoint
         self.api_base = f"{self.databricks_host}/api/2.0/genie/spaces"
+
+        # Cache for organization ID
+        self._org_id = None
         
     def _get_headers(self) -> Dict[str, str]:
         """Get headers for API requests."""
@@ -56,6 +59,52 @@ class GenieSpaceClient:
             "Authorization": f"Bearer {self.databricks_token}",
             "Content-Type": "application/json"
         }
+
+    def get_organization_id(self) -> Optional[str]:
+        """
+        Get the organization ID for the current workspace.
+
+        Returns:
+            Organization ID or None if it cannot be retrieved
+        """
+        if self._org_id:
+            return self._org_id
+
+        try:
+            # Try to get org ID from the current user's workspace info
+            response = requests.get(
+                f"{self.databricks_host}/api/2.0/preview/scim/v2/Me",
+                headers=self._get_headers(),
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            # Extract org ID from the response
+            if "groups" in data:
+                for group in data.get("groups", []):
+                    if "value" in group and group["value"].startswith("org_"):
+                        # Parse org ID from group name like "org_7474647945795688"
+                        org_id = group["value"].replace("org_", "")
+                        self._org_id = org_id
+                        return org_id
+
+            # Alternative: try to get from workspace API
+            response = requests.get(
+                f"{self.databricks_host}/api/2.0/workspace-conf",
+                headers=self._get_headers(),
+                params={"keys": "enableOrganizationId"},
+                timeout=30
+            )
+            if response.ok:
+                data = response.json()
+                # Try to extract org ID if available
+                pass
+
+        except Exception:
+            pass
+
+        return None
     
     def get_available_warehouse(self) -> Optional[str]:
         """
@@ -385,14 +434,22 @@ class GenieSpaceClient:
     def get_space_url(self, space_id: str) -> str:
         """
         Get the URL for accessing a Genie space.
-        
+
         Args:
             space_id: The ID of the space
-            
+
         Returns:
             Full URL to access the space in the Databricks UI
         """
-        return f"{self.databricks_host}/genie/spaces/{space_id}"
+        # Use /genie/rooms/ (correct UI endpoint) instead of /genie/spaces/
+        base_url = f"{self.databricks_host}/genie/rooms/{space_id}"
+
+        # Try to append organization ID if available
+        org_id = self.get_organization_id()
+        if org_id:
+            base_url += f"?o={org_id}"
+
+        return base_url
     
     def export_space_config(
         self,
