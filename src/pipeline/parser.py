@@ -14,6 +14,7 @@ from src.parsing.llm_enricher import LLMEnricher
 from src.parsing.markdown_generator import generate_markdown
 from src.llm.databricks_llm import DatabricksFoundationModelClient
 from src.utils.parse_cache import ParseCacheManager
+from src.utils.page_cache import PageCacheManager
 
 
 async def parse_documents_async(
@@ -204,14 +205,15 @@ async def parse_documents_async(
     # =========================================================================
     # STEP 4: Enrich with LLM (optional)
     # =========================================================================
+    enrichment_reasoning = {}
     if use_llm and llm_client:
         if verbose:
             print("✨ Enriching with LLM...")
-        
+
         try:
             enricher = LLMEnricher(llm_client)
-            doc = enricher.enrich_document(doc)
-            
+            doc, enrichment_reasoning = enricher.enrich_document(doc)
+
             if verbose:
                 print("   ✓ Document enrichment complete")
         except Exception as e:
@@ -261,9 +263,10 @@ async def parse_documents_async(
         "sections_count": len(doc.sections),
         "used_llm": use_llm and llm_client is not None,
         "domain": domain,
-        "cache_used": False
+        "cache_used": False,
+        "enrichment_reasoning": enrichment_reasoning if enrichment_reasoning else None
     }
-    
+
     return results
 
 
@@ -417,6 +420,303 @@ async def _extract_pdfs_async(
     return all_pdf_data
 
 
+async def parse_documents_async_with_progress(
+    input_dir: str,
+    output_path: str,
+    use_llm: bool = True,
+    llm_model: str = "databricks-gpt-5-2",
+    vision_model: str = "databricks-claude-sonnet-4",
+    databricks_host: Optional[str] = None,
+    databricks_token: Optional[str] = None,
+    progress_callback: Optional[callable] = None,
+    enrichment_progress_callback: Optional[callable] = None,
+    page_cache_manager: Optional[PageCacheManager] = None,
+    verbose: bool = True,
+    max_concurrent_pdfs: int = 3,
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Parse documents with progress callbacks and per-page caching.
+
+    Args:
+        input_dir: Directory containing PDF and markdown files
+        output_path: Output file path for generated markdown
+        use_llm: Whether to use LLM for interpretation
+        llm_model: Text model for enrichment
+        vision_model: Vision model for PDFs
+        databricks_host: Databricks workspace URL
+        databricks_token: Databricks personal access token
+        progress_callback: Optional callback(file_name, page_num, total_pages, is_cache_hit, status, extracted_summary)
+        page_cache_manager: Optional PageCacheManager for per-page caching
+        verbose: Print progress messages
+        max_concurrent_pdfs: Maximum concurrent PDF processing
+        **kwargs: Additional arguments passed to parse_documents_async
+
+    Returns:
+        dict: Parsing results with cache statistics
+    """
+    # Validate input directory
+    input_path = Path(input_dir)
+    if not input_path.exists():
+        raise ValueError(f"Input directory not found: {input_dir}")
+
+    # Ensure output directory exists
+    output_path_obj = Path(output_path)
+    output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+
+    # Initialize LLM clients if needed
+    llm_client = None
+    vision_client = None
+
+    if use_llm:
+        # Get credentials
+        host = databricks_host or os.getenv("DATABRICKS_HOST")
+        token = databricks_token or os.getenv("DATABRICKS_TOKEN")
+
+        if not host or not token:
+            raise ValueError(
+                "DATABRICKS_HOST and DATABRICKS_TOKEN must be set when using LLM. "
+                "Either set environment variables or pass as arguments."
+            )
+
+        try:
+            # Initialize clients
+            llm_client = DatabricksFoundationModelClient(model_name=llm_model)
+            vision_client = DatabricksFoundationModelClient(model_name=vision_model)
+
+            if verbose:
+                print(f"   Initialized LLM client: {llm_model}")
+                print(f"   Initialized vision client: {vision_model}")
+
+        except Exception as e:
+            if verbose:
+                print(f"   Warning: Failed to initialize LLM clients: {e}")
+            use_llm = False
+            llm_client = None
+            vision_client = None
+
+    # Extract PDFs with progress tracking
+    if verbose:
+        print("📄 Extracting content from PDF files...")
+
+    pdf_data = await _extract_pdfs_async_with_progress(
+        input_dir, vision_client, use_llm, verbose, max_concurrent_pdfs,
+        progress_callback, page_cache_manager
+    )
+
+    if verbose:
+        print(f"   ✓ Extracted from PDFs: {len(pdf_data['questions'])} questions, "
+              f"{len(pdf_data['tables'])} tables")
+
+    # Extract markdown with progress callback
+    if verbose:
+        print("📝 Extracting content from Markdown files...")
+
+    md_data = _extract_markdown(input_dir, verbose, progress_callback)
+
+    if verbose:
+        print(f"   ✓ Extracted from Markdown: {len(md_data['questions'])} questions, "
+              f"{len(md_data['tables'])} tables")
+
+    # Structure and combine data
+    if verbose:
+        print("🔨 Structuring data...")
+
+    structurer = RequirementsStructurer()
+    doc = structurer.structure_data(pdf_data, md_data)
+    doc = structurer.update_metadata(doc)
+
+    if verbose:
+        print(f"   ✓ Structured document: {len(doc.all_questions)} questions, "
+              f"{len(doc.all_tables)} tables, {len(doc.sections)} sections")
+
+    # Enrich with LLM (optional)
+    enrichment_reasoning = {}
+    if use_llm and llm_client:
+        if verbose:
+            print("✨ Enriching with LLM...")
+
+        try:
+            enricher = LLMEnricher(llm_client, enrichment_progress_callback=enrichment_progress_callback)
+            doc, enrichment_reasoning = enricher.enrich_document(doc)
+
+            if verbose:
+                print("   ✓ Document enrichment complete")
+        except Exception as e:
+            if verbose:
+                print(f"   Warning: Error during enrichment: {e}")
+
+    # Generate output markdown
+    if verbose:
+        print("📋 Generating markdown output...")
+
+    markdown = generate_markdown(doc, output_path)
+
+    if verbose:
+        print(f"   ✓ Generated {len(markdown)} characters of markdown")
+
+    # Return results with cache statistics
+    results = {
+        "output_path": str(output_path),
+        "questions_count": len(doc.all_questions),
+        "tables_count": len(doc.all_tables),
+        "queries_count": len(doc.all_queries),
+        "sections_count": len(doc.sections),
+        "used_llm": use_llm and llm_client is not None,
+        "cache_used": False,
+        "cache_stats": pdf_data.get("cache_stats", {}),
+        "enrichment_reasoning": enrichment_reasoning if enrichment_reasoning else None
+    }
+
+    return results
+
+
+async def _extract_pdfs_async_with_progress(
+    input_dir: str,
+    vision_client,
+    use_llm: bool,
+    verbose: bool,
+    max_concurrent: int = 3,
+    progress_callback: Optional[callable] = None,
+    page_cache_manager: Optional[PageCacheManager] = None
+) -> dict:
+    """
+    Extract content from PDF files with progress callbacks and caching.
+
+    Args:
+        input_dir: Directory containing PDF files
+        vision_client: LLM client for vision-based parsing
+        use_llm: Whether to use LLM for interpretation
+        verbose: Whether to print progress messages
+        max_concurrent: Maximum number of PDFs to process concurrently
+        progress_callback: Optional callback(file_name, page_num, total_pages, is_cache_hit, status, extracted_summary)
+        page_cache_manager: Optional PageCacheManager for per-page caching
+
+    Returns:
+        Dictionary with extracted questions, tables, queries, and cache stats
+    """
+    pdf_dir = Path(input_dir)
+    pdf_files = list(pdf_dir.glob("*.pdf"))
+
+    if verbose:
+        print(f"   Found {len(pdf_files)} PDF files")
+
+    if not pdf_files:
+        return {
+            "questions": [],
+            "tables": [],
+            "sql_queries": [],
+            "metadata": {},
+            "cache_stats": {}
+        }
+
+    # Initialize parser with page cache manager
+    pdf_parser = PDFParser(
+        llm_client=vision_client,
+        use_images=True,
+        per_page=True,
+        page_cache_manager=page_cache_manager
+    )
+
+    all_pdf_data = {
+        "questions": [],
+        "tables": [],
+        "sql_queries": [],
+        "metadata": {},
+        "cache_stats": {
+            "total_files": len(pdf_files),
+            "files": []
+        }
+    }
+
+    # Create semaphore to limit concurrent processing
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def process_pdf_with_progress(pdf_file: Path, file_index: int):
+        """Process a single PDF with progress callbacks."""
+        async with semaphore:
+            file_name = pdf_file.name
+            import time
+            start_time = time.time()
+
+            try:
+                # Notify start
+                if progress_callback:
+                    progress_callback(file_name, 0, None, False, "processing")
+
+                # Parse PDF (cache handled internally in PDFParser)
+                pdf_content = await pdf_parser.parse_pdf_async(str(pdf_file), use_llm=use_llm)
+
+                # Get cache stats for this file
+                cache_stats = {}
+                if page_cache_manager:
+                    vision_model = getattr(vision_client, 'model_name', 'unknown')
+                    cache_stats = page_cache_manager.get_cache_stats(str(pdf_file), vision_model)
+
+                duration_ms = int((time.time() - start_time) * 1000)
+
+                # Notify completion with extracted data
+                if progress_callback:
+                    # Extract summary of what was found
+                    extracted_summary = {
+                        "questions_count": len(pdf_content.get("questions", [])),
+                        "tables_count": len(pdf_content.get("tables", [])),
+                        "queries_count": len(pdf_content.get("sql_queries", []))
+                    }
+                    progress_callback(
+                        file_name,
+                        cache_stats.get("total_pages", 0),
+                        cache_stats.get("total_pages", 0),
+                        cache_stats.get("cache_hit_rate", 0) > 0.5,
+                        "completed",
+                        extracted_summary
+                    )
+
+                return pdf_file, pdf_content, None, cache_stats, duration_ms
+
+            except Exception as e:
+                if progress_callback:
+                    progress_callback(file_name, 0, None, False, "failed")
+                return pdf_file, None, e, {}, 0
+
+    # Create tasks for all PDFs
+    tasks = [process_pdf_with_progress(pdf_file, idx) for idx, pdf_file in enumerate(pdf_files)]
+
+    # Process PDFs
+    if verbose:
+        print(f"   Processing PDFs (max {max_concurrent} concurrent)...")
+
+    results = await asyncio.gather(*tasks)
+
+    # Collect results and cache statistics
+    for pdf_file, pdf_content, error, cache_stats, duration_ms in results:
+        if error:
+            if verbose:
+                print(f"   Error processing {pdf_file.name}: {error}")
+            all_pdf_data["cache_stats"]["files"].append({
+                "name": pdf_file.name,
+                "status": "failed",
+                "error": str(error)
+            })
+        elif pdf_content:
+            # Merge data
+            all_pdf_data["questions"].extend(pdf_content.get("questions", []))
+            all_pdf_data["tables"].extend(pdf_content.get("tables", []))
+            all_pdf_data["sql_queries"].extend(pdf_content.get("sql_queries", []))
+
+            # Record cache statistics
+            all_pdf_data["cache_stats"]["files"].append({
+                "name": pdf_file.name,
+                "status": "completed",
+                "pages_total": cache_stats.get("total_pages", 0),
+                "pages_cached": cache_stats.get("cached_pages", 0),
+                "cache_hit_rate": cache_stats.get("cache_hit_rate", 0),
+                "duration_ms": duration_ms
+            })
+
+    return all_pdf_data
+
+
 def _extract_pdfs(input_dir: str, vision_client, use_llm: bool, verbose: bool) -> dict:
     """
     Synchronous wrapper for async PDF extraction.
@@ -425,40 +725,55 @@ def _extract_pdfs(input_dir: str, vision_client, use_llm: bool, verbose: bool) -
     return asyncio.run(_extract_pdfs_async(input_dir, vision_client, use_llm, verbose))
 
 
-def _extract_markdown(input_dir: str, verbose: bool) -> dict:
+def _extract_markdown(input_dir: str, verbose: bool, progress_callback: Optional[callable] = None) -> dict:
     """Extract content from markdown files in directory."""
     md_dir = Path(input_dir)
     md_files = list(md_dir.glob("*.md"))
-    
+
     if verbose:
         print(f"   Found {len(md_files)} markdown files")
-    
+
     if not md_files:
         return {"questions": [], "tables": [], "sql_queries": [], "metadata": {}}
-    
+
     md_parser = MarkdownParser()
-    
+
     all_md_data = {
         "questions": [],
         "tables": [],
         "sql_queries": [],
         "metadata": {}
     }
-    
+
     for md_file in md_files:
         try:
             if verbose:
                 print(f"   Processing: {md_file.name}")
-            
+
+            # Notify start
+            if progress_callback:
+                progress_callback(md_file.name, 0, 1, False, "processing")
+
             md_content = md_parser.parse_file(str(md_file))
-            
+
             # Merge data
             all_md_data["questions"].extend(md_content.get("questions", []))
             all_md_data["tables"].extend(md_content.get("tables", []))
             all_md_data["sql_queries"].extend(md_content.get("sql_queries", []))
-            
+
+            # Notify completion with extracted data
+            if progress_callback:
+                extracted_summary = {
+                    "questions_count": len(md_content.get("questions", [])),
+                    "tables_count": len(md_content.get("tables", [])),
+                    "queries_count": len(md_content.get("sql_queries", []))
+                }
+                progress_callback(md_file.name, 1, 1, False, "completed", extracted_summary)
+
         except Exception as e:
             if verbose:
                 print(f"   Error processing {md_file.name}: {e}")
-    
+            if progress_callback:
+                progress_callback(md_file.name, 0, 1, False, "failed")
+
     return all_md_data

@@ -54,7 +54,7 @@ export function ValidateStep({ sessionId, configPath, onComplete }: ValidateStep
   };
 
   useEffect(() => {
-    if (job?.status === 'completed') {
+    if (job?.status === 'completed' && job.result) {
       setValidationResult(job.result);
       if (job.result.has_errors) {
         setShowFixer(true);

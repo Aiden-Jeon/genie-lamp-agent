@@ -127,7 +127,7 @@ async def parse_files(
         "output_path": output_path
     })
 
-    # Start background task
+    # Start background task (job_id will be passed automatically for progress tracking)
     background_tasks.add_task(
         job_manager.run_job,
         job.job_id,
@@ -314,6 +314,7 @@ async def get_job_status(
         "type": job.type,
         "result": job.result,
         "error": job.error,
+        "progress": job.progress,
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "completed_at": job.completed_at.isoformat() if job.completed_at else None
     }

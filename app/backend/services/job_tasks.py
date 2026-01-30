@@ -9,25 +9,36 @@ from typing import Dict, List
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 sys.path.insert(0, project_root)
 
-from src.pipeline.parser import parse_documents_async
+from src.pipeline.parser import parse_documents_async, parse_documents_async_with_progress
 from src.pipeline.generator import generate_config
 from src.pipeline.validator import validate_config
 from src.pipeline.deployer import deploy_space
+from src.utils.page_cache import PageCacheManager
 from genie import update_config_catalog_schema_table, update_config_catalog_schema, remove_table_from_config
 
+# Global reference to session store (set by job manager)
+_global_session_store = None
 
-def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str) -> Dict:
+def set_session_store(store):
+    """Set global session store reference for job tasks."""
+    global _global_session_store
+    _global_session_store = store
+
+
+def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str, job_id: str = None) -> Dict:
     """
-    Run parsing job on uploaded files.
+    Run parsing job on uploaded files with progress tracking.
 
     Args:
         file_paths: List of file paths to parse
         use_llm: Whether to use LLM enrichment
         output_path: Where to save parsed output
+        job_id: Optional job ID for progress updates (uses global session store)
 
     Returns:
         Dict with output_path and parsing stats
     """
+
     # Get input directory from first file
     input_dir = os.path.dirname(file_paths[0])
 
@@ -38,22 +49,122 @@ def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str) -> Dic
         # Change to project root
         os.chdir(project_root)
 
-        # Run existing parser with asyncio.run() since it's an async function
-        result = asyncio.run(parse_documents_async(
-            input_dir=input_dir,
-            output_path=output_path,
-            use_llm=use_llm,
-            verbose=False
-        ))
+        # Use progress tracking if job_id provided and global session store available
+        if job_id is not None and _global_session_store is not None:
+            # Initialize progress tracking
+            from datetime import datetime
+            progress_data = {
+                "total_files": len(file_paths),
+                "completed_files": 0,
+                "files": [],
+                "last_update": datetime.now().isoformat()
+            }
+
+            # Get file names from paths
+            file_names = [os.path.basename(fp) for fp in file_paths]
+
+            # Initialize file progress entries for all files (PDFs and markdown)
+            for file_name in file_names:
+                # Determine if file is PDF or markdown
+                is_pdf = file_name.lower().endswith('.pdf')
+                progress_data["files"].append({
+                    "name": file_name,
+                    "status": "queued",
+                    "pages_total": 1 if not is_pdf else None,  # Markdown files have 1 "page"
+                    "pages_completed": 0
+                })
+
+            # Update initial progress
+            _update_job_progress(job_id, progress_data)
+
+            # Initialize page cache manager
+            page_cache_manager = PageCacheManager()
+
+            # Progress callback function
+            def progress_callback(file_name: str, page_num: int, total_pages: int, is_cache_hit: bool, status: str, extracted_summary: dict = None):
+                """Update progress for a file/page."""
+                from datetime import datetime
+
+                # Find file in progress data
+                for file_entry in progress_data["files"]:
+                    if file_entry["name"] == file_name:
+                        file_entry["status"] = status
+                        file_entry["pages_total"] = total_pages
+                        file_entry["pages_completed"] = page_num
+                        file_entry["cache_hit"] = is_cache_hit
+
+                        # Add extracted summary if provided
+                        if extracted_summary:
+                            file_entry["extracted"] = extracted_summary
+
+                        if status == "completed":
+                            progress_data["completed_files"] += 1
+                            progress_data["current_file"] = None
+                        elif status == "processing":
+                            progress_data["current_file"] = file_name
+                            file_entry["current_page"] = page_num
+
+                        break
+
+                progress_data["last_update"] = datetime.now().isoformat()
+                _update_job_progress(job_id, progress_data)
+
+            # Enrichment progress callback
+            def enrichment_progress_callback(stage: str, details: str):
+                """Update progress for enrichment stages."""
+                from datetime import datetime
+
+                if "enrichment_progress" not in progress_data:
+                    progress_data["enrichment_progress"] = []
+
+                progress_data["enrichment_progress"].append({
+                    "stage": stage,
+                    "details": details,
+                    "timestamp": datetime.now().isoformat()
+                })
+                progress_data["last_update"] = datetime.now().isoformat()
+                _update_job_progress(job_id, progress_data)
+
+            # Run parser with progress tracking
+            result = asyncio.run(parse_documents_async_with_progress(
+                input_dir=input_dir,
+                output_path=output_path,
+                use_llm=use_llm,
+                verbose=False,
+                progress_callback=progress_callback,
+                enrichment_progress_callback=enrichment_progress_callback,
+                page_cache_manager=page_cache_manager
+            ))
+        else:
+            # Fall back to standard parsing without progress
+            result = asyncio.run(parse_documents_async(
+                input_dir=input_dir,
+                output_path=output_path,
+                use_llm=use_llm,
+                verbose=False
+            ))
 
         return {
             "output_path": output_path,
             "tables_found": result.get("tables_count", 0),
-            "files_parsed": len(file_paths)
+            "files_parsed": len(file_paths),
+            "cache_stats": result.get("cache_stats", {}),
+            "enrichment_reasoning": result.get("enrichment_reasoning")
         }
     finally:
         # Restore original directory
         os.chdir(original_cwd)
+
+
+def _update_job_progress(job_id: str, progress_data: dict):
+    """Update job progress in global session store."""
+    if _global_session_store is None:
+        return  # No session store available, skip progress update
+
+    job = _global_session_store.get_job(job_id)
+    if job:
+        job.progress = progress_data
+        _global_session_store.update_job(job)
 
 
 def run_generate_job(requirements_path: str, output_path: str, model: str) -> Dict:
@@ -66,7 +177,7 @@ def run_generate_job(requirements_path: str, output_path: str, model: str) -> Di
         model: LLM model to use
 
     Returns:
-        Dict with output_path and config metadata
+        Dict with output_path, config metadata, and reasoning
     """
     # Save current directory
     original_cwd = os.getcwd()
@@ -83,9 +194,19 @@ def run_generate_job(requirements_path: str, output_path: str, model: str) -> Di
             verbose=False
         )
 
+        # Extract reasoning from result
+        reasoning = result.get("reasoning", {})
+
+        # Extract config metadata
+        config = result.get("genie_space_config", {})
+        tables_count = len(config.get("tables", []))
+        instructions_count = len(config.get("instructions", []))
+
         return {
             "output_path": output_path,
-            "config": result
+            "reasoning": reasoning,
+            "tables_count": tables_count,
+            "instructions_count": instructions_count
         }
     finally:
         # Restore original directory

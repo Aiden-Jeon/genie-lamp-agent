@@ -20,6 +20,7 @@ class Job(BaseModel):
     error: Optional[str] = None
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    progress: Optional[dict] = None  # Progress tracking data
 
 
 class SessionStore:
@@ -64,7 +65,8 @@ class SessionStore:
                 result STRING,
                 error STRING,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-                completed_at TIMESTAMP
+                completed_at TIMESTAMP,
+                progress STRING
             )
         """)
         cursor.close()
@@ -91,9 +93,11 @@ class SessionStore:
             cursor = self.conn.cursor()
             cursor.execute(
                 """INSERT INTO genie_jobs
-                   (job_id, session_id, type, status, inputs, created_at)
-                   VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP())""",
-                (job.job_id, job.session_id, job.type, job.status, json.dumps(job.inputs))
+                   (job_id, session_id, type, status, inputs, progress, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP())""",
+                (job.job_id, job.session_id, job.type, job.status,
+                 json.dumps(job.inputs),
+                 json.dumps(job.progress) if job.progress else None)
             )
             cursor.close()
 
@@ -119,23 +123,25 @@ class SessionStore:
                 result=json.loads(row[5]) if row[5] else None,
                 error=row[6],
                 created_at=row[7],
-                completed_at=row[8]
+                completed_at=row[8],
+                progress=json.loads(row[9]) if row[9] else None
             )
 
     def update_job(self, job: Job):
-        """Update job status, result, and error."""
+        """Update job status, result, error, and progress."""
         if self.conn is None:
             self._jobs[job.job_id] = job
         else:
             cursor = self.conn.cursor()
             cursor.execute(
                 """UPDATE genie_jobs
-                   SET status = ?, result = ?, error = ?, completed_at = ?
+                   SET status = ?, result = ?, error = ?, completed_at = ?, progress = ?
                    WHERE job_id = ?""",
                 (job.status,
                  json.dumps(job.result) if job.result else None,
                  job.error,
                  job.completed_at,
+                 json.dumps(job.progress) if job.progress else None,
                  job.job_id)
             )
             cursor.close()
@@ -164,7 +170,8 @@ class SessionStore:
                     result=json.loads(row[5]) if row[5] else None,
                     error=row[6],
                     created_at=row[7],
-                    completed_at=row[8]
+                    completed_at=row[8],
+                    progress=json.loads(row[9]) if len(row) > 9 and row[9] else None
                 )
                 for row in rows
             ]

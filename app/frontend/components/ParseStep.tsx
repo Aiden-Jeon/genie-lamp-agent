@@ -7,6 +7,8 @@
 import { useState, useEffect } from 'react';
 import { useJobPolling } from '@/lib/hooks/useJobPolling';
 import { apiClient } from '@/lib/api-client';
+import { FileProgressList } from './FileProgressList';
+import { ReasoningDisplay } from './ReasoningDisplay';
 
 interface ParseStepProps {
   sessionId: string;
@@ -37,11 +39,12 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
     }
   };
 
-  useEffect(() => {
-    if (job?.status === 'completed') {
-      onComplete(job.result);
-    }
-  }, [job, onComplete]);
+  // Don't auto-advance - let user see results and click Continue
+  // useEffect(() => {
+  //   if (job?.status === 'completed') {
+  //     onComplete(job.result);
+  //   }
+  // }, [job, onComplete]);
 
   return (
     <div className="space-y-4">
@@ -87,7 +90,93 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
         {isPolling ? 'Parsing...' : 'Start Parsing'}
       </button>
 
-      {isPolling && (
+      {isPolling && job?.progress && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <div className="flex justify-between mb-3">
+              <p className="font-semibold">
+                Parsing {job.progress.total_files} files...
+              </p>
+              <p className="text-sm text-gray-600">
+                {job.progress.completed_files}/{job.progress.total_files} completed
+              </p>
+            </div>
+
+            {job.progress.current_file && (
+              <p className="text-sm text-gray-600 mb-3">
+                Current: <span className="font-medium">{job.progress.current_file}</span>
+              </p>
+            )}
+
+            <FileProgressList
+              files={job.progress.files}
+              currentFile={job.progress.current_file}
+            />
+          </div>
+
+          {/* Show enrichment progress when all files are parsed */}
+          {job.progress.completed_files === job.progress.total_files && (
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="animate-spin text-2xl">🧠</div>
+                <p className="font-semibold text-purple-800">
+                  Enriching with GPT-5-2...
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">
+                Combining and enhancing extracted data from all files
+              </p>
+
+              {/* Show real-time enrichment progress if available */}
+              {job.progress.enrichment_progress && job.progress.enrichment_progress.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {job.progress.enrichment_progress.map((progress, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-2 text-xs p-2 rounded ${
+                        progress.stage.includes('complete')
+                          ? 'bg-green-100 text-green-700'
+                          : progress.stage.includes('start')
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${
+                        progress.stage.includes('complete')
+                          ? 'bg-green-500'
+                          : 'bg-blue-500 animate-pulse'
+                      }`}></div>
+                      <span className="flex-1">{progress.details}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1 text-xs text-gray-500">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+                    <span>Enriching table descriptions</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+                    <span>Enhancing SQL query descriptions</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+                    <span>Generating business scenarios</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+                    <span>Creating document summary</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fallback for jobs without progress */}
+      {isPolling && !job?.progress && (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
           <p className="font-semibold">Parsing {files.length} files...</p>
           <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
@@ -108,6 +197,33 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
         <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
           <p className="font-semibold">Parsing Failed</p>
           <p>{job.error}</p>
+        </div>
+      )}
+
+      {/* Show results when job completes */}
+      {job?.status === 'completed' && (
+        <div className="mt-4 space-y-4">
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <p className="font-semibold text-green-800">✓ Parsing Complete!</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Extracted {job.result?.tables_found || 0} tables from {job.result?.files_parsed || 0} files
+            </p>
+          </div>
+
+          {/* Show enrichment reasoning if available */}
+          {job.result?.enrichment_reasoning && (
+            <ReasoningDisplay
+              reasoning={job.result.enrichment_reasoning}
+              defaultExpanded={true}
+            />
+          )}
+
+          <button
+            onClick={() => onComplete(job.result)}
+            className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Continue to Generate Step →
+          </button>
         </div>
       )}
     </div>

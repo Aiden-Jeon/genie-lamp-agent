@@ -63,20 +63,22 @@ class PDFParser:
     Per-page mode is 2.21x faster based on benchmarks with async parallel processing.
     """
     
-    def __init__(self, llm_client=None, use_images: bool = True, per_page: bool = True):
+    def __init__(self, llm_client=None, use_images: bool = True, per_page: bool = True, page_cache_manager=None):
         """
         Initialize PDF parser.
-        
+
         Args:
             llm_client: Optional LLM client for interpretation (DatabricksFoundationModelClient)
             use_images: Whether to extract PDF pages as images (default: True)
             per_page: Whether to process images page-by-page vs all-at-once (default: True)
                      - per_page=True: Process each page separately with async parallel (2.21x faster)
                      - per_page=False: Process all pages in one batch (fewer API calls)
+            page_cache_manager: Optional PageCacheManager for per-page caching
         """
         self.llm_client = llm_client
         self.use_images = use_images
         self.per_page = per_page
+        self.page_cache_manager = page_cache_manager
     
     def extract_raw_content(self, pdf_path: str) -> PDFContent:
         """
@@ -401,19 +403,37 @@ Important:
         
         return structured_data
     
-    async def _interpret_single_page_async(self, image: Image.Image, page_num: int) -> Dict:
+    async def _interpret_single_page_async(
+        self,
+        image: Image.Image,
+        page_num: int,
+        pdf_path: Optional[str] = None,
+        total_pages: Optional[int] = None
+    ) -> Tuple[Dict, bool]:
         """
         Interpret a single PDF page image with LLM (async).
-        
+
         Args:
             image: Single page image
             page_num: Page number for logging
-            
+            pdf_path: Optional PDF path for caching
+            total_pages: Optional total page count for caching
+
         Returns:
-            Dictionary with structured information from this page
+            Tuple of (structured data dict, cache_hit boolean)
         """
         logger.debug(f"Processing page {page_num}...")
-        
+
+        # Check cache first
+        if self.page_cache_manager and pdf_path and self.llm_client:
+            vision_model = getattr(self.llm_client, 'model_name', 'unknown')
+            cached = self.page_cache_manager.get_cached_page(
+                pdf_path, page_num, vision_model
+            )
+            if cached:
+                logger.debug(f"Cache HIT for page {page_num}")
+                return cached['page_data'], True  # Cache HIT
+
         # Create PDFContent with just this one image
         single_page_content = PDFContent(
             text_by_page=[],
@@ -421,10 +441,10 @@ Important:
             images=[image],
             metadata={"page": page_num}
         )
-        
+
         # Use standard interpretation
         prompt = self._get_image_based_prompt()
-        
+
         try:
             response = await self.llm_client.generate_async(
                 prompt=prompt,
@@ -432,24 +452,31 @@ Important:
                 temperature=0.1,
                 max_tokens=16000
             )
-            
+
             structured_data = self._parse_llm_response(response)
             self._validate_structure(structured_data)
-            
-            return structured_data
-            
+
+            # Save to cache
+            if self.page_cache_manager and pdf_path and self.llm_client:
+                vision_model = getattr(self.llm_client, 'model_name', 'unknown')
+                self.page_cache_manager.save_page_result(
+                    pdf_path, page_num, structured_data, total_pages or page_num, vision_model
+                )
+
+            return structured_data, False  # Cache MISS
+
         except Exception as e:
             logger.error(f"Error processing page {page_num}: {e}")
             # Return empty structure for failed pages
-            return self._create_empty_structure()
+            return self._create_empty_structure(), False
     
-    def _merge_page_results(self, page_results: List[Dict]) -> Dict:
+    def _merge_page_results(self, page_results: List[Tuple[Dict, bool]]) -> Dict:
         """
         Merge results from multiple single-page interpretations.
-        
+
         Args:
-            page_results: List of results from individual pages
-            
+            page_results: List of (result_dict, cache_hit) tuples from individual pages
+
         Returns:
             Combined results dictionary
         """
@@ -459,75 +486,83 @@ Important:
             "sql_queries": [],
             "metadata": {}
         }
-        
+
         # Collect unique questions (by ID)
         question_ids = set()
-        for page_result in page_results:
+        for page_result, _ in page_results:
             for q in page_result.get("questions", []):
                 q_id = q.get("id")
                 if q_id and q_id not in question_ids:
                     merged["questions"].append(q)
                     question_ids.add(q_id)
-        
+
         # Collect unique tables (by full_name)
         table_names = set()
-        for page_result in page_results:
+        for page_result, _ in page_results:
             for t in page_result.get("tables", []):
                 t_name = t.get("full_name")
                 if t_name and t_name not in table_names:
                     merged["tables"].append(t)
                     table_names.add(t_name)
-        
+
         # Collect all SQL queries
-        for page_result in page_results:
+        for page_result, _ in page_results:
             merged["sql_queries"].extend(page_result.get("sql_queries", []))
-        
+
         # Merge metadata from first page
         if page_results:
-            merged["metadata"] = page_results[0].get("metadata", {})
-        
+            merged["metadata"] = page_results[0][0].get("metadata", {})
+
         logger.info(f"Merged results: {len(merged['questions'])} questions, "
                    f"{len(merged['tables'])} tables, {len(merged['sql_queries'])} queries")
-        
+
         return merged
     
-    async def interpret_with_llm_async(self, raw_content: PDFContent) -> Dict:
+    async def interpret_with_llm_async(self, raw_content: PDFContent, pdf_path: Optional[str] = None) -> Dict:
         """
         Async version of interpret_with_llm.
         Uses LLM to interpret raw PDF content and extract structured information.
         Supports both per-page and batch processing modes.
-        
+
         Args:
             raw_content: Raw content extracted from PDF
-            
+            pdf_path: Optional PDF path for caching
+
         Returns:
             Dictionary with structured information (questions, tables, queries, metadata)
         """
         if not self.llm_client:
             logger.warning("No LLM client provided, skipping interpretation")
             return self._create_empty_structure()
-        
+
         # Check if we should use per-page processing
         if self.per_page and raw_content.images and len(raw_content.images) > 1:
             logger.info(f"Using per-page interpretation with {len(raw_content.images)} images (async parallel)")
-            
+            total_pages = len(raw_content.images)
+
             try:
                 # Process all pages in parallel
                 tasks = [
-                    self._interpret_single_page_async(img, idx + 1)
+                    self._interpret_single_page_async(img, idx + 1, pdf_path, total_pages)
                     for idx, img in enumerate(raw_content.images)
                 ]
-                
+
                 page_results = await asyncio.gather(*tasks)
-                
+
+                # Calculate cache statistics
+                cache_hits = sum(1 for _, is_hit in page_results if is_hit)
+                cache_hit_rate = cache_hits / total_pages if total_pages > 0 else 0.0
+
+                logger.info(f"Cache statistics: {cache_hits}/{total_pages} pages cached ({cache_hit_rate:.1%})")
+
                 # Merge results
                 merged_result = self._merge_page_results(page_results)
-                
+
                 logger.info(f"Per-page interpretation complete: {len(merged_result['questions'])} questions, "
                            f"{len(merged_result['tables'])} tables")
-                
+
                 return merged_result
-                
+
             except Exception as e:
                 logger.error(f"Error during per-page interpretation: {e}")
                 raise
@@ -577,26 +612,26 @@ Important:
         """
         Async version of parse_pdf.
         Full pipeline: extract raw content and optionally interpret with LLM.
-        
+
         Args:
             pdf_path: Path to PDF file
             use_llm: Whether to use LLM for interpretation
-            
+
         Returns:
             Dictionary with structured information
         """
         # Step 1: Extract raw content (run in executor since it's CPU-bound)
         loop = asyncio.get_event_loop()
         raw_content = await loop.run_in_executor(None, self.extract_raw_content, pdf_path)
-        
+
         # Step 2: Interpret with LLM (optional)
         if use_llm and self.llm_client:
-            structured_data = await self.interpret_with_llm_async(raw_content)
+            structured_data = await self.interpret_with_llm_async(raw_content, pdf_path)
         else:
             structured_data = self._create_empty_structure()
             # Add raw content for manual processing
             structured_data["raw_content"] = raw_content.to_dict()
-        
+
         return structured_data
 
 

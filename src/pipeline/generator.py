@@ -160,7 +160,22 @@ def generate_config(
     
     # Extract config
     config_data = response.model_dump()
-    
+
+    # Extract reasoning from response
+    reasoning = {}
+    if hasattr(response, 'reasoning') and response.reasoning:
+        reasoning["overall_strategy"] = response.reasoning
+    else:
+        # Extract from config data if reasoning is part of the response
+        config = config_data.get("genie_space_config", {})
+        reasoning["table_selection"] = f"Selected {len(config.get('tables', []))} tables from requirements"
+        reasoning["instruction_design"] = f"Created {len(config.get('instructions', []))} instructions for data context"
+        reasoning["sql_examples"] = f"Generated {len(config.get('example_sql_queries', []))} example SQL queries"
+        reasoning["overall_strategy"] = f"Designed Genie space '{config.get('space_name', 'Unknown')}' based on provided requirements"
+
+    # Store reasoning in config data
+    config_data["reasoning"] = reasoning
+
     # Show summary
     if verbose:
         config = config_data["genie_space_config"]

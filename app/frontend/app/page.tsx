@@ -34,7 +34,9 @@ export default function Home() {
           <p className="text-gray-600">
             Generate Databricks Genie Spaces from natural language requirements
           </p>
-          <p className="text-sm text-gray-500 mt-1">Session: {sessionId}</p>
+          <p className="text-sm text-gray-500 mt-1" suppressHydrationWarning>
+            Session: {sessionId}
+          </p>
         </header>
 
         <Stepper currentStep={currentStep} steps={steps} />

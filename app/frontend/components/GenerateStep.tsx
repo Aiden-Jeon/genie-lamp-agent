@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useJobPolling } from '@/lib/hooks/useJobPolling';
 import { apiClient } from '@/lib/api-client';
+import { ReasoningDisplay } from './ReasoningDisplay';
 
 interface GenerateStepProps {
   sessionId: string;
@@ -84,6 +85,22 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete }: Genera
         <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
           <p className="font-semibold">Generation Failed</p>
           <p>{job.error}</p>
+        </div>
+      )}
+
+      {job?.status === 'completed' && job.result?.reasoning && (
+        <div className="mt-4">
+          <ReasoningDisplay reasoning={job.result.reasoning} />
+        </div>
+      )}
+
+      {job?.status === 'completed' && (
+        <div className="bg-green-50 p-4 rounded-lg border border-green-200 mt-4">
+          <p className="font-semibold text-green-800">✓ Configuration Generated</p>
+          <div className="text-sm text-gray-600 mt-2 space-y-1">
+            <p>Tables: {job.result?.tables_count || 0}</p>
+            <p>Instructions: {job.result?.instructions_count || 0}</p>
+          </div>
         </div>
       )}
     </div>

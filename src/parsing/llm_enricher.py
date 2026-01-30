@@ -19,68 +19,112 @@ class LLMEnricher:
     Adds descriptions, summaries, and refines content.
     """
     
-    def __init__(self, llm_client):
+    def __init__(self, llm_client, enrichment_progress_callback=None):
         """
         Initialize LLM enricher.
-        
+
         Args:
             llm_client: LLM client (DatabricksFoundationModelClient)
+            enrichment_progress_callback: Optional callback for progress updates
         """
         self.llm_client = llm_client
+        self.enrichment_progress_callback = enrichment_progress_callback
     
-    def enrich_document(self, doc: RequirementsDocument) -> RequirementsDocument:
+    def enrich_document(self, doc: RequirementsDocument) -> tuple[RequirementsDocument, dict]:
         """
         Enrich requirements document with LLM-generated content.
-        
+
         Args:
             doc: RequirementsDocument to enrich
-            
+
         Returns:
-            Enriched RequirementsDocument
+            Tuple of (Enriched RequirementsDocument, enrichment reasoning dict)
         """
         logger.info("Enriching requirements document with LLM")
-        
+
+        reasoning = {}
+
         # Enrich tables (add descriptions if missing)
-        self._enrich_tables(doc.all_tables)
-        
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("tables_start", f"Starting to enrich {len([t for t in doc.all_tables if not t.description or t.description == 'Unknown'])} table descriptions")
+
+        tables_enriched = self._enrich_tables(doc.all_tables)
+        reasoning["tables_enrichment"] = f"Enriched {tables_enriched} table descriptions using LLM to provide business context and purpose"
+
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("tables_complete", f"✓ Enriched {tables_enriched} table descriptions with business context")
+
         # Enrich queries (add descriptions if missing)
-        self._enrich_queries(doc.all_queries)
-        
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("queries_start", f"Starting to enhance {len([q for q in doc.all_queries if not q.description or q.description.startswith('Query for')])} SQL query descriptions")
+
+        queries_enriched = self._enrich_queries(doc.all_queries)
+        reasoning["queries_enrichment"] = f"Enhanced {queries_enriched} SQL query descriptions to clarify business questions and key metrics"
+
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("queries_complete", f"✓ Enhanced {queries_enriched} SQL query descriptions")
+
         # Generate business scenarios
-        doc.metadata["business_scenarios"] = self._generate_scenarios(doc)
-        
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("scenarios_start", "Analyzing questions to generate business scenarios")
+
+        scenarios = self._generate_scenarios(doc)
+        doc.metadata["business_scenarios"] = scenarios
+        reasoning["scenarios_generation"] = f"Generated {len(scenarios)} realistic business scenarios based on question categories and patterns"
+
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("scenarios_complete", f"✓ Generated {len(scenarios)} business scenarios")
+
         # Generate document summary
-        doc.metadata["summary"] = self._generate_summary(doc)
-        
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("summary_start", "Creating comprehensive document summary")
+
+        summary = self._generate_summary(doc)
+        doc.metadata["summary"] = summary
+        reasoning["summary_generation"] = f"Created comprehensive document summary covering {len(doc.all_questions)} questions across {len(doc.all_tables)} tables"
+
+        if self.enrichment_progress_callback:
+            self.enrichment_progress_callback("summary_complete", f"✓ Created document summary ({len(doc.all_questions)} questions, {len(doc.all_tables)} tables)")
+
+        reasoning["overall"] = f"LLM enrichment complete: Enhanced {tables_enriched} tables, {queries_enriched} queries, generated {len(scenarios)} scenarios"
+
         logger.info("Document enrichment complete")
-        
-        return doc
+
+        return doc, reasoning
     
-    def _enrich_tables(self, tables: List[TableInfo]) -> None:
-        """Enrich table descriptions using LLM"""
+    def _enrich_tables(self, tables: List[TableInfo]) -> int:
+        """Enrich table descriptions using LLM. Returns count of enriched tables."""
         logger.info(f"Enriching {len(tables)} tables")
-        
+
+        enriched_count = 0
         for table in tables:
             if not table.description or table.description == "Unknown":
                 try:
                     description = self._generate_table_description(table)
                     table.description = description
+                    enriched_count += 1
                     logger.debug(f"Generated description for {table.full_name}")
                 except Exception as e:
                     logger.error(f"Error enriching table {table.full_name}: {e}")
+
+        return enriched_count
     
-    def _enrich_queries(self, queries: List[SQLQuery]) -> None:
-        """Enrich query descriptions using LLM"""
+    def _enrich_queries(self, queries: List[SQLQuery]) -> int:
+        """Enrich query descriptions using LLM. Returns count of enriched queries."""
         logger.info(f"Enriching {len(queries)} queries")
-        
+
+        enriched_count = 0
         for query in queries:
             if not query.description or query.description.startswith("Query for"):
                 try:
                     description = self._generate_query_description(query)
                     query.description = description
+                    enriched_count += 1
                     logger.debug(f"Generated description for query {query.question_id}")
                 except Exception as e:
                     logger.error(f"Error enriching query {query.question_id}: {e}")
+
+        return enriched_count
     
     def _generate_table_description(self, table: TableInfo) -> str:
         """Generate description for a table using LLM"""
@@ -290,16 +334,16 @@ Respond with ONLY the refined question, no additional text."""
             return question_text
 
 
-def enrich_requirements(doc: RequirementsDocument, llm_client) -> RequirementsDocument:
+def enrich_requirements(doc: RequirementsDocument, llm_client) -> tuple[RequirementsDocument, dict]:
     """
     Convenience function to enrich requirements document.
-    
+
     Args:
         doc: RequirementsDocument to enrich
         llm_client: LLM client for enrichment
-        
+
     Returns:
-        Enriched RequirementsDocument
+        Tuple of (Enriched RequirementsDocument, enrichment reasoning dict)
     """
     enricher = LLMEnricher(llm_client)
     return enricher.enrich_document(doc)

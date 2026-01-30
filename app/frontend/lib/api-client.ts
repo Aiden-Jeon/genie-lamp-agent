@@ -4,14 +4,52 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+export interface FileProgress {
+  name: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  pages_total: number | null;
+  pages_completed: number;
+  current_page?: number;
+  cache_hit?: boolean;
+  duration_ms?: number;
+  error?: string;
+  extracted?: {
+    questions_count: number;
+    tables_count: number;
+    queries_count: number;
+  };
+}
+
+export interface EnrichmentProgress {
+  stage: string;
+  details: string;
+  timestamp: string;
+}
+
+export interface JobProgress {
+  current_file?: string;
+  total_files: number;
+  completed_files: number;
+  files: FileProgress[];
+  last_update?: string;
+  enrichment_progress?: EnrichmentProgress[];
+}
+
 export interface JobStatus {
   job_id: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   type: string;
-  result?: any;
-  error?: string;
-  created_at?: string;
-  completed_at?: string;
+  result?: {
+    output_path?: string;
+    reasoning?: Record<string, string>;
+    tables_count?: number;
+    instructions_count?: number;
+    [key: string]: any;
+  };
+  error?: string | null;
+  progress?: JobProgress;
+  created_at?: string | null;
+  completed_at?: string | null;
 }
 
 export interface ValidationFix {
