@@ -40,12 +40,12 @@ Claude will:
 
 ### genie-deploy
 
-Automated Genie space deployment from real_requirements with automatic catalog replacement.
+Automated Genie space deployment from real_requirements/inputs with automatic catalog replacement.
 
 **Triggers:** When you ask to "deploy genie", "create a genie space from real requirements", or "run automated deployment"
 
 **Features:**
-- Parses documents from `real_requirements/` directory
+- Parses documents from `real_requirements/inputs/` directory
 - Generates Genie space configuration using LLM
 - Validates tables against Unity Catalog
 - **Automatically replaces** failed catalog.schema with `sandbox.agent_poc`
@@ -57,7 +57,7 @@ Automated Genie space deployment from real_requirements with automatic catalog r
 User: "deploy genie from real requirements"
 
 Claude will:
-1. Parse PDFs/markdown from real_requirements/
+1. Parse PDFs/markdown from real_requirements/inputs/
 2. Generate structured requirements
 3. Create Genie configuration
 4. Validate tables (auto-replace with sandbox.agent_poc)
@@ -68,11 +68,21 @@ Claude will:
 **Script:** `scripts/auto_deploy.py`
 
 **Key Configuration:**
-- Input: `real_requirements/` directory
+- Input: `real_requirements/inputs/` directory (requirements documents)
+- Benchmarks: `real_requirements/benchmarks/` directory (optional)
 - Parsed output: `data/parsed.md`
 - Config output: `output/genie_space_config.json`
 - Result output: `output/genie_space_result.json`
 - Auto-replacement: `sandbox.agent_poc`
+
+**Troubleshooting:**
+If deployment fails with `INTERNAL_ERROR`:
+- Check for special characters (backticks, complex parentheses) in space_name, description, or purpose
+- Clean metadata: Use simple names without special formatting
+- Verify table names match Unity Catalog (e.g., `steam_app_id` → `steam_apps`)
+- Test with minimal config first, then incrementally add components
+
+See `genie-deploy/skill.md` for detailed troubleshooting steps.
 
 ### create-folder
 

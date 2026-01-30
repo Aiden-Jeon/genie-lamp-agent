@@ -45,7 +45,7 @@ SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
 .venv/bin/python genie.py create --requirements data/demo_requirements.md
 
 # Parse documents (PDFs/markdown to structured format)
-.venv/bin/python genie.py parse --input-dir real_requirements --output data/parsed.md
+.venv/bin/python genie.py parse --input-dir real_requirements/inputs --output data/parsed.md
 
 # Individual pipeline steps
 .venv/bin/python genie.py generate --requirements data/parsed.md

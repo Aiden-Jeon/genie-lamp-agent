@@ -2411,7 +2411,7 @@ python scripts/validate_setup.py
 
 # 2. Parse documents if needed (async/concurrent with progress bars)
 genie.py parse \
-  --input-dir real_requirements \
+  --input-dir real_requirements/inputs \
   --output data/my_requirements.md \
   --max-concurrent 5
 

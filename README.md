@@ -71,7 +71,7 @@ The agent follows a structured 7-step pipeline:
 
 ### ⚡ Performance Improvements
 
-**Per-Page PDF Parsing (2.21x Faster!)** 🚀
+**Per-Page PDF Parsing (2.21x Faster)**
 - PDF pages are now processed individually with async parallel execution
 - **2.21x faster** than batch processing based on real-world benchmarks
 - **Extracts more content**: +92% more questions, +24% more tables in tests
@@ -85,7 +85,7 @@ The agent follows a structured 7-step pipeline:
 - Significant performance improvements when processing multiple PDFs
 - Uses `aiohttp` for async HTTP requests and `tqdm` for progress visualization
 
-**Smart Parse Caching** 🎯
+**Smart Parse Caching**
 - Automatically caches parsing results to avoid expensive re-parsing
 - Saves time and API costs (vision model calls) when requirements haven't changed
 - Intelligent cache invalidation when files are modified, added, or removed
@@ -186,15 +186,15 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
 - **Reasoning**: Optional reasoning output to understand configuration choices
 - **Markdown-Formatted Instructions**: Generate well-structured instructions using markdown (headings, lists, bold, code blocks) for better readability and organization
 
-### Quality Assurance Features (New! ⭐)
+### Quality Assurance Features
 
-#### Priority 1: Enhanced Prompt Engineering
+#### Enhanced Prompt Engineering
 - **SQL Quality Criteria**: 6-point checklist for correct column references, explicit joins, aggregations, filters, and output formatting
 - **Few-Shot Examples**: High vs low quality configuration examples to guide LLM generation
 - **Instruction Guidelines**: 5 principles for specific, actionable, prioritized, and clear instructions
 - **Join Specifications**: Explicit join relationship documentation for all table pairs
 
-#### Priority 2: Automated Validation
+#### Automated Validation
 - **SQL Validator**: Comprehensive SQL syntax, table/column verification, and quality checks
   - Validates example queries, SQL expressions, and benchmark queries
   - Detects: syntax errors, missing tables, incomplete joins, SELECT *, hard-coded dates, unsafe division
@@ -205,7 +205,7 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
   - Clarity (30 pts): No vague terms, actionable language
   - Letter grades (A-F) with actionable suggestions
 
-#### Priority 3: Domain Intelligence & Comprehensive Review
+#### Domain Intelligence & Comprehensive Review
 - **Domain Knowledge Extractor**: Automatically extracts from requirements:
   - Table relationships (one-to-one, one-to-many, many-to-one, many-to-many)
   - Business metrics (formulas, aggregations, KPIs)
@@ -220,10 +220,10 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
   - Overall pass/fail with actionable feedback for each issue
 
 ### Test Coverage
-✅ **83/83 tests passing** across all priorities:
-- Priority 1: 7 tests (enhanced prompts, join specs, instruction patterns)
-- Priority 2: 45 tests (SQL validation + instruction scoring)
-- Priority 3: 31 tests (domain extraction + comprehensive review)
+✅ **83/83 tests passing** across all features:
+- Enhanced Prompt Engineering: 7 tests (prompts, join specs, instruction patterns)
+- Automated Validation: 45 tests (SQL validation + instruction scoring)
+- Domain Intelligence & Review: 31 tests (domain extraction + comprehensive review)
 
 ## Prerequisites
 
@@ -351,17 +351,17 @@ If you have PDF or markdown documents that need to be converted to the standard 
 
 ```bash
 # Parse documents into structured requirements (with concurrent processing + caching)
-python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+python genie.py parse --input-dir real_requirements/inputs --output data/my_requirements.md
 
 # Second run with same files - instant response from cache! ⚡
-python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+python genie.py parse --input-dir real_requirements/inputs --output data/my_requirements.md
 # ✓ Using cached results (no changes detected)
 
 # Process multiple PDFs faster with increased concurrency
-python genie.py parse --input-dir real_requirements --output data/my_requirements.md --max-concurrent 5
+python genie.py parse --input-dir real_requirements/inputs --output data/my_requirements.md --max-concurrent 5
 
 # Force re-parse when needed (bypasses cache)
-python genie.py parse --input-dir real_requirements --output data/my_requirements.md --force
+python genie.py parse --input-dir real_requirements/inputs --output data/my_requirements.md --force
 
 # Then create Genie space
 python genie.py create --requirements data/my_requirements.md
@@ -385,7 +385,7 @@ For more control, run individual steps:
 
 ```bash
 # Parse documents (if needed)
-python genie.py parse --input-dir real_requirements --output data/parsed.md
+python genie.py parse --input-dir real_requirements/inputs --output data/parsed.md
 
 # Generate config only
 python genie.py generate --requirements data/parsed.md
@@ -477,24 +477,24 @@ python genie.py deploy [--config <config-path>]
 
 ```bash
 # Parse documents first
-python genie.py parse --input-dir real_requirements --output data/my_requirements.md
+python genie.py parse --input-dir real_requirements/inputs --output data/my_requirements.md
 
 # Parse without LLM (faster)
 python genie.py parse \
-  --input-dir real_requirements \
+  --input-dir real_requirements/inputs \
   --output data/my_requirements.md \
   --no-llm
 
 # Parse with custom models
 python genie.py parse \
-  --input-dir real_requirements \
+  --input-dir real_requirements/inputs \
   --output data/my_requirements.md \
   --llm-model databricks-gpt-5-2 \
   --vision-model databricks-claude-sonnet-4
 
 # Parse with cache control
 python genie.py parse \
-  --input-dir real_requirements \
+  --input-dir real_requirements/inputs \
   --output data/my_requirements.md \
   --force  # Force re-parse even if cached
 
@@ -618,10 +618,10 @@ config = generate_config(
     model="databricks-gpt-5-2",
 
     # Enable all quality features
-    extract_domain=True,              # Priority 3: Extract domain knowledge
-    validate_sql=True,                # Priority 2: SQL validation
-    validate_instructions=True,       # Priority 2: Instruction scoring
-    review_config=True,               # Priority 3: Comprehensive review
+    extract_domain=True,              # Extract domain knowledge
+    validate_sql=True,                # SQL validation
+    validate_instructions=True,       # Instruction scoring
+    review_config=True,               # Comprehensive review
     validation_output="output/validation.json",
     review_output="output/review.json"
 )
@@ -1075,7 +1075,7 @@ pytest tests/test_requirements_converter.py -v
 | Command | Purpose | When to Use |
 |---------|---------|------------|
 | `genie.py parse` | Parse documents into structured requirements | Convert PDFs/markdown to standard format |
-| `genie.py create` ⭐ | Full pipeline (generate → validate → deploy) | Primary workflow (recommended) |
+| `genie.py create` | Full pipeline (generate → validate → deploy) | Primary workflow (recommended) |
 | `genie.py generate` | Generate configuration only | When you want to review config before deploying |
 | `genie.py validate` | Validate tables and columns | After manual config edits |
 | `genie.py deploy` | Deploy existing configuration | After validation passes |
