@@ -11,7 +11,34 @@ Automate git commits for the Genie Lamp Agent project with proper testing, valid
 
 Follow this workflow when the user requests a commit:
 
-### 1. Pre-commit Status Check
+### 1. Check Branch and Create Feature Branch
+
+**Always check the current branch before committing:**
+
+```bash
+git branch --show-current
+```
+
+**If on `main` or `master` branch:**
+1. Ask the user if they want to create a feature branch
+2. Suggest a branch name based on the commit type and description:
+   - Format: `<type>/<short-description>`
+   - Examples:
+     - `feat/pre-commit-hook`
+     - `fix/table-validation`
+     - `refactor/parsing-module`
+     - `docs/update-readme`
+
+3. Create and switch to the feature branch:
+```bash
+git checkout -b feat/your-feature-name
+```
+
+**If already on a feature branch:** Proceed with the commit workflow.
+
+**Note:** This prevents accidentally committing directly to main/master and follows Git best practices.
+
+### 2. Pre-commit Status Check
 
 **Note:** The pre-commit hook validates that tests were run recently (< 120 min).
 If the hook fails, run `scripts/run_smoke.sh` first.
@@ -26,7 +53,7 @@ git diff
 
 Analyze what files have changed and their purpose in the project.
 
-### 2. Determine Commit Type
+### 3. Determine Commit Type
 
 Based on the changed files, classify the commit:
 
@@ -64,7 +91,7 @@ Based on the changed files, classify the commit:
   - Configuration changes
   - Build script updates
 
-### 3. Craft Commit Message
+### 4. Craft Commit Message
 
 Format: `<type>: <description>`
 
@@ -85,7 +112,7 @@ docs: Enhance README with GitHub integration and fix broken references
 test: Add integration tests for table validator
 ```
 
-### 4. Stage and Commit
+### 5. Stage and Commit
 
 Stage specific files (avoid `git add -A` to prevent accidentally committing sensitive files):
 
@@ -108,7 +135,7 @@ EOF
 )"
 ```
 
-### 5. Verify Commit
+### 6. Verify Commit
 
 After committing, verify success:
 
@@ -146,32 +173,39 @@ Never commit:
 
 ### Common Scenarios
 
-**Scenario 1: Feature addition**
+**Scenario 1: Committing from main branch**
 ```bash
-# User added new functionality to generator.py
+# Check current branch
+git branch --show-current
+# Output: main
+
+# Create feature branch before committing
+git checkout -b feat/retry-logic
+
+# Then proceed with commit
 Type: feat
 Message: "feat: Add retry logic for LLM API calls"
 ```
 
-**Scenario 2: Bug fix**
+**Scenario 2: Feature addition on feature branch**
+```bash
+# Already on feature branch, proceed with commit
+Type: feat
+Message: "feat: Add retry logic for LLM API calls"
+```
+
+**Scenario 3: Bug fix**
 ```bash
 # User fixed table validation error handling
 Type: fix
 Message: "fix: Handle missing schema gracefully in table validator"
 ```
 
-**Scenario 3: Refactoring**
+**Scenario 4: Refactoring**
 ```bash
 # User reorganized the parsing module
 Type: refactor
 Message: "refactor: Split PDF parser into separate page processors"
-```
-
-**Scenario 4: Test failures**
-```bash
-# Tests failed but user wants to commit anyway
-Type: feat (or appropriate type)
-Message: "feat: Add new validation rule (tests failing, WIP)"
 ```
 
 ## Error Handling
