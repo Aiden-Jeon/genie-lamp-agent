@@ -370,6 +370,127 @@ def update_config_catalog_schema(config_path: str, old_catalog: str, old_schema:
     }
 
 
+def remove_table_from_config(config_path: str, catalog: str, schema: str, table: str):
+    """
+    Remove a table and all its references from the configuration.
+
+    Args:
+        config_path: Path to the configuration JSON file
+        catalog: Catalog name
+        schema: Schema name
+        table: Table name
+
+    Returns:
+        Dictionary with counts of removed items
+    """
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+
+    # Get the genie_space_config
+    if "genie_space_config" in config:
+        genie_config = config["genie_space_config"]
+    else:
+        genie_config = config
+
+    full_table = f"{catalog}.{schema}.{table}"
+
+    # Remove from tables array
+    tables_before = len(genie_config.get("tables", []))
+    genie_config["tables"] = [
+        t for t in genie_config.get("tables", [])
+        if not (t.get("catalog_name") == catalog and
+                t.get("schema_name") == schema and
+                t.get("table_name") == table)
+    ]
+    tables_removed = tables_before - len(genie_config.get("tables", []))
+
+    # Remove SQL expressions that reference this table
+    sql_snippets = genie_config.get("sql_snippets", {})
+
+    filters_before = len(sql_snippets.get("filters", []))
+    sql_snippets["filters"] = [
+        f for f in sql_snippets.get("filters", [])
+        if full_table not in f.get("sql", "")
+    ]
+    filters_removed = filters_before - len(sql_snippets.get("filters", []))
+
+    expressions_before = len(sql_snippets.get("expressions", []))
+    sql_snippets["expressions"] = [
+        e for e in sql_snippets.get("expressions", [])
+        if full_table not in e.get("sql", "")
+    ]
+    expressions_removed = expressions_before - len(sql_snippets.get("expressions", []))
+
+    measures_before = len(sql_snippets.get("measures", []))
+    sql_snippets["measures"] = [
+        m for m in sql_snippets.get("measures", [])
+        if full_table not in m.get("sql", "")
+    ]
+    measures_removed = measures_before - len(sql_snippets.get("measures", []))
+
+    # Remove example queries that reference this table
+    queries_before = len(genie_config.get("example_sql_queries", []))
+    genie_config["example_sql_queries"] = [
+        q for q in genie_config.get("example_sql_queries", [])
+        if full_table not in q.get("sql_query", "")
+    ]
+    queries_removed = queries_before - len(genie_config.get("example_sql_queries", []))
+
+    # Remove benchmark questions that reference this table
+    benchmarks_before = len(genie_config.get("benchmark_questions", []))
+    genie_config["benchmark_questions"] = [
+        b for b in genie_config.get("benchmark_questions", [])
+        if full_table not in b.get("expected_sql", "") and
+           f"`{full_table}`" not in b.get("table", "")
+    ]
+    benchmarks_removed = benchmarks_before - len(genie_config.get("benchmark_questions", []))
+
+    # Remove instructions that reference this table
+    instructions_before = len(genie_config.get("instructions", []))
+    genie_config["instructions"] = [
+        i for i in genie_config.get("instructions", [])
+        if full_table not in i.get("content", "")
+    ]
+    instructions_removed = instructions_before - len(genie_config.get("instructions", []))
+
+    # Remove joins that reference this table
+    joins_before = len(genie_config.get("joins", []))
+    genie_config["joins"] = [
+        j for j in genie_config.get("joins", [])
+        if j.get("left_table") != full_table and j.get("right_table") != full_table
+    ]
+    joins_removed = joins_before - len(genie_config.get("joins", []))
+
+    # Remove join_specifications that reference this table
+    join_specs_before = len(genie_config.get("join_specifications", []))
+    genie_config["join_specifications"] = [
+        js for js in genie_config.get("join_specifications", [])
+        if js.get("left_table") != full_table and js.get("right_table") != full_table
+    ]
+    join_specs_removed = join_specs_before - len(genie_config.get("join_specifications", []))
+
+    # Save back to file
+    if "genie_space_config" in config:
+        config["genie_space_config"] = genie_config
+    else:
+        config = genie_config
+
+    with open(config_path, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
+    return {
+        'tables': tables_removed,
+        'sql_filters': filters_removed,
+        'sql_expressions': expressions_removed,
+        'sql_measures': measures_removed,
+        'example_queries': queries_removed,
+        'benchmark_questions': benchmarks_removed,
+        'instructions': instructions_removed,
+        'joins': joins_removed,
+        'join_specifications': join_specs_removed
+    }
+
+
 def prompt_catalog_schema_replacement(report, config_path: str) -> bool:
     """
     Prompt user for catalog/schema/table replacement when tables are not found.

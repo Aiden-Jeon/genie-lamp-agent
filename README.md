@@ -11,6 +11,7 @@ An intelligent agent that generates Databricks Genie space configurations using 
 
 - [Overview](#overview)
 - [Recent Updates](#recent-updates)
+- [Databricks App (Web UI)](#databricks-app-web-ui)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
@@ -18,6 +19,19 @@ An intelligent agent that generates Databricks Genie space configurations using 
 - [Support](#support)
 
 ## Recent Updates
+
+### January 2026 ⭐
+
+**🌐 Databricks App with Web UI**
+- Multi-user web application with guided 5-step workflow
+- FastAPI backend + Next.js frontend
+- Session isolation with UUID-based storage
+- Background job processing with real-time polling
+- Interactive validation fixing with table replacement UI
+- Databricks OAuth2 authentication
+- Unity Catalog Volume for file storage
+- Lakebase (Postgres) for session/job persistence
+- See [Databricks App section](#databricks-app-web-ui) and [app/README.md](app/README.md) for details
 
 ### January 2026 ⭐
 
@@ -39,6 +53,10 @@ An intelligent agent that generates Databricks Genie space configurations using 
 ## Overview
 
 The Genie Lamp Agent automates the creation of Databricks Genie spaces by intelligently generating production-ready configurations from natural language requirements. Simply provide your business requirements and documentation, and let the agent handle the complex configuration process.
+
+**Available in Two Modes:**
+- **CLI Mode**: Command-line interface for automation and scripting (documented below)
+- **Web UI Mode**: Multi-user Databricks App with interactive workflow (see [Databricks App section](#databricks-app-web-ui))
 
 **Key Benefits:**
 - 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
