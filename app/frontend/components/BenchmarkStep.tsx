@@ -7,10 +7,10 @@
 import { useState } from 'react';
 
 interface Benchmark {
-  korean_question: string;  // Required
+  question: string;         // Required (Korean question)
   expected_sql: string;     // Required
   id?: string;              // Optional
-  question?: string;        // Optional (English translation)
+  korean_question?: string; // Optional (for backward compatibility)
   source_file?: string;     // Optional
   question_number?: number; // Optional
 }
@@ -48,7 +48,7 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
   };
 
   const addNewBenchmark = () => {
-    setBenchmarks([...benchmarks, { korean_question: '', expected_sql: '' }]);
+    setBenchmarks([...benchmarks, { question: '', expected_sql: '' }]);
     setEditingIndex(benchmarks.length);
   };
 
@@ -141,9 +141,9 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
               className="w-full"
             />
             <p className="text-xs text-gray-500 mt-2">
-              Required fields: <code className="bg-gray-100 px-1">korean_question</code>, <code className="bg-gray-100 px-1">expected_sql</code>
+              Required fields: <code className="bg-gray-100 px-1">question</code>, <code className="bg-gray-100 px-1">expected_sql</code>
               <br />
-              Optional: <code className="bg-gray-100 px-1">question</code> (English), <code className="bg-gray-100 px-1">id</code>, <code className="bg-gray-100 px-1">source_file</code>
+              Optional: <code className="bg-gray-100 px-1">id</code>, <code className="bg-gray-100 px-1">korean_question</code>, <code className="bg-gray-100 px-1">source_file</code>
             </p>
           </div>
 
@@ -195,34 +195,19 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
                           </div>
                         </div>
                         {editingIndex === index ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={benchmark.korean_question}
-                              onChange={(e) => updateBenchmark(index, 'korean_question', e.target.value)}
-                              className="w-full p-2 border border-gray-300 rounded text-sm min-h-[80px]"
-                              placeholder="Enter Korean question... (Required)"
-                            />
-                            <textarea
-                              value={benchmark.question || ''}
-                              onChange={(e) => updateBenchmark(index, 'question', e.target.value)}
-                              className="w-full p-2 border border-gray-200 rounded text-xs min-h-[60px] text-gray-600"
-                              placeholder="English translation (Optional)"
-                            />
-                          </div>
+                          <textarea
+                            value={benchmark.question}
+                            onChange={(e) => updateBenchmark(index, 'question', e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded text-sm min-h-[100px]"
+                            placeholder="Enter question... (Required)"
+                          />
                         ) : (
-                          <div
-                            className="cursor-pointer hover:bg-gray-100 p-2 rounded"
+                          <p
+                            className="text-sm cursor-pointer hover:bg-gray-100 p-2 rounded"
                             onClick={() => setEditingIndex(index)}
                           >
-                            <p className="text-sm">
-                              {benchmark.korean_question || <span className="text-gray-400">Click to edit...</span>}
-                            </p>
-                            {benchmark.question && (
-                              <p className="text-xs text-gray-500 mt-2 italic">
-                                {benchmark.question}
-                              </p>
-                            )}
-                          </div>
+                            {benchmark.question || benchmark.korean_question || <span className="text-gray-400">Click to edit...</span>}
+                          </p>
                         )}
                       </div>
 
