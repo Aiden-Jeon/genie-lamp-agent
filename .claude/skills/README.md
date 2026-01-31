@@ -84,6 +84,69 @@ If deployment fails with `INTERNAL_ERROR`:
 
 See `genie-deploy/skill.md` for detailed troubleshooting steps.
 
+### deploy-app
+
+Deploy the Genie Lamp Agent Databricks app using Asset Bundles.
+
+**Triggers:** When you ask to "deploy the app", "deploy genie-lamp-agent", "update the app", or "publish the app"
+
+**Features:**
+- Automated Databricks app deployment using Asset Bundles
+- Support for both initial deployment (first-time) and update deployment
+- Automatic handling of bundle deploy, app start, and app deploy commands
+- Environment-specific deployments (dev, prod)
+- Working directory support for nested bundle configs
+- Pre-deployment validation (secrets, config files)
+
+**Example Usage:**
+```
+User: "deploy the app to dev"
+
+Claude will:
+1. Ask for deployment type (initial or update)
+2. Confirm source code path
+3. Change to app/ directory
+4. Run databricks bundle deploy
+5. Start app (if initial) or skip (if update)
+6. Deploy app code
+7. Provide access instructions
+```
+
+**Script:** `.claude/skills/deploy-app/scripts/deploy_app.py`
+
+**Project Configuration:**
+- Bundle Name: `genie-lamp-agent`
+- App Resource Name: `genie_lamp_app`
+- Working Directory: `app/`
+- Environments: `dev` (default), `prod`
+- Source Code Path Pattern: `/Workspace/Users/<username>/.bundle/genie-lamp-agent/<env>/files`
+
+**Prerequisites:**
+- Databricks CLI installed and configured
+- Secrets configured in `genie-lamp` scope (service-token, sql-warehouse-http-path)
+- Frontend built (if deploying after frontend changes): `cd app/frontend && npm run build`
+
+**Common Commands:**
+```bash
+# Initial deployment to dev
+python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+  --target dev \
+  --profile DEFAULT \
+  --source-code-path /Workspace/Users/user@example.com/.bundle/genie-lamp-agent/dev/files \
+  --working-dir app \
+  --initial
+
+# Update deployment to dev
+python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+  --target dev \
+  --profile DEFAULT \
+  --source-code-path /Workspace/Users/user@example.com/.bundle/genie-lamp-agent/dev/files \
+  --working-dir app \
+  --update
+```
+
+See `.claude/skills/deploy-app/SKILL.md` for detailed deployment workflows and troubleshooting.
+
 ### create-folder
 
 Safely create directories with validation and parent directory creation.
@@ -121,17 +184,14 @@ Claude will:
 This makes the skills available globally in Claude Code:
 
 ```bash
-# Create symlink for genie-commit
+# Create symlinks for all skills
 ln -s "$(pwd)/.claude/skills/genie-commit" ~/.codex/skills/genie-commit
-
-# Create symlink for genie-deploy
 ln -s "$(pwd)/.claude/skills/genie-deploy" ~/.codex/skills/genie-deploy
-
-# Create symlink for create-folder
+ln -s "$(pwd)/.claude/skills/deploy-app" ~/.codex/skills/deploy-app
 ln -s "$(pwd)/.claude/skills/create-folder" ~/.codex/skills/create-folder
 
 # Verify
-ls -la ~/.codex/skills/genie-* ~/.codex/skills/create-folder
+ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-app ~/.codex/skills/create-folder
 ```
 
 ### Option 2: Copy to Claude Code skills directory
@@ -140,10 +200,11 @@ ls -la ~/.codex/skills/genie-* ~/.codex/skills/create-folder
 # Copy the skills
 cp -r .claude/skills/genie-commit ~/.codex/skills/
 cp -r .claude/skills/genie-deploy ~/.codex/skills/
+cp -r .claude/skills/deploy-app ~/.codex/skills/
 cp -r .claude/skills/create-folder ~/.codex/skills/
 
 # Verify
-ls -la ~/.codex/skills/genie-* ~/.codex/skills/create-folder
+ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-app ~/.codex/skills/create-folder
 ```
 
 ### After Installation

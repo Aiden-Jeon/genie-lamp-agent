@@ -6,6 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Genie Lamp Agent is an LLM-powered tool that automatically generates Databricks Genie space configurations from natural language requirements. It transforms business requirements documents into production-ready Genie space JSON configurations with comprehensive validation and deployment capabilities.
 
+## Project Rules
+
+**IMPORTANT:** This project has specific rules that must be followed. These rules are located in `.claude/rules/` directory:
+
+- **`.claude/rules/python-venv.md`**: Python virtual environment usage (CRITICAL - always use `.venv/bin/python`)
+- **`.claude/rules/app-permissions.md`**: ⚠️ App service principal permissions (CRITICAL - never delete permissions)
+- **`.claude/rules/README.md`**: Overview of all rules and how they work
+
+These rules override default behavior and enforce project-specific standards. Always consult the rules when:
+- Suggesting Python commands
+- Writing scripts
+- Running tests
+- Installing dependencies
+- **Working with app deployment or permissions** ⚠️
+
 ## Development Commands
 
 ### Environment Setup
@@ -172,7 +187,7 @@ git worktree prune
 5. **Easy cleanup**: Remove worktree directory after merge
 
 ### Virtual Environment Requirement
-**ALWAYS use `.venv/bin/python` instead of `python` or `python3`**. This is enforced by `.cursor/rules/python-standards.mdc`.
+**ALWAYS use `.venv/bin/python` instead of `python` or `python3`**. This is enforced by `.claude/rules/python-venv.md`. See the rules file for complete usage guidelines and examples.
 
 ### Validation Flow with Interactive Replacement
 When table validation fails:
@@ -229,11 +244,13 @@ Optional environment variables:
 
 ## Code Organization Standards
 
-From `.cursor/rules/python-standards.mdc`:
+**Project Rules:** See `.claude/rules/` for detailed project-specific rules.
+
+Key standards:
 1. All test files must be in `tests/` directory
 2. Test files must start with `test_` prefix
 3. All markdown documentation (except README.md, ARCHITECTURE.md, CLAUDE.md) goes in `change_logs/` directory
-4. Always use `.venv/bin/python` for Python commands
+4. **Always use `.venv/bin/python` for Python commands** (see `.claude/rules/python-venv.md`)
 
 ## Key Integration Points
 

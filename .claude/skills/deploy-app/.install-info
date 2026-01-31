@@ -1,0 +1,34 @@
+Deploy App Skill
+================
+
+Created: 2026-01-31
+Type: Databricks app deployment automation
+Project: Genie Lamp Agent
+
+This skill provides:
+- Automated Databricks app deployment using Asset Bundles
+- Support for both initial deployment (first-time) and update deployment
+- Automatic handling of bundle deploy, app start, and app deploy commands
+- Environment-specific deployments (dev, prod)
+- Working directory support for projects with nested bundle configs
+
+Project Configuration:
+- Bundle Name: genie-lamp-agent
+- App Resource Name: genie_lamp_app
+- Working Directory: app/
+- Available Environments: dev (default), prod
+- Required Secrets Scope: genie-lamp
+- Required Secret Keys: service-token, sql-warehouse-http-path
+
+To use: Ask Claude to "deploy the app" or "deploy genie-lamp-agent to dev/prod"
+
+The skill will automatically trigger when you request app deployment.
+
+Deployment Types:
+- Initial: First-time deployment (includes databricks apps start)
+- Update: Update existing app (skips app start, only updates code)
+
+Prerequisites:
+- Databricks CLI installed and configured
+- Secrets configured in genie-lamp scope
+- Frontend built (if deploying after frontend changes)
