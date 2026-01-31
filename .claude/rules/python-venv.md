@@ -25,11 +25,8 @@ When executing Python commands, you MUST use:
 # Running the main application
 .venv/bin/python genie.py create --requirements data/demo_requirements.md
 
-# Running tests
-.venv/bin/python -m pytest tests/ -v
-
-# Running specific test files
-.venv/bin/python -m pytest tests/test_generation.py -v
+# Running validation
+.venv/bin/python genie.py validate
 
 # Installing packages
 .venv/bin/python -m pip install -r requirements.txt
@@ -39,7 +36,6 @@ When executing Python commands, you MUST use:
 .venv/bin/python scripts/validate_setup.py
 
 # Running modules
-.venv/bin/python -m pytest
 .venv/bin/python -m pip
 ```
 
@@ -48,9 +44,9 @@ When executing Python commands, you MUST use:
 ```bash
 # DO NOT USE THESE
 python genie.py create --requirements data/demo_requirements.md
-python3 -m pytest tests/
+python3 genie.py validate
 pip install -r requirements.txt
-pytest tests/
+python scripts/validate_setup.py
 ```
 
 ### Project-Specific Commands
@@ -71,20 +67,13 @@ All project commands must use `.venv/bin/python`:
 .venv/bin/python genie.py deploy
 ```
 
-**Testing:**
+**Validation:**
 ```bash
-# All tests
-.venv/bin/python -m pytest tests/ -v
+# Validate configuration
+.venv/bin/python genie.py validate
 
-# Specific domains
-.venv/bin/python -m pytest tests/test_generation_domain.py -v
-.venv/bin/python -m pytest tests/test_validation_domain.py -v
-
-# With LLM tests
-RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
-
-# Skip LLM tests
-SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
+# Verify setup
+.venv/bin/python scripts/validate_setup.py
 ```
 
 **Scripts:**
@@ -167,8 +156,8 @@ To verify you're using the correct Python:
 
 This rule is enforced:
 - In documentation (CLAUDE.md)
-- In skills (genie-commit, genie-deploy)
-- In test scripts
+- In skills (genie-commit, genie-deploy, deploy-app)
+- In validation scripts
 - In deployment workflows
 
 **When suggesting Python commands to users, ALWAYS use `.venv/bin/python`.**

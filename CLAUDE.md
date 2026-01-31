@@ -33,26 +33,12 @@ cp .env.example .env
 # Edit .env with DATABRICKS_HOST and DATABRICKS_TOKEN
 ```
 
-### Running Tests
-```bash
-# Run all tests (LLM tests auto-skipped if genie/llm/ not modified)
-.venv/bin/python -m pytest tests/ -v
+### Validation & Testing
 
-# Run specific test domains
-.venv/bin/python -m pytest tests/test_generation_domain.py -v
-.venv/bin/python -m pytest tests/test_validation_domain.py -v
-.venv/bin/python -m pytest tests/test_requirements_domain.py -v
-.venv/bin/python -m pytest tests/test_transformation_domain.py -v
-.venv/bin/python -m pytest tests/test_integration.py -v
-
-# Force run LLM tests (even if genie/llm/ not modified)
-RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
-
-# Force skip LLM tests
-SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
-```
-
-**Note:** LLM tests are automatically skipped unless `genie/llm/` has been modified. This speeds up test runs and avoids unnecessary API costs. To force running LLM tests, set `RUN_LLM_TESTS=true`.
+**Note:** This project currently does not have an automated test suite. Validation is performed through:
+- Built-in validation commands (`genie.py validate`)
+- Setup validation script (`scripts/validate_setup.py`)
+- Manual testing of generated configurations
 
 ### Main CLI Commands
 ```bash
@@ -121,16 +107,17 @@ genie-lamp-agent/
 └── requirements.txt                  # Root Python dependencies
 ```
 
-### Web Application
+### Web Application (Databricks App)
 
 The project includes a multi-user web application for interactive Genie space generation:
 
 **Backend** (`backend/`):
 - FastAPI service with async job processing
 - Session management with SQLite storage
-- File upload and storage
+- File upload and storage (PDF/markdown requirements)
 - Benchmark validation
 - Databricks authentication middleware
+- Real-time job status updates
 
 **Frontend** (`frontend/`):
 - Next.js application with TypeScript
@@ -138,12 +125,24 @@ The project includes a multi-user web application for interactive Genie space ge
 - Real-time job progress tracking
 - Session sidebar with history
 - Interactive validation fixing
+- Results display and download
 
 **Deployment:**
 ```bash
-# Deploy to Databricks Apps
+# Deploy to Databricks Apps using bundle
 databricks bundle deploy
+
+# Or use the deploy-app skill
+/deploy-app
 ```
+
+**Access:** `https://<workspace-url>/apps/genie-lamp-agent`
+
+**Use Cases:**
+- Interactive workflow for non-technical users
+- Multi-user collaborative environment
+- Visual feedback and exploration
+- Both modes (CLI and Web UI) use the same core `genie/` package
 
 ### High-Level Data Flow
 ```
@@ -221,7 +220,7 @@ Change to the worktree directory and work normally:
 cd worktrees/feat/add-validation
 
 # Work normally - virtual environment is shared
-.venv/bin/python -m pytest tests/ -v
+.venv/bin/python genie.py validate
 
 # Commit changes
 git add .
@@ -294,16 +293,6 @@ All generated files go to `output/` directory:
 - `genie_space_result.json`: Deployment result with space ID and URL
 - `validation_report.json`: Table/column validation details
 
-## Testing Strategy
-
-Tests are in `tests/` directory with `test_` prefix:
-- `test_generation.py`: End-to-end config generation
-- `test_table_validator.py`: Unity Catalog validation logic
-- `test_requirements_converter.py`: PDF/markdown parsing
-- `test_pdf_image_parsing.py`: Vision model PDF parsing
-- `test_endpoint.py`: Databricks endpoint connectivity
-- `test_join_specs.py`: Join specification handling
-
 ## Configuration & Environment
 
 Required environment variables (`.env`):
@@ -319,10 +308,9 @@ Optional environment variables:
 **Project Rules:** See `.claude/rules/` for detailed project-specific rules.
 
 Key standards:
-1. All test files must be in `tests/` directory
-2. Test files must start with `test_` prefix
-3. All markdown documentation (except README.md, ARCHITECTURE.md, CLAUDE.md) goes in `change_logs/` directory
-4. **Always use `.venv/bin/python` for Python commands** (see `.claude/rules/python-venv.md`)
+1. All markdown documentation (except README.md, ARCHITECTURE.md, CLAUDE.md) goes in `change_logs/` directory
+2. **Always use `.venv/bin/python` for Python commands** (see `.claude/rules/python-venv.md`)
+3. Validation is performed through built-in commands and manual testing
 
 ## Key Integration Points
 
@@ -351,9 +339,8 @@ This project includes custom skills in the `.claude/skills/` directory to automa
 
 ### Available Skills
 
-**genie-commit**: Automated commit workflow with testing and validation
+**genie-commit**: Automated commit workflow with validation
 - Triggers: When asked to "commit changes" or "create a commit"
-- Runs `.venv/bin/python -m pytest tests/ -v` before committing
 - Follows conventional commit format (feat/fix/refactor/docs/test)
 - Checks for sensitive files and validates staging
 - See `.claude/skills/README.md` for installation instructions
@@ -378,12 +365,12 @@ cp -r .claude/skills/genie-commit ~/.codex/skills/
 1. Update Pydantic models in `genie/models.py`
 2. Modify prompt templates in `genie/prompt/templates/`
 3. Update `config_transformer.py` for serialized format
-4. Add tests in `tests/test_generation.py`
+4. Validate manually using `genie.py create` command
 
 ### Adding New Validation Rules
 1. Extend `table_validator.py` validation logic
 2. Update validation report structure
-3. Add tests in `tests/test_table_validator.py`
+3. Test manually with real configurations
 
 ### Modifying Prompt Templates
 Templates are markdown files in `genie/prompt/templates/`:

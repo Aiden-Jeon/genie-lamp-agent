@@ -28,7 +28,7 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 
 **Key Benefits:**
 - 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
-- ✅ **Complete Test Coverage**: Load curated benchmarks from JSON files for comprehensive testing
+- ✅ **Benchmark Support**: Load curated benchmark questions from JSON files for quality validation
 - 🔍 **Smart Validation**: Multi-layer validation (SQL syntax + instruction quality + comprehensive review)
 - 🎯 **Best Practices Built-in**: Leverages Databricks Genie best practices automatically
 - 🤖 **LLM-Powered**: Uses Databricks foundation models for intelligent configuration generation
@@ -76,6 +76,42 @@ The agent follows a structured pipeline with **Enhanced Parsing**:
 **8. Output**
 - Produces a production-ready Genie space configuration with quality report
 
+## Recent Updates
+
+### February 2026
+
+**📦 Project Restructuring**
+- Reorganized codebase with `backend/` and `frontend/` directories at root level
+- Core Python package renamed from `src/` to `genie/` for clarity
+- Web UI application with multi-user support and interactive workflow
+
+**🚀 Enhanced Parsing (Phase 1 & 2)**
+- Rich metadata extraction with column details, JOIN specs, and aggregation patterns
+- Platform-specific logic extraction for game analytics requirements
+- Formula detection for reusable metrics (DAU, ARPU, Retention)
+- 46 new tests covering all enhanced parsing features
+
+**🔄 Modular Architecture**
+- Split `genie/utils/` into focused modules: `benchmark/`, `extractor/`, `validation/`
+- Clear separation of concerns for better maintainability
+- Improved import structure: `from genie.benchmark import ...`
+
+**⚡ Performance Improvements**
+- Per-page PDF parsing (2.21x faster than batch processing)
+- Async concurrent processing with progress tracking
+- Smart parse caching with intelligent invalidation
+- Configurable concurrency levels (default: 3, adjustable with `--max-concurrent`)
+
+**✨ Quality Assurance Pipeline**
+- Enhanced prompt engineering with SQL quality criteria and few-shot examples
+- Automated SQL validation and instruction quality scoring
+- Domain knowledge extraction and 4-dimension comprehensive review
+- Manual validation workflow with built-in quality checks
+
+**🧪 Benchmark SQL Generation**
+- Two-pass benchmark processing for scalability (100+ benchmarks supported)
+- Separate SQL generation phase to avoid token limits
+- Batch processing with configurable batch sizes (default: 10 questions/batch)
 
 ### ⚡ Performance Improvements
 
@@ -182,6 +218,103 @@ result = asyncio.run(parse_documents_async(
 
 See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema-replacement-feature.md) for detailed documentation.
 
+## Databricks App (Web UI)
+
+In addition to the CLI mode, Genie Lamp Agent is available as a **multi-user web application** deployed on Databricks Apps. The web interface provides an intuitive, step-by-step wizard for generating and deploying Genie spaces.
+
+### Architecture
+
+The web application consists of two main components:
+
+**Backend (`backend/`)**
+- **FastAPI Service**: Async REST API for handling requests
+- **Job Management**: Background job processing with SQLite storage
+- **File Handling**: Secure upload and storage of requirements documents
+- **Session Management**: Multi-user session tracking and history
+- **Databricks Authentication**: Middleware for secure workspace access
+- **Validation Services**: Real-time validation and benchmark checking
+
+**Frontend (`frontend/`)**
+- **Next.js Application**: Modern React-based UI with TypeScript
+- **Multi-Step Wizard**: Guided workflow through parse → generate → validate → deploy
+- **Session Sidebar**: Browse and resume previous sessions
+- **Real-Time Progress**: Live job status updates and progress tracking
+- **Interactive Validation**: Fix validation errors directly in the UI
+- **Results Display**: View generated configurations and deployment results
+
+### Key Features
+
+✅ **Multi-User Support**: Multiple users can work simultaneously with isolated sessions
+
+✅ **Persistent Sessions**: All sessions are saved and can be resumed later
+
+✅ **File Upload**: Upload PDFs or markdown requirements documents
+
+✅ **Real-Time Jobs**: Background processing with live progress updates
+
+✅ **Interactive Validation**: Fix table/column issues directly in the interface
+
+✅ **Deployment Integration**: One-click deployment to Databricks Genie Spaces
+
+✅ **Results Download**: Export configurations and validation reports
+
+### Workflow
+
+1. **Parse**: Upload requirements documents (PDF/markdown) → Extract structured requirements
+2. **Generate**: Generate Genie space configuration with LLM → Review quality scores
+3. **Validate**: Check Unity Catalog tables → Fix issues interactively
+4. **Deploy**: Create Genie space in workspace → Get shareable space URL
+
+### Deployment
+
+The application is deployed using **Databricks Asset Bundles**:
+
+```bash
+# Deploy to Databricks workspace
+databricks bundle deploy
+
+# Deploy to specific target
+databricks bundle deploy --target prod
+```
+
+Or use the custom skill:
+
+```bash
+# Using Claude Code skill
+/deploy-app
+```
+
+### Configuration Files
+
+- **`databricks.yml`**: Asset bundle configuration at root level
+- **`app.yaml`**: Databricks App runtime configuration (Python environment, resources)
+- **`backend/requirements.txt`**: Backend Python dependencies
+- **`frontend/package.json`**: Frontend JavaScript dependencies
+
+### Access
+
+Once deployed, access the web application at:
+```
+https://<workspace-url>/apps/<app-name>
+```
+
+### Use Cases
+
+**When to use Web UI:**
+- Interactive workflow with visual feedback
+- Multiple team members need access
+- Non-technical users (business analysts, product managers)
+- Exploring and experimenting with configurations
+- Need to review and edit before deployment
+
+**When to use CLI:**
+- Automated workflows and CI/CD pipelines
+- Scripting and batch processing
+- Command-line preference
+- Programmatic integration
+
+Both modes use the same core `genie/` package for generation and validation, ensuring consistent results.
+
 ## Features
 
 ### Core Features
@@ -227,11 +360,12 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
   - Coverage Score (20%): Example queries per table + benchmark questions + SQL expressions
   - Overall pass/fail with actionable feedback for each issue
 
-### Test Coverage
-✅ **83/83 tests passing** across all features:
-- Enhanced Prompt Engineering: 7 tests (prompts, join specs, instruction patterns)
-- Automated Validation: 45 tests (SQL validation + instruction scoring)
-- Domain Intelligence & Review: 31 tests (domain extraction + comprehensive review)
+### Validation & Quality Assurance
+The project provides comprehensive validation through:
+- **SQL Validation**: Syntax checking, table/column verification, join pattern analysis
+- **Instruction Scoring**: 3-dimension quality assessment (specificity, structure, clarity)
+- **Configuration Review**: 4-dimension comprehensive review with actionable feedback
+- **Manual Testing**: Built-in validation commands and setup verification scripts
 
 ## Prerequisites
 
@@ -1061,14 +1195,6 @@ Markdown Files → MarkdownParser (regex) → Structured JSON
                                         Output Markdown
 ```
 
-### Parsing Module Testing
-
-Run tests for the parsing module:
-
-```bash
-pytest tests/test_requirements_converter.py -v
-```
-
 ### Design Principles
 
 1. **Modularity**: Each component is independent
@@ -1226,11 +1352,9 @@ cd genie-lamp-agent
 # Create a feature branch
 git checkout -b feature/your-feature-name
 
-# Make your changes and test (LLM tests auto-skipped if genie/llm/ not modified)
-.venv/bin/python -m pytest tests/
-
-# To force run LLM tests:
-RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/
+# Make your changes and validate
+.venv/bin/python genie.py validate
+.venv/bin/python scripts/validate_setup.py
 
 # Commit and push (use genie-commit skill or manual)
 git add .
@@ -1242,7 +1366,7 @@ git push origin feature/your-feature-name
 
 This project includes custom skills for Claude Code in `.claude/skills/`:
 
-- **genie-commit**: Automated commit workflow with testing and validation
+- **genie-commit**: Automated commit workflow with validation
 
 To install:
 ```bash

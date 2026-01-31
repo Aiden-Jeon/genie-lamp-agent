@@ -28,7 +28,7 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 
 **Key Benefits:**
 - 🚀 **Automated Configuration**: Transform requirements into production-ready Genie space configs
-- ✅ **Complete Test Coverage**: Load curated benchmarks from JSON files for comprehensive testing
+- ✅ **Benchmark Support**: Load curated benchmark questions from JSON files for quality validation
 - 🔍 **Smart Validation**: Multi-layer validation (SQL syntax + instruction quality + comprehensive review)
 - 🎯 **Best Practices Built-in**: Leverages Databricks Genie best practices automatically
 - 🤖 **LLM-Powered**: Uses Databricks foundation models for intelligent configuration generation
@@ -227,11 +227,12 @@ See [changelogs/catalog-schema-replacement-feature.md](changelogs/catalog-schema
   - Coverage Score (20%): Example queries per table + benchmark questions + SQL expressions
   - Overall pass/fail with actionable feedback for each issue
 
-### Test Coverage
-✅ **83/83 tests passing** across all features:
-- Enhanced Prompt Engineering: 7 tests (prompts, join specs, instruction patterns)
-- Automated Validation: 45 tests (SQL validation + instruction scoring)
-- Domain Intelligence & Review: 31 tests (domain extraction + comprehensive review)
+### Validation & Quality Assurance
+The project provides comprehensive validation through:
+- **SQL Validation**: Syntax checking, table/column verification, join pattern analysis
+- **Instruction Scoring**: 3-dimension quality assessment (specificity, structure, clarity)
+- **Configuration Review**: 4-dimension comprehensive review with actionable feedback
+- **Manual Testing**: Built-in validation commands and setup verification scripts
 
 ## Prerequisites
 
@@ -1061,21 +1062,13 @@ Markdown Files → MarkdownParser (regex) → Structured JSON
                                         Output Markdown
 ```
 
-### Parsing Module Testing
-
-Run tests for the parsing module:
-
-```bash
-pytest tests/test_requirements_converter.py -v
-```
-
 ### Design Principles
 
 1. **Modularity**: Each component is independent
 2. **Flexibility**: LLM is optional, can work without it
 3. **Extensibility**: Easy to add new parsers/generators
 4. **Type Safety**: Dataclasses for structured data
-5. **Testability**: Unit tests for all components
+5. **Validation**: Built-in quality checks and manual testing
 
 ## Scripts Reference
 
@@ -1226,11 +1219,9 @@ cd genie-lamp-agent
 # Create a feature branch
 git checkout -b feature/your-feature-name
 
-# Make your changes and test (LLM tests auto-skipped if genie/llm/ not modified)
-.venv/bin/python -m pytest tests/
-
-# To force run LLM tests:
-RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/
+# Make your changes and validate
+.venv/bin/python genie.py validate
+.venv/bin/python scripts/validate_setup.py
 
 # Commit and push (use genie-commit skill or manual)
 git add .
@@ -1242,7 +1233,7 @@ git push origin feature/your-feature-name
 
 This project includes custom skills for Claude Code in `.claude/skills/`:
 
-- **genie-commit**: Automated commit workflow with testing and validation
+- **genie-commit**: Automated commit workflow with validation
 
 To install:
 ```bash
@@ -1264,7 +1255,7 @@ See `.claude/skills/README.md` for details.
 ### Pull Request Process
 
 1. Ensure your code follows the existing style
-2. Add tests for new functionality
+2. Validate new functionality using built-in validation commands
 3. Update documentation as needed
 4. Submit a pull request with a clear description
 
