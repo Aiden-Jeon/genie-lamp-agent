@@ -180,7 +180,7 @@ def _update_job_progress(job_id: str, progress_data: dict):
         _global_session_store.update_job(job)
 
 
-def run_generate_job(requirements_path: str, output_path: str, model: str) -> Dict:
+def run_generate_job(requirements_path: str, output_path: str, model: str, job_id: str = None) -> Dict:
     """
     Generate Genie space configuration from requirements.
 
@@ -188,6 +188,7 @@ def run_generate_job(requirements_path: str, output_path: str, model: str) -> Di
         requirements_path: Path to requirements markdown
         output_path: Where to save generated config
         model: LLM model to use
+        job_id: Optional job ID for progress updates
 
     Returns:
         Dict with output_path, config metadata, and reasoning
@@ -226,7 +227,7 @@ def run_generate_job(requirements_path: str, output_path: str, model: str) -> Di
         os.chdir(original_cwd)
 
 
-def run_validate_job(config_path: str) -> Dict:
+def run_validate_job(config_path: str, job_id: str = None) -> Dict:
     """
     Validate Genie space configuration against Unity Catalog.
 
@@ -266,7 +267,7 @@ def run_validate_job(config_path: str) -> Dict:
         os.chdir(original_cwd)
 
 
-def run_deploy_job(config_path: str, parent_path: str = None) -> Dict:
+def run_deploy_job(config_path: str, parent_path: str = None, job_id: str = None) -> Dict:
     """
     Deploy Genie space to Databricks.
 
