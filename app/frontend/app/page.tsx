@@ -22,7 +22,7 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   const [workflowState, setWorkflowState] = useState<any>({});
 
-  const steps = ['Upload', 'Parse', 'Generate', 'Validate', 'Deploy'];
+  const steps = ['Upload & Extract', 'Generate', 'Validate', 'Deploy', 'Complete'];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -60,6 +60,7 @@ export default function Home() {
                 setWorkflowState((s: any) => ({ ...s, generateResult: result }));
                 setCurrentStep(3);
               }}
+              onPrevious={() => setCurrentStep(1)}
             />
           )}
 
@@ -71,6 +72,7 @@ export default function Home() {
                 setWorkflowState((s: any) => ({ ...s, validateResult: result }));
                 setCurrentStep(4);
               }}
+              onPrevious={() => setCurrentStep(2)}
             />
           )}
 
@@ -82,6 +84,7 @@ export default function Home() {
                 setWorkflowState((s: any) => ({ ...s, deployResult: result }));
                 setCurrentStep(5);
               }}
+              onPrevious={() => setCurrentStep(3)}
             />
           )}
 
@@ -89,7 +92,7 @@ export default function Home() {
             <div className="text-center">
               <div className="bg-green-50 p-8 rounded-lg border border-green-200">
                 <h2 className="text-3xl font-bold text-green-800 mb-4">
-                  ✅ Deployment Complete!
+                  ✅ Complete!
                 </h2>
                 <div className="space-y-3">
                   <p className="text-gray-700">
@@ -109,16 +112,24 @@ export default function Home() {
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setCurrentStep(1);
-                  setWorkflowState({});
-                  window.location.reload();
-                }}
-                className="mt-6 px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Start New Workflow
-              </button>
+              <div className="mt-6 flex gap-3 justify-center">
+                <button
+                  onClick={() => setCurrentStep(4)}
+                  className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  ← Back to Deploy
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentStep(1);
+                    setWorkflowState({});
+                    window.location.reload();
+                  }}
+                  className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Start New Workflow
+                </button>
+              </div>
             </div>
           )}
         </div>

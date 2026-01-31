@@ -131,15 +131,15 @@ from src.pipeline.generator import generate_config
 ### Frontend Architecture
 
 **Core Structure** (`frontend/`):
-- **app/page.tsx**: Main workflow UI with 5-step wizard
+- **app/page.tsx**: Main workflow UI with 5-step wizard (Upload & Extract → Generate → Validate → Deploy → Complete)
 - **app/layout.tsx**: App layout and global styles
 - **components/**: Step-specific components
-  - `ParseStep.tsx`: File upload and parsing with real-time progress
+  - `ParseStep.tsx`: File upload and requirement extraction with real-time progress
   - `GenerateStep.tsx`: LLM config generation
   - `ValidateStep.tsx`: Unity Catalog validation
   - `ValidationFixer.tsx`: Interactive table reference fixing
   - `DeployStep.tsx`: Genie space deployment
-  - `FileProgressList.tsx`: Real-time parsing progress display
+  - `FileProgressList.tsx`: Real-time extraction progress display
   - `ReasoningDisplay.tsx`: LLM reasoning visualization
   - `Stepper.tsx`: Progress indicator
 - **lib/api-client.ts**: Type-safe API client for backend
@@ -190,7 +190,7 @@ from src.pipeline.generator import generate_config
 ### Parent Project Dependencies
 
 This app wraps existing pipeline code from parent directory:
-- `../src/pipeline/parser.py`: Document parsing with LLM enrichment
+- `../src/pipeline/parser.py`: Document extraction with LLM enrichment
 - `../src/pipeline/generator.py`: Config generation
 - `../src/pipeline/validator.py`: Unity Catalog validation
 - `../src/pipeline/deployer.py`: Genie space deployment
@@ -214,7 +214,7 @@ This ensures prompt templates and relative paths resolve correctly.
 
 ### Progress Tracking System
 
-Parsing jobs support real-time progress updates:
+Extraction jobs support real-time progress updates:
 - Per-file status tracking (queued → processing → completed)
 - Per-page progress for PDFs
 - Cache hit indicators
@@ -228,7 +228,7 @@ Frontend polls and displays progress via `FileProgressList.tsx`.
 ### POST /api/parse
 - **Input**: Files (multipart), session_id, use_llm flag
 - **Output**: job_id
-- **Background Task**: Parses documents, extracts tables, optionally enriches with LLM
+- **Background Task**: Extracts requirements from documents, identifies tables, optionally enriches with LLM
 - **Result**: `{ output_path, tables_found, files_parsed, cache_stats, enrichment_reasoning }`
 
 ### POST /api/generate
@@ -334,7 +334,7 @@ Backend serves Next.js static files if available:
 
 1. Start services: `./start-local.sh`
 2. Open http://localhost:3000
-3. **Step 1 - Parse**: Upload PDF or markdown files
+3. **Step 1 - Upload & Extract**: Upload PDF or markdown files and extract requirements
    - Watch real-time progress (file-by-file, page-by-page)
    - Verify enrichment stages if LLM enabled
 4. **Step 2 - Generate**: Review generated config reasoning

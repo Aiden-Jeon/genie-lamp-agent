@@ -12,9 +12,10 @@ interface DeployStepProps {
   sessionId: string;
   configPath: string;
   onComplete: (result: any) => void;
+  onPrevious: () => void;
 }
 
-export function DeployStep({ sessionId, configPath, onComplete }: DeployStepProps) {
+export function DeployStep({ sessionId, configPath, onComplete, onPrevious }: DeployStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [parentPath, setParentPath] = useState('');
   const { job, isPolling, error } = useJobPolling(jobId);
@@ -62,13 +63,22 @@ export function DeployStep({ sessionId, configPath, onComplete }: DeployStepProp
         </p>
       </div>
 
-      <button
-        onClick={handleDeploy}
-        disabled={isPolling}
-        className="px-6 py-3 bg-blue-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
-      >
-        {isPolling ? 'Deploying...' : 'Deploy Genie Space'}
-      </button>
+      <div className="flex gap-3">
+        <button
+          onClick={onPrevious}
+          disabled={isPolling}
+          className="px-6 py-3 bg-gray-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors"
+        >
+          ← Previous
+        </button>
+        <button
+          onClick={handleDeploy}
+          disabled={isPolling}
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+        >
+          {isPolling ? 'Deploying...' : 'Deploy Genie Space'}
+        </button>
+      </div>
 
       {isPolling && (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">

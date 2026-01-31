@@ -13,9 +13,10 @@ interface ValidateStepProps {
   sessionId: string;
   configPath: string;
   onComplete: (result: any) => void;
+  onPrevious: () => void;
 }
 
-export function ValidateStep({ sessionId, configPath, onComplete }: ValidateStepProps) {
+export function ValidateStep({ sessionId, configPath, onComplete, onPrevious }: ValidateStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [showFixer, setShowFixer] = useState(false);
   const [validationResult, setValidationResult] = useState<any>(null);
@@ -72,12 +73,20 @@ export function ValidateStep({ sessionId, configPath, onComplete }: ValidateStep
       </p>
 
       {!validationResult && !isPolling && (
-        <button
-          onClick={handleValidate}
-          className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          Validate Configuration
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={onPrevious}
+            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={handleValidate}
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Validate Configuration
+          </button>
+        </div>
       )}
 
       {isPolling && (
@@ -109,14 +118,22 @@ export function ValidateStep({ sessionId, configPath, onComplete }: ValidateStep
       )}
 
       {validationResult && !validationResult.has_errors && (
-        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-          <h3 className="text-xl font-bold text-green-800 mb-2">✅ Validation Passed!</h3>
-          <p className="text-green-700">
-            {validationResult.tables_valid} table{validationResult.tables_valid > 1 ? 's' : ''}{' '}
-            validated successfully.
-          </p>
-          <p className="text-sm text-gray-600 mt-2">Ready to deploy to Databricks Genie.</p>
-        </div>
+        <>
+          <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+            <h3 className="text-xl font-bold text-green-800 mb-2">✅ Validation Passed!</h3>
+            <p className="text-green-700">
+              {validationResult.tables_valid} table{validationResult.tables_valid > 1 ? 's' : ''}{' '}
+              validated successfully.
+            </p>
+            <p className="text-sm text-gray-600 mt-2">Ready to deploy to Databricks Genie.</p>
+          </div>
+          <button
+            onClick={onPrevious}
+            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            ← Back to Generate
+          </button>
+        </>
       )}
     </div>
   );

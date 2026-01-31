@@ -49,9 +49,9 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold">Step 1: Upload Requirements</h2>
+      <h2 className="text-2xl font-bold">Step 1: Upload & Extract Requirements</h2>
       <p className="text-gray-600">
-        Upload PDF or Markdown files containing your Genie space requirements.
+        Upload and extract requirements from PDF or Markdown files.
       </p>
 
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
@@ -79,7 +79,7 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
           disabled={isPolling}
         />
         <label htmlFor="use-llm" className="text-sm">
-          Use LLM enrichment (recommended for better parsing)
+          Use LLM enrichment (recommended for better extraction)
         </label>
       </div>
 
@@ -88,7 +88,7 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
         disabled={files.length === 0 || isPolling}
         className="px-6 py-3 bg-blue-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
       >
-        {isPolling ? 'Parsing...' : 'Start Parsing'}
+        {isPolling ? 'Extracting...' : 'Upload & Extract'}
       </button>
 
       {isPolling && job?.progress && (
@@ -96,7 +96,7 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <div className="flex justify-between mb-3">
               <p className="font-semibold">
-                Parsing {job.progress.total_files} files...
+                Extracting from {job.progress.total_files} files...
               </p>
               <p className="text-sm text-gray-600">
                 {job.progress.completed_files}/{job.progress.total_files} completed
@@ -179,7 +179,7 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
       {/* Fallback for jobs without progress */}
       {isPolling && !job?.progress && (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <p className="font-semibold">Parsing {files.length} files...</p>
+          <p className="font-semibold">Extracting from {files.length} files...</p>
           <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
             <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '50%' }} />
           </div>
@@ -196,7 +196,7 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
 
       {job?.status === 'failed' && (
         <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
-          <p className="font-semibold">Parsing Failed</p>
+          <p className="font-semibold">Extraction Failed</p>
           <p>{job.error}</p>
         </div>
       )}
@@ -205,7 +205,7 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
       {job?.status === 'completed' && (
         <div className="mt-4 space-y-4">
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <p className="font-semibold text-green-800">✓ Parsing Complete!</p>
+            <p className="font-semibold text-green-800">✓ Extraction Complete!</p>
             <p className="text-sm text-gray-600 mt-1">
               Extracted {job.result?.tables_found || 0} tables from {job.result?.files_parsed || 0} files
             </p>

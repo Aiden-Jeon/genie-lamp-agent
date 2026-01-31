@@ -13,9 +13,10 @@ interface GenerateStepProps {
   sessionId: string;
   requirementsPath: string;
   onComplete: (result: any) => void;
+  onPrevious: () => void;
 }
 
-export function GenerateStep({ sessionId, requirementsPath, onComplete }: GenerateStepProps) {
+export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevious }: GenerateStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [model, setModel] = useState('databricks-gpt-5-2');
   const { job, isPolling, error } = useJobPolling(jobId);
@@ -56,13 +57,22 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete }: Genera
         </select>
       </div>
 
-      <button
-        onClick={handleGenerate}
-        disabled={isPolling}
-        className="px-6 py-3 bg-blue-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
-      >
-        {isPolling ? 'Generating...' : 'Generate Configuration'}
-      </button>
+      <div className="flex gap-3">
+        <button
+          onClick={onPrevious}
+          disabled={isPolling}
+          className="px-6 py-3 bg-gray-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-gray-600 transition-colors"
+        >
+          ← Previous
+        </button>
+        <button
+          onClick={handleGenerate}
+          disabled={isPolling}
+          className="px-6 py-3 bg-blue-500 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600 transition-colors"
+        >
+          {isPolling ? 'Generating...' : 'Generate Configuration'}
+        </button>
+      </div>
 
       {isPolling && (
         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
@@ -95,13 +105,21 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete }: Genera
       )}
 
       {job?.status === 'completed' && (
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200 mt-4">
-          <p className="font-semibold text-green-800">✓ Configuration Generated</p>
-          <div className="text-sm text-gray-600 mt-2 space-y-1">
-            <p>Tables: {job.result?.tables_count || 0}</p>
-            <p>Instructions: {job.result?.instructions_count || 0}</p>
+        <>
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200 mt-4">
+            <p className="font-semibold text-green-800">✓ Configuration Generated</p>
+            <div className="text-sm text-gray-600 mt-2 space-y-1">
+              <p>Tables: {job.result?.tables_count || 0}</p>
+              <p>Instructions: {job.result?.instructions_count || 0}</p>
+            </div>
           </div>
-        </div>
+          <button
+            onClick={onPrevious}
+            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            ← Back to Upload & Extract
+          </button>
+        </>
       )}
     </div>
   );
