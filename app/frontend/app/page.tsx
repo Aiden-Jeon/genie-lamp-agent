@@ -1,5 +1,5 @@
 /**
- * Main application page with 5-step workflow.
+ * Main application page with 6-step workflow.
  */
 
 'use client';
@@ -9,6 +9,7 @@ import { Stepper } from '@/components/Stepper';
 import { ParseStep } from '@/components/ParseStep';
 import { GenerateStep } from '@/components/GenerateStep';
 import { ValidateStep } from '@/components/ValidateStep';
+import { BenchmarkStep } from '@/components/BenchmarkStep';
 import { DeployStep } from '@/components/DeployStep';
 
 export default function Home() {
@@ -22,7 +23,7 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   const [workflowState, setWorkflowState] = useState<any>({});
 
-  const steps = ['Upload & Extract', 'Generate', 'Validate', 'Deploy', 'Complete'];
+  const steps = ['Upload & Extract', 'Generate', 'Validate', 'Benchmark', 'Deploy', 'Complete'];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -80,19 +81,31 @@ export default function Home() {
           )}
 
           {currentStep === 4 && (
+            <BenchmarkStep
+              sessionId={sessionId}
+              onComplete={(benchmarks) => {
+                setWorkflowState((s: any) => ({ ...s, benchmarks }));
+                setCurrentStep(5);
+              }}
+              onPrevious={() => setCurrentStep(3)}
+              existingResult={workflowState.benchmarks}
+            />
+          )}
+
+          {currentStep === 5 && (
             <DeployStep
               sessionId={sessionId}
               configPath={workflowState.generateResult?.output_path}
               onComplete={(result) => {
                 setWorkflowState((s: any) => ({ ...s, deployResult: result }));
-                setCurrentStep(5);
+                setCurrentStep(6);
               }}
-              onPrevious={() => setCurrentStep(3)}
+              onPrevious={() => setCurrentStep(4)}
               existingResult={workflowState.deployResult}
             />
           )}
 
-          {currentStep === 5 && (
+          {currentStep === 6 && (
             <div className="text-center">
               <div className="bg-green-50 p-8 rounded-lg border border-green-200">
                 <h2 className="text-3xl font-bold text-green-800 mb-4">
@@ -118,7 +131,7 @@ export default function Home() {
 
               <div className="mt-6 flex gap-3 justify-center">
                 <button
-                  onClick={() => setCurrentStep(4)}
+                  onClick={() => setCurrentStep(5)}
                   className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
                 >
                   ← Back to Deploy
