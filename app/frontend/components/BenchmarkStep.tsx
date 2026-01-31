@@ -99,18 +99,20 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
 
       if (!benchmark.question || benchmark.question.trim() === '') {
         benchmarkErrors.push('Question is required');
+        hasErrors = true;
       }
 
       if (!benchmark.expected_sql || benchmark.expected_sql.trim() === '') {
         benchmarkErrors.push('Expected SQL is required');
+        hasErrors = true;
       }
 
       if (benchmarkErrors.length > 0) {
         errors.set(index, benchmarkErrors);
-        hasErrors = true;
       }
     });
 
+    console.log('Validation errors:', errors, 'hasErrors:', hasErrors);
     setValidationErrors(errors);
     return !hasErrors;
   };
