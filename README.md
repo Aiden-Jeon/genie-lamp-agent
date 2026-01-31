@@ -393,10 +393,10 @@ For more control, run individual steps:
 
 ```bash
 # Parse documents (if needed)
-python genie.py parse --input-dir real_requirements/inputs --output data/parsed.md
+python genie.py parse --input-dir real_requirements/inputs --output real_requirements/parsed/parsed_requirements.md
 
 # Generate config only
-python genie.py generate --requirements data/parsed.md
+python genie.py generate --requirements real_requirements/parsed/parsed_requirements.md
 
 # Validate config
 python genie.py validate
@@ -521,8 +521,8 @@ python genie.py validate
 python genie.py deploy
 
 # Full workflow with parsing
-python genie.py parse --input-dir docs --output data/parsed.md
-python genie.py create --requirements data/parsed.md
+python genie.py parse --input-dir docs --output real_requirements/parsed/parsed_requirements.md
+python genie.py create --requirements real_requirements/parsed/parsed_requirements.md
 
 # Skip validation (faster, but risky)
 python genie.py create \
@@ -1187,7 +1187,7 @@ For automated workflows, use the auto-deploy script:
 ```bash
 # Auto-deploy with catalog replacement
 .venv/bin/python scripts/auto_deploy.py \
-  --requirements data/parsed.md \
+  --requirements real_requirements/parsed/parsed_requirements.md \
   --catalog sandbox \
   --schema agent_poc
 

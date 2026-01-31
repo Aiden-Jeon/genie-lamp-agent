@@ -57,13 +57,13 @@ SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
 ### Main CLI Commands
 ```bash
 # Full pipeline (recommended workflow)
-.venv/bin/python genie.py create --requirements data/demo_requirements.md
+.venv/bin/python genie.py create --requirements real_requirements/parsed/parsed_requirements.md
 
 # Parse documents (PDFs/markdown to structured format)
-.venv/bin/python genie.py parse --input-dir real_requirements/inputs --output data/parsed.md
+.venv/bin/python genie.py parse --input-dir real_requirements/inputs --output real_requirements/parsed/parsed_requirements.md
 
 # Individual pipeline steps
-.venv/bin/python genie.py generate --requirements data/parsed.md
+.venv/bin/python genie.py generate --requirements real_requirements/parsed/parsed_requirements.md
 .venv/bin/python genie.py validate
 .venv/bin/python genie.py deploy
 
@@ -72,6 +72,78 @@ SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
 ```
 
 ## Architecture Overview
+
+### Directory Structure
+
+```
+genie-lamp-agent/
+├── .claude/                          # Claude Code configuration & skills
+├── .venv/                            # Root Python environment (ignored)
+├── archive/                          # Archived code (pre-restructure)
+│   └── 2026-02-01-pre-restructure/
+│       └── src/                      # Old package structure
+├── backend/                          # FastAPI service for web app
+│   ├── middleware/                   # Authentication middleware
+│   ├── services/                     # Job manager, file storage, validators
+│   ├── main.py                       # FastAPI app entry point
+│   └── requirements.txt              # Backend Python dependencies
+├── frontend/                         # Next.js web interface
+│   ├── app/                          # Next.js pages
+│   ├── components/                   # React components
+│   ├── lib/                          # Utilities and hooks
+│   └── package.json                  # Frontend dependencies
+├── genie/                            # Core Python package (formerly src/)
+│   ├── api/                          # Genie Space API client
+│   ├── benchmark/                    # Benchmark loading utilities
+│   ├── llm/                          # LLM integration
+│   ├── parsing/                      # PDF/markdown parsers
+│   ├── pipeline/                     # Generator, validator, deployer
+│   ├── prompt/                       # Prompt construction
+│   └── utils/                        # Table validator, transformers
+├── scripts/                          # Deployment and utility scripts
+├── tests/                            # Test suite
+├── real_requirements/                # Production requirements & benchmarks (ignored)
+│   ├── inputs/                       # Source PDFs and markdown
+│   ├── benchmarks/
+│   │   └── benchmarks.json           # Production benchmark questions
+│   └── parsed/
+│       └── parsed_requirements.md    # Parsed production requirements
+├── sample/                           # Demo data
+│   └── benchmarks/
+│       └── benchmarks.json           # Example benchmarks for demos
+├── output/                           # Generated configurations (ignored)
+│   ├── genie_space_config.json       # Current generated config
+│   ├── genie_space_result.json       # Deployment result
+│   └── archive/                      # Historical test artifacts
+├── app.yaml                          # Databricks Apps runtime config
+├── databricks.yml                    # Asset bundle config
+├── genie.py                          # CLI entry point
+└── requirements.txt                  # Root Python dependencies
+```
+
+### Web Application
+
+The project includes a multi-user web application for interactive Genie space generation:
+
+**Backend** (`backend/`):
+- FastAPI service with async job processing
+- Session management with SQLite storage
+- File upload and storage
+- Benchmark validation
+- Databricks authentication middleware
+
+**Frontend** (`frontend/`):
+- Next.js application with TypeScript
+- Multi-step wizard interface (parse → generate → validate → deploy)
+- Real-time job progress tracking
+- Session sidebar with history
+- Interactive validation fixing
+
+**Deployment:**
+```bash
+# Deploy to Databricks Apps
+databricks bundle deploy
+```
 
 ### High-Level Data Flow
 ```
