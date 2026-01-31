@@ -32,7 +32,8 @@ You are an expert in creating Databricks Genie spaces. Your task is to analyze t
 **❌ Don't overload text**
 - Text isn't filtered by prompt; this uses context space and makes conflicting context more likely
 - Keep instructions focused and essential only
-- If you have more than 10-15 instruction items, you're probably including too much
+- Start with 5-15 instruction items. Up to 100 total allowed, but more instructions can reduce effectiveness
+- If instructions exceed 15 items, verify each one is truly necessary and not duplicating SQL expressions
 
 **❌ Avoid conflicting instructions**
 - Like telling a new data analyst two ways to answer the same question—it'll confuse the LLM
@@ -49,6 +50,127 @@ You are an expert in creating Databricks Genie spaces. Your task is to analyze t
 - Prioritize Example SQL and SQL Primitives (expressions, measures, filters) to teach Genie SQL logic
 - Example: DON'T write "To calculate revenue, sum the amount column and multiply by quantity"
 - Instead: Create a SQL expression: `SUM(amount * quantity) as total_revenue`
+
+---
+
+## Query Parameters for Trusted Responses
+
+When creating parameterized SQL queries, use named parameter markers with colon prefix. Parameterized queries enable the "Trusted" response label, signaling verified SQL to users.
+
+**Syntax**: `:parameter_name`
+
+**Example**:
+```sql
+SELECT * FROM orders
+WHERE region = :region_code
+  AND order_date BETWEEN :start_date AND :end_date
+```
+
+**Parameter Types**:
+- **String** (default): Text values
+- **Date**: Date values (format: yyyy-MM-dd)
+- **Numeric**: Decimal or Integer values
+
+**Best Practice**: Use parameterized queries for frequently asked questions with variable inputs. Include type specifications and clear parameter names that match business terminology.
+
+---
+
+## Knowledge Store Configuration
+
+### Entity Matching (for Categorical Columns)
+
+Enable entity matching for columns with discrete values to significantly improve Genie's reliability:
+- State/country codes
+- Product categories
+- Status codes (e.g., 'ACTIVE', 'INACTIVE', 'PENDING')
+- Department names
+
+**Limitation**: Entity matching cannot be enabled on tables with row filters or column masks.
+
+### Column Visibility Strategy
+
+- **Hide** unnecessary columns that might confuse Genie
+- Keep only columns essential for the defined purpose
+- Use descriptions and synonyms to clarify remaining columns
+- Reducing column count improves response accuracy
+
+### Metadata Customization
+
+- Add space-scoped synonyms (doesn't affect Unity Catalog)
+- Provide custom descriptions for columns
+- Map business terminology to technical column names
+- Example: Add synonym "revenue" for column "total_amount"
+
+---
+
+## When to Recommend Metric Views
+
+Consider recommending metric views when the requirements indicate:
+- Data requires pre-aggregation (daily summaries, running totals)
+- Multiple tables need pre-joining for common query patterns
+- Complex business logic should be encapsulated
+- The space would otherwise exceed 25 tables
+
+Metric views pre-define:
+- **Metrics** (measures): Pre-calculated aggregations
+- **Dimensions** (grouping attributes): Standard grouping columns
+- **Aggregations** (pre-computed summaries): Common rollups
+
+This improves Genie's response accuracy for complex analytical questions by simplifying the data model.
+
+---
+
+## Common Issues and Preventive Instructions
+
+Generate instructions that preemptively address these common Genie failures:
+
+### Filtering Errors
+- Enable entity matching for categorical columns
+- Document expected value formats in instructions
+- Example instruction: "Filter by `status` column. Values use uppercase: 'ACTIVE', 'INACTIVE', 'PENDING'"
+
+### Join Errors
+- Define ALL join relationships in `join_specifications`
+- Provide clear `instruction` field for when to use each join
+- Consider pre-joining tables into views for complex relationships
+- Example: "When analyzing customer orders, ALWAYS join customers to orders using customer_id"
+
+### Timezone Handling
+- Always specify timezone conversion in instructions when relevant
+- Example: "Convert timestamps using `convert_timezone('UTC', 'America/Los_Angeles', timestamp_col)`"
+- Document the expected timezone for date filters
+
+### Ignored Instructions
+When Genie ignores text instructions, the solution hierarchy is:
+1. **Provide example SQL queries** (most effective teaching method)
+2. **Hide irrelevant columns** to reduce confusion
+3. **Simplify data model with views**
+4. **Review instruction count** - too many can reduce effectiveness
+
+### Value Format Mismatches
+- Document exact formats for common filters
+- Example: "Date format is 'YYYY-MM-DD'. For 'last month', use DATE_SUB(CURRENT_DATE(), 30)"
+- Include case sensitivity notes: "Product codes are uppercase (e.g., 'SKU-001')"
+
+---
+
+## Benchmark Questions (Handled Separately)
+
+**Note**: Benchmarks are loaded from external JSON files (`benchmarks/benchmarks.json`), not generated in this configuration.
+
+When creating benchmarks separately, follow these guidelines:
+- Include **2-4 phrasings** of the same question to test robustness
+- Use the same expected SQL across related phrasings
+- Cover frequently asked user questions
+- Test edge cases (empty results, NULL handling, boundary dates)
+
+Example benchmark structure:
+```json
+{{
+  "question": "What were our top 10 customers by revenue last month?",
+  "expected_sql": "SELECT customer_name, SUM(amount) as total FROM orders WHERE date >= DATE_SUB(CURRENT_DATE(), 30) GROUP BY customer_name ORDER BY total DESC LIMIT 10"
+}}
+```
 
 ---
 

@@ -78,163 +78,6 @@ You should be your space's first user. After you create a new space, start askin
 
 After you've reviewed a question, you can add it as a benchmark question that you can use to test and score your space for overall accuracy systematically. You can use variations and different question phrasings to test Genie's responses.
 
-## Advanced SQL patterns for multi-source data
-
-### Cross-platform aggregation (CRITICAL for social analytics)
-
-When users ask about "all social platforms", "전체 소셜 플랫폼", or want to compare across multiple data sources (Discord, Steam reviews, Steam community, etc.), you MUST use UNION ALL to combine data from all relevant sources. Do not rely on a single table or source.
-
-**Pattern for cross-platform queries**:
-```sql
-WITH discord AS (
-  SELECT 'discord' AS platform,
-         CAST(message_id AS STRING) AS content_id,
-         message AS content,
-         event_date,
-         COALESCE(SUM(reaction.count), 0) AS engagement
-  FROM message
-  LEFT JOIN reaction ON message.message_id = reaction.message_id
-  WHERE game_code = 'inzoi' -- Always filter by game/app unless asked for "all games"
-    AND event_date BETWEEN '2025-08-18' AND '2025-08-25'
-  GROUP BY 1, 2, 3, 4
-),
-steam_reviews AS (
-  SELECT 'steam_review' AS platform,
-         CAST(recommendationid AS STRING) AS content_id,
-         review AS content,
-         event_date,
-         votes_up AS engagement
-  FROM store_appreviews
-  WHERE app_id = 2456740 -- Always filter by app_id unless asked for "all games"
-    AND event_date BETWEEN '2025-08-18' AND '2025-08-25'
-),
-steam_community AS (
-  SELECT 'steam_community' AS platform,
-         topic_url AS content_id,
-         title AS content,
-         t.event_date,
-         COUNT(DISTINCT c.comment_id) AS engagement
-  FROM community_discussions_topics t
-  LEFT JOIN community_discussions_comments c ON t.topic_url = c.topic_url
-  WHERE t.app_id = 2456740
-    AND t.event_date BETWEEN '2025-08-18' AND '2025-08-25'
-  GROUP BY 1, 2, 3, 4
-)
-SELECT * FROM discord
-UNION ALL SELECT * FROM steam_reviews
-UNION ALL SELECT * FROM steam_community
-ORDER BY engagement DESC
-LIMIT 20;
-```
-
-**Key principles**:
-- Each CTE represents one platform/source with a unified schema (platform, content_id, content, event_date, engagement)
-- ALWAYS use UNION ALL (not UNION) to preserve all records
-- Normalize engagement metrics across sources (reactions, votes_up, comment counts)
-- Filter each source by its appropriate game identifier (game_code for Discord, app_id for Steam)
-- Group by platform for summary statistics when needed
-
-### Regional analysis patterns
-
-When analyzing regional or country-level data, use the `partner_regions_and_countries` table with proper date parsing and period comparison:
-
-```sql
-SELECT
-  region,
-  country,
-  'before_event' AS period,
-  AVG(wishlists_daily) AS avg_daily_wishlists,
-  AVG(purchases_daily) AS avg_daily_purchases
-FROM partner_regions_and_countries
-WHERE app_id = 2456740
-  AND TRY_TO_DATE(date, 'yyyy-MM-dd') BETWEEN '2025-08-11' AND '2025-08-17'
-GROUP BY region, country
-UNION ALL
-SELECT
-  region,
-  country,
-  'after_event' AS period,
-  AVG(wishlists_daily) AS avg_daily_wishlists,
-  AVG(purchases_daily) AS avg_daily_purchases
-FROM partner_regions_and_countries
-WHERE app_id = 2456740
-  AND TRY_TO_DATE(date, 'yyyy-MM-dd') BETWEEN '2025-08-18' AND '2025-08-25'
-GROUP BY region, country
-ORDER BY region, country, period;
-```
-
-### Required game/app filters (DEFAULT BEHAVIOR)
-
-**ALWAYS apply game/app filters** unless the user explicitly asks for "all games" or multiple games:
-
-- **Discord data**: Filter by `game_code` (e.g., `game_code = 'inzoi'`)
-- **Steam data**: Filter by `app_id` (e.g., `app_id = 2456740`)
-
-If the user doesn't specify which game, use the default filters shown above or ask a clarification question.
-
-### Time range handling
-
-Users specify time ranges in various ways:
-
-**Relative time ranges**:
-- "최근 24시간" (last 24 hours): `event_date >= DATE_SUB(CURRENT_DATE(), 1)`
-- "지난 주" (last week): `event_date >= DATE_SUB(CURRENT_DATE(), 7)`
-- "최근 한 달" (last month): `event_date >= DATE_SUB(CURRENT_DATE(), 30)`
-
-**Absolute time ranges**:
-- "2025년 8월 18일부터 25일까지": `event_date BETWEEN '2025-08-18' AND '2025-08-25'`
-
-**Hour-level analysis**:
-- Use `event_hour` column when available for granular time-of-day analysis
-- Example: `WHERE event_date = '2025-08-20' AND event_hour BETWEEN 14 AND 16`
-
-**Default behavior**: If no time range specified, default to last 7 days.
-
-### Contextual joins for richer analysis
-
-**Discord channel context**:
-Join `message` with `channel_list` to provide channel names for context:
-```sql
-FROM message m
-LEFT JOIN channel_list cl ON m.channel_id = cl.channel_id
-WHERE m.game_code = 'inzoi'
-```
-
-**Steam community engagement**:
-Join `community_discussions_topics` with `community_discussions_comments` to analyze discussion engagement:
-```sql
-FROM community_discussions_topics t
-LEFT JOIN community_discussions_comments c ON t.topic_url = c.topic_url
-WHERE t.app_id = 2456740
-GROUP BY t.topic_url, t.title
-```
-
-### Keyword extraction and analysis
-
-For keyword/mention analysis, use word splitting with filtering:
-```sql
-WITH all_content AS (
-  SELECT message AS text, event_date, 'discord' AS platform
-  FROM message
-  WHERE game_code = 'inzoi' AND event_date >= DATE_SUB(CURRENT_DATE(), 1)
-  UNION ALL
-  SELECT review AS text, event_date, 'steam_review' AS platform
-  FROM store_appreviews
-  WHERE app_id = 2456740 AND event_date >= DATE_SUB(CURRENT_DATE(), 1)
-),
-words AS (
-  SELECT platform, LOWER(TRIM(word)) AS keyword
-  FROM all_content
-  LATERAL VIEW EXPLODE(SPLIT(text, ' ')) word_table AS word
-  WHERE LENGTH(TRIM(word)) > 2  -- Filter out short words
-)
-SELECT keyword, platform, COUNT(*) AS mention_count
-FROM words
-GROUP BY keyword, platform
-ORDER BY mention_count DESC
-LIMIT 20;
-```
-
 ### Conduct user testing
 
 After verifying response quality through testing, recruit a business user to try the Genie space. Use the following guidelines to provide a smooth user journey and collect feedback for ongoing improvement:
@@ -250,3 +93,72 @@ Consider providing training materials or a written document with guidelines for 
 As business users test the space, users with at least CAN MANAGE permissions can see the questions they've asked on the **Monitoring** tab. Continue adding context to help Genie correctly interpret the questions and data to provide accurate answers.
 
 **Note**: Business users must be members of the originating workspace to access your space.
+
+## Metric Views for Pre-Aggregation
+
+Metric views are particularly effective for Genie spaces because they pre-define metrics, dimensions, and aggregations. Consider recommending metric views when:
+
+* Data requires pre-aggregation (daily summaries, running totals)
+* Multiple tables need pre-joining
+* Complex business logic should be encapsulated
+* The space would otherwise exceed 25 tables
+
+This approach helps you stay within the limit, simplifies your data model, and can improve Genie's response accuracy.
+
+## Knowledge Store Configuration
+
+### Entity Matching (for categorical columns)
+
+Enable entity matching for columns with discrete values to significantly improve reliability:
+* State/country codes
+* Product categories
+* Status codes
+* Department names
+
+**Limitation**: Cannot be enabled on tables with row filters or column masks.
+
+### Column Visibility Strategy
+
+* **Hide** unnecessary columns that might confuse Genie
+* Keep only columns essential for the defined purpose
+* Use descriptions and synonyms to clarify remaining columns
+
+### Metadata Customization
+
+* Add space-scoped synonyms (doesn't affect Unity Catalog)
+* Provide custom descriptions for columns
+* Map business terminology to technical column names
+
+## Throughput and Capacity Limits
+
+Be aware of these limits when planning your Genie space:
+
+* **Table limit**: Maximum 25 tables or views per space
+* **API throughput**: 5 queries per minute per workspace (Public Preview)
+* **UI throughput**: Up to 20 questions per minute
+* **Conversation limit**: 10,000 conversations maximum per space
+* **Query result limit**: Maximum 5,000 rows returned per query
+
+## Common Issues and Preventive Guidance
+
+### Filtering Errors
+* Enable entity matching for categorical columns
+* Document expected value formats in instructions
+* Example: "Filter by `status` column. Values use uppercase: 'ACTIVE', 'INACTIVE'"
+
+### Join Errors
+* Define ALL join relationships explicitly
+* Provide clear guidance for when to use each join
+* Consider pre-joining tables into views for complex relationships
+
+### Ignored Instructions
+When Genie ignores text instructions:
+1. Provide example SQL queries (most effective teaching method)
+2. Hide irrelevant columns to reduce confusion
+3. Simplify data model with views
+4. Review instruction count - too many can reduce effectiveness
+
+### Misunderstood Jargon
+* Map business terminology explicitly in instructions
+* Add synonyms for commonly used terms
+* Provide example SQL that demonstrates correct column/table usage
