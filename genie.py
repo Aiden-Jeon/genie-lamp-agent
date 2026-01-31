@@ -1438,8 +1438,8 @@ Environment Variables:
     parse_parser.add_argument(
         "--output",
         type=str,
-        default="data/parsed_requirements.md",
-        help="Output path for generated markdown (default: data/parsed_requirements.md)"
+        default="real_requirements/parsed/parsed_requirements.md",
+        help="Output path for generated markdown (default: real_requirements/parsed/parsed_requirements.md)"
     )
     parse_parser.add_argument(
         "--llm-model",

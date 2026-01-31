@@ -17,7 +17,7 @@ load_dotenv()
 
 
 def auto_deploy(
-    requirements_path: str = "data/parsed.md",
+    requirements_path: str = "real_requirements/parsed/parsed_requirements.md",
     output_path: str = "output/genie_space_config.json",
     result_output: str = "output/genie_space_result.json",
     auto_replace_catalog: str = "sandbox",

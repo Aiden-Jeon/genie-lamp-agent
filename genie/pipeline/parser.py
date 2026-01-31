@@ -21,7 +21,7 @@ from genie.utils.page_cache import PageCacheManager
 
 async def parse_documents_async(
     input_dir: str,
-    output_path: str = "data/parsed_requirements.md",
+    output_path: str = "real_requirements/parsed/parsed_requirements.md",
     llm_model: str = "databricks-gpt-5-2",
     vision_model: str = "databricks-claude-sonnet-4",
     use_llm: bool = True,
@@ -290,7 +290,7 @@ async def parse_documents_async(
 
 def parse_documents(
     input_dir: str,
-    output_path: str = "data/parsed_requirements.md",
+    output_path: str = "real_requirements/parsed/parsed_requirements.md",
     llm_model: str = "databricks-gpt-5-2",
     vision_model: str = "databricks-claude-sonnet-4",
     use_llm: bool = True,
