@@ -27,17 +27,37 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual Environments (all locations)
 .venv/
 venv/
 ENV/
 env/
+backend/.venv/
+backend/venv/
 
-# Output
+# Frontend build artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/package-lock.json
+
+# Backend artifacts
+backend/__pycache__/
+backend/.parse_cache.json
+backend/storage/uploads/
+backend/.env
+
+# Output and generated files
 output/
-*.json
+*.log
 
-# Cache
+# JSON files (with exceptions for essential configs)
+*.json
+!sample/benchmarks/benchmarks.json
+!frontend/package.json
+!frontend/tsconfig.json
+
+# Cache files
 .parse_cache.json
 .last_test_run
 
@@ -58,9 +78,6 @@ Thumbs.db
 
 # Claude Code local settings (but track skills)
 .claude/settings.local.json
-
-# Logs
-*.log
 
 # Git worktrees
 worktrees/
