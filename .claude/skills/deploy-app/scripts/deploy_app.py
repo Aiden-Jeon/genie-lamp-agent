@@ -12,14 +12,12 @@ import os
 from pathlib import Path
 
 
-def run_command(command, description, cwd=None):
+def run_command(command, description):
     """Run a shell command and handle errors."""
     print(f"\n🔄 {description}...")
     print(f"   Command: {command}")
-    if cwd:
-        print(f"   Working directory: {cwd}")
 
-    result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=cwd)
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
 
     if result.returncode != 0:
         print(f"❌ Error: {description} failed")
@@ -35,7 +33,7 @@ def run_command(command, description, cwd=None):
     return True
 
 
-def deploy_app(app_name, target_env, profile, source_code_path, is_initial_deployment, working_dir=None):
+def deploy_app(app_name, target_env, profile, source_code_path, is_initial_deployment):
     """
     Deploy a Databricks app.
 
@@ -45,7 +43,6 @@ def deploy_app(app_name, target_env, profile, source_code_path, is_initial_deplo
         profile: Databricks profile name (e.g., 'DEFAULT')
         source_code_path: Path to source code in Workspace
         is_initial_deployment: True for first deployment, False for updates
-        working_dir: Working directory for bundle commands (e.g., 'app')
     """
 
     print(f"\n{'='*60}")
@@ -55,24 +52,17 @@ def deploy_app(app_name, target_env, profile, source_code_path, is_initial_deplo
     print(f"   Environment: {target_env}")
     print(f"   Profile: {profile}")
     print(f"   Deployment Type: {'Initial' if is_initial_deployment else 'Update'}")
-    if working_dir:
-        print(f"   Working Directory: {working_dir}")
     print(f"{'='*60}\n")
 
-    # Validate working directory if provided
-    if working_dir:
-        if not os.path.isdir(working_dir):
-            print(f"❌ Error: Working directory '{working_dir}' does not exist")
-            return False
-
-        databricks_yml = os.path.join(working_dir, "databricks.yml")
-        if not os.path.isfile(databricks_yml):
-            print(f"❌ Error: databricks.yml not found in '{working_dir}'")
-            return False
+    # Validate databricks.yml exists in current directory
+    if not os.path.isfile("databricks.yml"):
+        print(f"❌ Error: databricks.yml not found in current directory")
+        print(f"   Make sure you're running this from the project root")
+        return False
 
     # Step 1: Bundle deploy (both initial and update)
     bundle_cmd = f"databricks bundle deploy -t {target_env} -p {profile}"
-    if not run_command(bundle_cmd, "Bundle deploy", cwd=working_dir):
+    if not run_command(bundle_cmd, "Bundle deploy"):
         return False
 
     # Step 2: App start (only for initial deployment)
@@ -123,13 +113,6 @@ def main():
     )
 
     parser.add_argument(
-        "--working-dir",
-        "-w",
-        default=None,
-        help="Working directory for bundle commands (e.g., 'app' for Genie Lamp Agent)",
-    )
-
-    parser.add_argument(
         "--initial",
         action="store_true",
         help="Flag for initial deployment (includes app start command)",
@@ -158,7 +141,6 @@ def main():
         profile=args.profile,
         source_code_path=args.source_code_path,
         is_initial_deployment=is_initial,
-        working_dir=args.working_dir,
     )
 
     sys.exit(0 if success else 1)

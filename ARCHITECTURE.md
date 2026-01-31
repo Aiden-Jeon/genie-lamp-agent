@@ -306,18 +306,31 @@
 ├── CONVERSION_PIPELINE.md          # Requirements conversion guide
 ├── SIMPLIFIED_WORKFLOW.md          # Simplified workflow details
 │
-├── app/                            # 🌟 Databricks App (Web UI Mode)
-│   ├── databricks.yml              # Asset bundle configuration
-│   ├── app.yaml                    # Databricks App configuration
-│   ├── backend/                    # FastAPI backend
-│   │   ├── services/               # Business logic services
-│   │   │   └── job_tasks.py        # Job task orchestration
-│   │   └── middleware/             # Request middleware
-│   └── frontend/                   # Next.js UI application
-│       ├── src/                    # React components
-│       └── public/                 # Static assets
+├── databricks.yml                  # Asset bundle configuration
+├── app.yaml                        # Databricks App runtime configuration
 │
-├── genie/                            # Core source code (Python package)
+├── backend/                        # 🌟 FastAPI backend (Web UI Mode)
+│   ├── __init__.py
+│   ├── main.py                     # FastAPI app entry point
+│   ├── services/                   # Business logic services
+│   │   ├── job_tasks.py            # Job task orchestration
+│   │   ├── file_storage.py         # File upload handling
+│   │   └── validators.py           # Validation services
+│   ├── middleware/                 # Request middleware
+│   │   └── databricks_auth.py      # Databricks authentication
+│   ├── storage/                    # Session and job storage
+│   └── requirements.txt            # Backend Python dependencies
+│
+├── frontend/                       # 🌟 Next.js UI application (Web UI Mode)
+│   ├── app/                        # Next.js pages and routing
+│   ├── components/                 # React components
+│   │   ├── wizard/                 # Multi-step wizard components
+│   │   └── session/                # Session management components
+│   ├── lib/                        # Utilities and hooks
+│   ├── package.json                # Frontend dependencies
+│   └── tsconfig.json               # TypeScript configuration
+│
+├── genie/                          # Core source code (Python package)
 │   ├── __init__.py
 │   ├── models.py                   # Pydantic models for Genie space config
 │   ├── pipeline/                   # 🌟 Pipeline orchestration

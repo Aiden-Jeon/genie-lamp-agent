@@ -35,9 +35,9 @@ When deploying, ALWAYS use `--update` for existing apps. This preserves the app 
 This skill is configured for the **Genie Lamp Agent** project with the following settings:
 
 - **Bundle Name**: `genie-lamp-agent`
-- **App Resource Name**: `genie_lamp_app` (defined in `app/databricks.yml`)
+- **App Resource Name**: `genie_lamp_app` (defined in `databricks.yml`)
 - **App Display Name**: `genie-lamp-agent`
-- **Working Directory**: `app/` (where databricks.yml is located)
+- **Project Structure**: Root-level deployment (databricks.yml at project root)
 - **Available Environments**: `dev` (default), `prod`
 
 ## Deployment Process
@@ -51,14 +51,15 @@ Before deploying, ensure:
    databricks --version
    ```
 
-2. **You're in the app directory**
+2. **You're in the project root directory**
    ```bash
-   cd app/
+   cd /path/to/genie-lamp-agent
    ```
 
-3. **Secrets are configured** in Databricks:
-   - Scope: `genie-lamp`
-   - Required keys: `service-token`, `sql-warehouse-http-path`
+3. **Environment variables are configured** in `.env` file:
+   - `DATABRICKS_HOST`: Your workspace URL
+   - `DATABRICKS_TOKEN`: Your personal access token
+   - `DATABRICKS_HTTP_PATH`: SQL Warehouse HTTP path (optional, can be configured in app.yaml)
 
 4. **Frontend is built** (if deploying for the first time or after frontend changes)
    ```bash
@@ -88,6 +89,13 @@ The source code path for Genie Lamp Agent follows this pattern:
 
 If the username is not known, ask the user for their Databricks email address.
 
+### Environment Configuration
+
+The deployment uses environment variables from your `.env` file:
+- `DATABRICKS_HOST`: Workspace URL (used by Databricks CLI)
+- `DATABRICKS_TOKEN`: Authentication token (used by Databricks CLI)
+- `DATABRICKS_HTTP_PATH`: SQL Warehouse path (can be configured in app.yaml)
+
 ### Determining Deployment Type
 
 Ask the user: "Is this the first time deploying the Genie Lamp app, or is this an update to an existing deployment?"
@@ -97,72 +105,65 @@ Ask the user: "Is this the first time deploying the Genie Lamp app, or is this a
 
 ## Using the Deployment Script
 
-**IMPORTANT**: Always run the deployment script from the project root, not from the app directory.
+**IMPORTANT**: Always run the deployment script from the project root directory.
 
 Execute the deployment using `.claude/skills/deploy-app/scripts/deploy_app.py`:
 
 **For initial deployment:**
 ```bash
-python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+.venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target <environment> \
   --profile <profile> \
   --source-code-path <path> \
-  --working-dir app \
   --initial
 ```
 
 **For update deployment:**
 ```bash
-python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+.venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target <environment> \
   --profile <profile> \
   --source-code-path <path> \
-  --working-dir app \
   --update
 ```
 
 **Example:**
 ```bash
 # Initial deployment to dev environment
-python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+.venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target dev \
   --profile DEFAULT \
   --source-code-path /Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/dev/files \
-  --working-dir app \
   --initial
 
 # Update deployment to dev environment
-python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+.venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target dev \
   --profile DEFAULT \
   --source-code-path /Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/dev/files \
-  --working-dir app \
   --update
 
 # Production deployment (update)
-python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+.venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target prod \
   --profile DEFAULT \
   --source-code-path /Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/prod/files \
-  --working-dir app \
   --update
 ```
 
 ## What the Script Does
 
-The deployment script changes to the `app/` directory (where `databricks.yml` is located) and executes the Databricks CLI commands.
+The deployment script executes Databricks CLI commands from the project root directory (where `databricks.yml` is located).
 
 ### Initial Deployment (--initial flag)
-1. Changes to working directory: `cd app/`
-2. Runs `databricks bundle deploy -t <env> -p <profile>` (deploys bundle resources)
-3. Runs `databricks apps start genie-lamp-agent -p <profile>` (starts the app for the first time)
-4. Runs `databricks apps deploy genie-lamp-agent --source-code-path <path> -p <profile>` (deploys app code)
+1. Runs `databricks bundle deploy -t <env> -p <profile>` (deploys bundle resources)
+2. Runs `databricks apps start genie-lamp-agent -p <profile>` (starts the app for the first time)
+3. Runs `databricks apps deploy genie-lamp-agent --source-code-path <path> -p <profile>` (deploys app code)
 
 ### Update Deployment (--update flag)
-1. Changes to working directory: `cd app/`
-2. Runs `databricks bundle deploy -t <env> -p <profile>` (updates bundle resources)
-3. Skips the `apps start` command (app already running)
-4. Runs `databricks apps deploy genie-lamp-agent --source-code-path <path> -p <profile>` (updates app code)
+1. Runs `databricks bundle deploy -t <env> -p <profile>` (updates bundle resources)
+2. Skips the `apps start` command (app already running)
+3. Runs `databricks apps deploy genie-lamp-agent --source-code-path <path> -p <profile>` (updates app code)
 
 ## Project-Specific Workflow
 
@@ -173,29 +174,30 @@ When deploying the Genie Lamp Agent app, follow this complete workflow:
 #### 1. Make Code Changes
 ```bash
 # Backend changes
-cd app/backend
+cd backend
 # ... make changes ...
+cd ..
 
 # Frontend changes
-cd app/frontend
+cd frontend
 # ... make changes ...
+cd ..
 ```
 
 #### 2. Build Frontend (if frontend changed)
 ```bash
-cd app/frontend
+cd frontend
 npm run build
-cd ../..
+cd ..
 ```
 
 #### 3. Deploy Using the Script
 ```bash
 # From project root
-python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
+.venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target dev \
   --profile DEFAULT \
   --source-code-path /Workspace/Users/<username>/.bundle/genie-lamp-agent/dev/files \
-  --working-dir app \
   --update
 ```
 
@@ -206,7 +208,7 @@ python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
 - Just run the deployment script with `--update`
 
 **Scenario 2: Frontend changes**
-- Build frontend: `cd app/frontend && npm run build && cd ../..`
+- Build frontend: `cd frontend && npm run build && cd ..`
 - Run the deployment script with `--update`
 
 **Scenario 3: Configuration changes in databricks.yml or app.yaml**
@@ -214,8 +216,8 @@ python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
 - The bundle deploy will pick up configuration changes
 
 **Scenario 4: First-time deployment**
-- Ensure secrets are configured in `genie-lamp` scope
-- Build frontend: `cd app/frontend && npm run build && cd ../..`
+- Ensure `.env` file is configured with `DATABRICKS_HOST`, `DATABRICKS_TOKEN`
+- Build frontend: `cd frontend && npm run build && cd ..`
 - Run the deployment script with `--initial`
 
 ### Troubleshooting
@@ -227,10 +229,12 @@ python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
 **Error: "Profile DEFAULT not found"**
 - Configure Databricks CLI: `databricks configure --profile DEFAULT`
 - Provide host and token
+- Or ensure `.env` file contains `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
 
-**Error: "Secret scope genie-lamp not found"**
-- Create secret scope in Databricks workspace
-- Add required secrets: `service-token`, `sql-warehouse-http-path`
+**Error: "Environment variable not set"**
+- Check that `.env` file exists in project root
+- Verify it contains: `DATABRICKS_HOST`, `DATABRICKS_TOKEN`
+- Source the environment: `source .env` (if needed)
 
 **Error: "App already exists" during initial deployment**
 - Use `--update` flag instead of `--initial`
