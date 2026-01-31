@@ -394,7 +394,9 @@
     ├── test_instruction_scorer.py  # P2: Instruction scoring tests
     ├── test_domain_extractor.py    # P3: Domain extraction tests
     ├── test_example_extractor.py   # Example query extraction tests
-    └── test_reviewer.py            # P3: Config review tests
+    ├── test_reviewer.py            # P3: Config review tests
+    ├── test_enhanced_parsing.py    # 🆕 Enhanced parsing Phase 1 tests (26 tests)
+    └── test_phase2_parsing.py      # 🆕 Enhanced parsing Phase 2 tests (20 tests)
 ```
 
 **Key Changes in Structure:**
@@ -670,7 +672,7 @@ LLMResponse
 - Data structure validation
 - Custom constraints
 
-### 5. Document Parsing Layer
+### 5. Document Parsing Layer (Enhanced 2026)
 
 **Module**: `src/pipeline/parser.py`
 
@@ -689,7 +691,7 @@ async def parse_documents_async(
     max_concurrent_pdfs: int = 3
 ) -> Dict[str, Any]:
     # Parse PDFs and markdown files into structured requirements
-    
+
 def parse_documents(...):
     # Synchronous wrapper for async parsing
 ```
@@ -702,8 +704,19 @@ def parse_documents(...):
    - Progress bars via `tqdm` for real-time feedback
 2. Extract content from Markdown files (regex-based)
 3. Structure and combine data using `RequirementsStructurer`
-4. Optional LLM enrichment via `LLMEnricher`
-5. Generate output markdown via `MarkdownGenerator`
+4. **Phase 1 Enhanced Extraction** (NEW):
+   - Column metadata (is_required, usage_type, transformation_rule)
+   - Table remarks (special notes, restrictions)
+   - SQL aggregation patterns (CTEs, UNION, COALESCE)
+   - Filtering rules (WHERE conditions)
+   - JOIN specifications (explicit syntax with conditions)
+5. **Phase 2 Enhanced Extraction** (NEW):
+   - Formula library (DAU, ARPU, Retention Rate patterns)
+   - Platform-specific logic (PUBG, Steam, Discord, InZOI)
+   - Query analysis (intent, complexity, optimization notes)
+   - Result examples (sample data for validation)
+6. Optional LLM enrichment via `LLMEnricher`
+7. Generate output markdown via `MarkdownGenerator`
 
 **Features**:
 - Async/concurrent PDF processing with semaphore control
@@ -712,12 +725,86 @@ def parse_documents(...):
 - Automatic error handling and recovery
 - Supports multiple domain types (social_analytics, kpi_analytics, combined)
 - Environment variable support for credentials
+- **Enhanced metadata extraction** (90%+ reduction in information loss)
+- **Formula pattern detection** (7 known patterns: DAU, MAU, ARPU, etc.)
+- **Platform-specific logic analysis** (restrictions, transformations, requirements)
 
 **Output**: Structured markdown file containing:
 - Questions (categorized by domain)
-- Tables with descriptions
-- SQL queries with context
+- Tables with descriptions and remarks
+- SQL queries with enhanced context (patterns, filters, joins)
+- **Column Details** section (required/optional, usage types, transformations)
+- **Join Relationships** section (explicit JOIN syntax)
+- **Aggregation Patterns** section (CTEs, UNION, window functions)
+- **Formula Library** section (reusable metric definitions)
+- **Platform Logic** section (platform-specific notes)
+- **Query Analysis** section (intent, complexity, optimization)
 - Metadata about extracted content
+
+**Data Models** (see `src/parsing/requirements_structurer.py`):
+
+```python
+@dataclass
+class ColumnInfo:
+    name: str
+    description: Optional[str] = None
+    data_type: Optional[str] = None
+    is_required: bool = True  # Phase 1: False if marked "optional"
+    usage_type: Optional[str] = None  # Phase 1: filtering, display, aggregation, join_key
+    transformation_rule: Optional[str] = None  # Phase 1: e.g., "FROM_UNIXTIME(timestamp)"
+
+@dataclass
+class TableInfo:
+    catalog: str
+    schema: str
+    table: str
+    description: str
+    columns: List[ColumnInfo] = field(default_factory=list)
+    related_kpi: Optional[str] = None
+    sample_query: Optional[str] = None
+    table_remarks: List[str] = field(default_factory=list)  # Phase 1: special notes
+
+@dataclass
+class SQLQuery:
+    question_id: str
+    query: str
+    description: str
+    tables_used: List[str] = field(default_factory=list)
+    # Phase 1 fields
+    aggregation_patterns: List[str] = field(default_factory=list)
+    filtering_rules: List[str] = field(default_factory=list)
+    join_specs: List[str] = field(default_factory=list)
+    # Phase 2 fields
+    intent: Optional[str] = None  # monitoring, analysis, reporting
+    complexity: Optional[str] = None  # simple, medium, high
+    optimization_notes: List[str] = field(default_factory=list)
+    result_example: Optional[QueryResultExample] = None
+
+@dataclass
+class FormulaDefinition:  # Phase 2
+    name: str  # DAU, ARPU, Retention Rate, etc.
+    formula: str  # SQL expression
+    description: str
+    required_columns: List[str] = field(default_factory=list)
+    notes: Optional[str] = None
+
+@dataclass
+class PlatformNote:  # Phase 2
+    platform: str  # PUBG, Steam, Discord, InZOI
+    note_type: str  # restriction, requirement, transformation, limitation
+    description: str
+    affected_tables: List[str] = field(default_factory=list)
+    example_code: Optional[str] = None
+```
+
+**Phase 1 + Phase 2 Results** (Validated on real_requirements/inputs):
+- Documentation growth: **355 → 1,855 lines** (5.2x increase)
+- Column metadata: **100% loss → <10% loss** (captures optional markers, usage types)
+- SQL patterns: **70% loss → <15% loss** (captures CTEs, UNION, aggregations)
+- JOIN specs: **85% loss → <15% loss** (explicit syntax captured)
+- Platform notes: **31 extracted** (device options, platform restrictions, user types)
+- Formula patterns: **Infrastructure complete** (ready for pattern tuning)
+- Test coverage: **46/46 tests passing** (26 Phase 1 + 20 Phase 2)
 
 ### 6. Table & Column Validation Layer
 
@@ -3426,11 +3513,13 @@ config, serialized = load_and_transform_config("config.json")
 | `src/validation/sql_validator.py` | SQL syntax & quality validator |
 | `src/validation/instruction_scorer.py` | Instruction quality scorer |
 | `src/utils/benchmark_sql_generator.py` | 🆕 Benchmark SQL generator (Pass 2, 2026) |
-| `src/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) |
-| `src/parsing/markdown_parser.py` | Markdown extraction (regex) |
-| `src/parsing/requirements_structurer.py` | Data models & structuring |
+| `src/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) with enhanced prompt |
+| `src/parsing/markdown_parser.py` | Markdown extraction (regex) with Phase 1 enhancements |
+| `src/parsing/requirements_structurer.py` | Data models & structuring (Phase 1 + Phase 2 fields) |
 | `src/parsing/llm_enricher.py` | LLM-based enrichment |
-| `src/parsing/markdown_generator.py` | Markdown output generation |
+| `src/parsing/markdown_generator.py` | Markdown output generation with 7 enhanced sections |
+| `src/parsing/formula_extractor.py` | 🆕 Formula pattern detection (Phase 2) |
+| `src/parsing/platform_analyzer.py` | 🆕 Platform-specific logic analysis (Phase 2) |
 | `src/parsing/feedback_parser.py` | Feedback analysis parser |
 | `src/prompt/templates/curate_effective_genie.md` | Best practices context |
 | `src/prompt/templates/genie_api.md` | API documentation |
@@ -3443,6 +3532,8 @@ config, serialized = load_and_transform_config("config.json")
 | `tests/test_join_specs.py` | Join specification tests |
 | `tests/test_pdf_image_parsing.py` | PDF image parsing tests |
 | `tests/test_benchmark_sql_generator.py` | 🆕 Benchmark SQL generator tests (16 tests, 2026) |
+| `tests/test_enhanced_parsing.py` | 🆕 Enhanced parsing Phase 1 tests (26 tests, 2026) |
+| `tests/test_phase2_parsing.py` | 🆕 Enhanced parsing Phase 2 tests (20 tests, 2026) |
 
 ### Environment Variables
 

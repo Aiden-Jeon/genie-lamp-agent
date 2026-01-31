@@ -18,38 +18,6 @@ An intelligent agent that generates Databricks Genie space configurations using 
 - [Contributing](#contributing)
 - [Support](#support)
 
-## Recent Updates
-
-### January 2026 ⭐
-
-**🌐 Databricks App with Web UI**
-- Multi-user web application with guided 5-step workflow
-- FastAPI backend + Next.js frontend
-- Session isolation with UUID-based storage
-- Background job processing with real-time polling
-- Interactive validation fixing with table replacement UI
-- Databricks OAuth2 authentication
-- Unity Catalog Volume for file storage
-- Lakebase (Postgres) for session/job persistence
-- See [Databricks App section](#databricks-app-web-ui) and [app/README.md](app/README.md) for details
-
-### January 2026 ⭐
-
-**🎯 Smart Parse Caching System**
-- Automatic caching of parsing results to avoid expensive re-parsing operations
-- Intelligent cache invalidation based on file changes, additions, or removals
-- Significant time and cost savings (no repeated vision model API calls)
-- Cache validated using file modification times, sizes, and parsing configuration
-- Full user control: `--force` to bypass cache, `--no-cache` to disable, `--cache-file` for custom location
-- Comprehensive test coverage (15 tests) for all caching scenarios
-- Graceful handling of corrupted cache files and edge cases
-
-**Benefits:**
-- ⚡ **Instant response** when files haven't changed (vs 2-3 min re-parsing)
-- 💰 **Cost savings** - no repeated vision model API calls
-- 🔍 **Smart validation** - automatic cache invalidation when needed
-- 🎛️ **User control** - explicit flags for cache management
-
 ## Overview
 
 The Genie Lamp Agent automates the creation of Databricks Genie spaces by intelligently generating production-ready configurations from natural language requirements. Simply provide your business requirements and documentation, and let the agent handle the complex configuration process.
@@ -77,14 +45,36 @@ The Genie Lamp Agent automates the creation of Databricks Genie spaces by intell
 📄 Your Requirements           ──┘
 ```
 
-The agent follows a structured 7-step pipeline:
-1. **Domain Extraction**: Automatically extracts table relationships, business metrics, and common filters
-2. **Enhanced Prompt Building**: Injects domain knowledge + SQL quality criteria + few-shot examples
-3. **LLM Generation**: Uses Databricks foundation models to generate intelligent configurations
-4. **Benchmark Loading**: Loads benchmark questions from `benchmarks/benchmarks.json` (if available)
-5. **SQL Validation**: Syntax checks, table references, join patterns, and quality scoring
-6. **Comprehensive Review**: 4-dimension quality assessment with actionable feedback
-7. **Output**: Produces a production-ready Genie space configuration with quality report
+The agent follows a structured pipeline with **Enhanced Parsing**:
+
+**1. Enhanced Document Parsing**
+- **Rich metadata extraction**: Captures column details, JOIN specs, aggregation patterns
+- **Platform-specific logic**: Extracts restrictions, transformations, requirements
+- **Formula detection**: Identifies reusable metrics (DAU, ARPU, Retention)
+- **Output sections**: Column Details 📋, Join Relationships 🔗, Aggregation Patterns 📊, Platform Logic 🎮
+
+**2. Domain Extraction**
+- Automatically extracts table relationships, business metrics, and common filters
+- Powered by enhanced parsing metadata
+
+**3. Enhanced Prompt Building**
+- Injects domain knowledge + SQL quality criteria + few-shot examples
+- Utilizes parsed JOIN specs and aggregation patterns
+
+**4. LLM Generation**
+- Uses Databricks foundation models to generate intelligent configurations
+
+**5. Benchmark Loading**
+- Loads benchmark questions from `benchmarks/benchmarks.json` (if available)
+
+**6. SQL Validation**
+- Syntax checks, table references, join patterns, and quality scoring
+
+**7. Comprehensive Review**
+- 4-dimension quality assessment with actionable feedback
+
+**8. Output**
+- Produces a production-ready Genie space configuration with quality report
 
 
 ### ⚡ Performance Improvements

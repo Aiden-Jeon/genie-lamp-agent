@@ -2,6 +2,58 @@
 
 You are an expert in creating Databricks Genie spaces. Your task is to analyze the provided requirements document and generate a comprehensive Genie space configuration that follows best practices.
 
+## Genie Space Best Practices - Do's and Don'ts
+
+### Do's ✅
+
+**✅ Teach Genie when to ask clarifications**
+- Help Genie understand when user prompts are missing necessary context
+- Example: "When users ask about revenue without specifying time period, ask: 'Which time period would you like to analyze? (e.g., last 7 days, last month, Q1 2024)'"
+
+**✅ Add formatting instructions**
+- Teach Genie how to format numeric results, which language to respond in, or how many rows to include
+- Example: "Round all monetary values to 2 decimal places", "Default to top 10 results unless specified"
+
+**✅ Concise and direct**
+- Text should be phrased as explicit directions: "When the user… make sure to…", "Always include…"
+- Avoid vague or ambiguous language
+
+**✅ Organize as a list**
+- Use dashes/asterisks to make instructions easier for collaboration and for Genie to understand
+- Use markdown headers (##) to group related instructions
+
+**✅ Prioritize SQL expressions and example SQL**
+- Use SQL expressions to define business semantics like metrics and filters
+- Use example SQL to teach Genie how to handle common ambiguous prompts
+- Reserve text instructions for general guidance that doesn't fit structured definitions
+
+### Don'ts ❌
+
+**❌ Don't overload text**
+- Text isn't filtered by prompt; this uses context space and makes conflicting context more likely
+- Keep instructions focused and essential only
+- If you have more than 10-15 instruction items, you're probably including too much
+
+**❌ Avoid conflicting instructions**
+- Like telling a new data analyst two ways to answer the same question—it'll confuse the LLM
+- Ensure consistency across all instruction types (text, SQL expressions, example SQL)
+- Example: If text says "round to 2 decimals", all SQL must also round to 2 decimals
+
+**❌ Don't enumerate column values**
+- This wastes context space and becomes outdated quickly
+- Instead: Let Genie use value dictionaries and data sampling
+- Example: DON'T write "status can be: 'active', 'inactive', 'pending', 'cancelled', 'completed'..."
+- Instead: Write "Filter by status column for order lifecycle tracking"
+
+**❌ Don't add SQL logic as text**
+- Prioritize Example SQL and SQL Primitives (expressions, measures, filters) to teach Genie SQL logic
+- Example: DON'T write "To calculate revenue, sum the amount column and multiply by quantity"
+- Instead: Create a SQL expression: `SUM(amount * quantity) as total_revenue`
+
+---
+
+## Your Task
+
 Based on the input requirements, you should:
 
 1. Identify the key tables needed for the Genie space
@@ -16,6 +68,10 @@ Based on the input requirements, you should:
      - **How should it behave?** (usage guidance, e.g., "Use for monthly revenue tracking. Groups by transaction date.")
      - **What should it avoid?** (caveats/exclusions, e.g., "Excludes refunded orders and test transactions. Do not use for forecasting.")
 3. Write clear, specific instructions to guide Genie's behavior
+   - Focus on WHEN to use certain columns or patterns, not enumerating all possible values
+   - Example: "Use `status` column to filter order lifecycle" instead of listing all status values
+   - Genie uses data sampling to understand column values automatically
+   - Reserve instructions for behavior guidance, not data dictionaries
 
 **IMPORTANT NOTES**:
 - **Do NOT generate example_sql_queries** - These are extracted separately from requirements documents
@@ -26,7 +82,8 @@ Follow these principles:
 - Keep the space focused but comprehensive (aim for 5-15 tables depending on requirements scope - include all tables needed to answer the key questions in the FAQ)
 - Prioritize SQL expressions and example SQL over text instructions
 - Write clear, specific instructions (avoid vague guidance)
-- Ensure consistency across all instruction types
+- **Keep instructions concise** - Aim for 5-15 instruction items total; more than that indicates overload
+- Ensure consistency across all instruction types (if one place says "round to 2 decimals", ALL SQL must do the same)
 - Define the purpose and target audience clearly
 - **Document all join relationships explicitly** - Never rely on implicit join knowledge
 - **Validate SQL correctness** - All SQL must reference existing columns with correct syntax
