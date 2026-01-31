@@ -27,6 +27,7 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
   const [showingExistingResult, setShowingExistingResult] = useState(!!existingResult);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [expandedSql, setExpandedSql] = useState<Set<number>>(new Set());
+  const [validationErrors, setValidationErrors] = useState<Map<number, string[]>>(new Map());
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -89,6 +90,38 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
     return `${preview}\n... ${remaining} more lines`;
   };
 
+  const validateBenchmarks = (): boolean => {
+    const errors = new Map<number, string[]>();
+    let hasErrors = false;
+
+    benchmarks.forEach((benchmark, index) => {
+      const benchmarkErrors: string[] = [];
+
+      if (!benchmark.question || benchmark.question.trim() === '') {
+        benchmarkErrors.push('Question is required');
+      }
+
+      if (!benchmark.expected_sql || benchmark.expected_sql.trim() === '') {
+        benchmarkErrors.push('Expected SQL is required');
+      }
+
+      if (benchmarkErrors.length > 0) {
+        errors.set(index, benchmarkErrors);
+        hasErrors = true;
+      }
+    });
+
+    setValidationErrors(errors);
+    return !hasErrors;
+  };
+
+  const handleContinue = () => {
+    if (benchmarks.length > 0 && !validateBenchmarks()) {
+      return; // Don't continue if validation fails
+    }
+    onComplete(benchmarks);
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">Step 4: Benchmark Questions</h2>
@@ -120,7 +153,7 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
               Edit Benchmarks
             </button>
             <button
-              onClick={() => onComplete(existingResult)}
+              onClick={handleContinue}
               className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
             >
               Continue to Deploy →
@@ -163,10 +196,16 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
               </div>
 
               <div className="space-y-2">
-                {benchmarks.map((benchmark, index) => (
+                {benchmarks.map((benchmark, index) => {
+                  const errors = validationErrors.get(index);
+                  const hasErrors = errors && errors.length > 0;
+
+                  return (
                   <div
                     key={index}
-                    className="border border-gray-300 rounded-lg overflow-hidden"
+                    className={`border rounded-lg overflow-hidden ${
+                      hasErrors ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                   >
                     <div className="grid grid-cols-2 gap-0">
                       {/* Question column */}
@@ -254,8 +293,21 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
                         )}
                       </div>
                     </div>
+
+                    {/* Validation errors */}
+                    {hasErrors && (
+                      <div className="px-4 py-3 bg-red-100 border-t border-red-300">
+                        <p className="text-sm font-semibold text-red-800 mb-1">Validation Errors:</p>
+                        <ul className="text-xs text-red-700 list-disc list-inside">
+                          {errors!.map((error, i) => (
+                            <li key={i}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -277,7 +329,7 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
               </button>
             ) : (
               <button
-                onClick={() => onComplete(benchmarks)}
+                onClick={handleContinue}
                 className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
               >
                 Save {benchmarks.length} Benchmark{benchmarks.length > 1 ? 's' : ''} & Continue →
