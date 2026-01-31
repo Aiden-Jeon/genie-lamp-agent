@@ -6,8 +6,8 @@ from typing import Dict, List
 
 
 
-# Project root is grandparent of app directory (../../.. from services/)
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+# Project root is parent of backend directory (../.. from services/)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 from genie.pipeline.parser import parse_documents_async, parse_documents_async_with_progress
 from genie.pipeline.generator import generate_config

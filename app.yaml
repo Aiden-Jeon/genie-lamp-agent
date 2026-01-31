@@ -26,9 +26,10 @@ env:
   - name: DATABRICKS_HTTP_PATH
     value: "/sql/1.0/warehouses/your-warehouse-id"
 
-  # Frontend build location
-  - name: FRONTEND_BUILD_DIR
-    value: "/app/frontend/.next"
+  # Frontend static export location (Next.js output: 'export')
+  # Path is relative to /app/python/source_code (the working directory)
+  - name: FRONTEND_EXPORT_DIR
+    value: "frontend/out"
 
   # Python unbuffered output
   - name: PYTHONUNBUFFERED

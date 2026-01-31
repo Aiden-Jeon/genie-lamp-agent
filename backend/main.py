@@ -7,18 +7,18 @@ from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from services.session_store import SessionStore
-from services.job_manager import JobManager
-from services.file_storage import FileStorageService
-from services.job_tasks import (
+from backend.services.session_store import SessionStore
+from backend.services.job_manager import JobManager
+from backend.services.file_storage import FileStorageService
+from backend.services.job_tasks import (
     run_parse_job,
     run_generate_job,
     run_validate_job,
     run_deploy_job,
     apply_validation_fixes
 )
-from services.benchmark_validator import validate_benchmark_queries
-from middleware.auth import get_current_user
+from backend.services.benchmark_validator import validate_benchmark_queries
+from backend.middleware.auth import get_current_user
 
 
 # Initialize FastAPI app
@@ -37,20 +37,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve Next.js static build
+# Serve Next.js static export
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pathlib import Path
 
-frontend_build_dir = os.getenv("FRONTEND_BUILD_DIR", "../frontend/.next")
-frontend_path = Path(frontend_build_dir)
+# Look for static export in 'out' directory (Next.js static export)
+frontend_export_dir = os.getenv("FRONTEND_EXPORT_DIR", "../frontend/out")
+frontend_export_path = Path(frontend_export_dir)
 
-if frontend_path.exists():
-    # Serve Next.js static files
-    app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
+# Debug: Log frontend path info
+print(f"Frontend export dir: {frontend_export_dir}")
+print(f"Frontend export path: {frontend_export_path}")
+print(f"Frontend path exists: {frontend_export_path.exists()}")
+print(f"Frontend path absolute: {frontend_export_path.absolute()}")
+if frontend_export_path.exists():
+    print(f"Frontend directory contents: {list(frontend_export_path.iterdir())[:10]}")
 
-    # Serve Next.js pages (if using static export)
-    if (frontend_path / "standalone").exists():
-        app.mount("/", StaticFiles(directory=str(frontend_path / "standalone"), html=True), name="frontend")
+# Mount static assets early (before API routes)
+if frontend_export_path.exists():
+    print(f"Mounting frontend static assets from {frontend_export_path}")
+    # Serve static assets from _next directory
+    if (frontend_export_path / "_next").exists():
+        app.mount("/_next", StaticFiles(directory=str(frontend_export_path / "_next")), name="next_static")
+        print("Mounted /_next static files")
+else:
+    print(f"WARNING: Frontend export directory not found at {frontend_export_path.absolute()}")
 
 # Initialize services
 session_store = SessionStore()
@@ -559,6 +571,36 @@ async def get_file_content(
         }
     except Exception as e:
         return {"error": f"Failed to read file: {str(e)}"}, 500
+
+
+# Serve frontend - MUST be after all API routes
+if frontend_export_path.exists():
+    # Serve index.html for root path
+    @app.get("/")
+    async def serve_frontend_root():
+        return FileResponse(str(frontend_export_path / "index.html"))
+
+    # Catch-all route to serve frontend files
+    # This must be last to not interfere with API routes
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Try to serve the exact file if it exists
+        file_path = frontend_export_path / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+
+        # Try with .html extension for clean URLs
+        html_path = frontend_export_path / f"{full_path}.html"
+        if html_path.exists():
+            return FileResponse(str(html_path))
+
+        # Try with index.html in directory
+        dir_index = frontend_export_path / full_path / "index.html"
+        if dir_index.exists():
+            return FileResponse(str(dir_index))
+
+        # Default to root index.html for client-side routing
+        return FileResponse(str(frontend_export_path / "index.html"))
 
 
 if __name__ == "__main__":

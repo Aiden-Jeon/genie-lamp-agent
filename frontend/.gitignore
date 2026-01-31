@@ -8,7 +8,7 @@
 
 # next.js
 /.next/
-/out/
+# /out/  # COMMENTED: out/ contains production build for Databricks Apps deployment
 
 # production
 /build

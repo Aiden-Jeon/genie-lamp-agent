@@ -1,5 +1,7 @@
-*.pid
+storage/
+frontend/out/
 
+*.pid
 change_logs/
 feedback/
 data/

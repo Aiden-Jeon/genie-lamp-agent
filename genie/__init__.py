@@ -25,6 +25,9 @@ from .utils import (
     transform_to_serialized_space,
     create_join_spec,
     ParseCacheManager,
+    update_config_catalog_schema_table,
+    update_config_catalog_schema,
+    remove_table_from_config,
 )
 
 # Benchmark utilities
@@ -71,6 +74,9 @@ __all__ = [
     "transform_to_serialized_space",
     "create_join_spec",
     "ParseCacheManager",
+    "update_config_catalog_schema_table",
+    "update_config_catalog_schema",
+    "remove_table_from_config",
     # Benchmark
     "extract_benchmarks_from_requirements",
     "load_benchmarks_from_json",

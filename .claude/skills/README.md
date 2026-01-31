@@ -147,6 +147,140 @@ python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
 
 See `.claude/skills/deploy-app/SKILL.md` for detailed deployment workflows and troubleshooting.
 
+### deploy-local
+
+Deploy the Genie Lamp Agent locally for development and testing.
+
+**Triggers:** When you ask to "run locally", "start local development", "test locally", or "deploy on local"
+
+**Features:**
+- Checks prerequisites (Python, Node.js, npm, virtual environment)
+- Installs backend dependencies (FastAPI, uvicorn, etc.)
+- Installs frontend dependencies (Next.js, React, etc.)
+- Validates environment configuration (.env file)
+- Starts backend FastAPI server with hot reload (port 8000)
+- Starts frontend Next.js dev server with hot reload (port 3000)
+- Supports custom ports and flexible deployment modes
+
+**Example Usage:**
+```
+User: "run the app locally"
+
+Claude will:
+1. Check prerequisites (Python, Node.js, npm, venv)
+2. Install backend dependencies (if needed)
+3. Install frontend dependencies (if needed)
+4. Validate .env file has required variables
+5. Start backend server on port 8000
+6. Start frontend server on port 3000
+7. Provide access URLs and instructions
+```
+
+**Script:** `.claude/skills/deploy-local/scripts/deploy_local.py`
+
+**Access URLs:**
+- Frontend (Web UI): http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs (Swagger): http://localhost:8000/docs
+- API Docs (Redoc): http://localhost:8000/redoc
+
+**Prerequisites:**
+- Python 3.8+
+- Node.js 18+ and npm
+- Virtual environment at `.venv/`
+- `.env` file with `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
+
+**Common Commands:**
+```bash
+# Full local deployment (installs deps + starts servers)
+.venv/bin/python .claude/skills/deploy-local/scripts/deploy_local.py
+
+# Skip installation (faster for repeated runs)
+.venv/bin/python .claude/skills/deploy-local/scripts/deploy_local.py --skip-install
+
+# Custom ports
+.venv/bin/python .claude/skills/deploy-local/scripts/deploy_local.py \
+  --backend-port 8080 --frontend-port 3001
+
+# Backend only (useful for API development)
+.venv/bin/python .claude/skills/deploy-local/scripts/deploy_local.py --backend-only
+
+# Frontend only (if backend is running elsewhere)
+.venv/bin/python .claude/skills/deploy-local/scripts/deploy_local.py --frontend-only
+```
+
+**Development Workflow:**
+1. Start local deployment: `/deploy-local`
+2. Make code changes (auto-reload on save)
+3. Test in browser (http://localhost:3000)
+4. Stop servers with `Ctrl+C`
+5. Deploy to Databricks when ready: `/deploy-app`
+
+See `.claude/skills/deploy-local/README.md` for detailed usage and troubleshooting.
+
+### stop-local
+
+Stop local Genie Lamp Agent development servers.
+
+**Triggers:** When you ask to "stop local servers", "shut down local development", "stop servers", or "clean up processes"
+
+**Features:**
+- Identifies processes by port (8000 for backend, 3000 for frontend)
+- Graceful shutdown with SIGTERM (5 second timeout)
+- Force-kills if needed with SIGKILL
+- Verifies ports are freed
+- Supports stopping individual servers or both together
+- Clear status reporting
+
+**Example Usage:**
+```
+User: "stop local servers"
+
+Claude will:
+1. Find processes on ports 8000 and 3000
+2. Send graceful shutdown signal (SIGTERM)
+3. Wait up to 5 seconds for clean shutdown
+4. Force-kill if processes don't stop
+5. Verify ports are freed
+6. Report status of each server
+```
+
+**Script:** `.claude/skills/stop-local/scripts/stop_local.py`
+
+**Common Commands:**
+```bash
+# Stop both servers
+.venv/bin/python .claude/skills/stop-local/scripts/stop_local.py
+
+# Stop only backend
+.venv/bin/python .claude/skills/stop-local/scripts/stop_local.py --backend-only
+
+# Stop only frontend
+.venv/bin/python .claude/skills/stop-local/scripts/stop_local.py --frontend-only
+
+# Force kill without waiting
+.venv/bin/python .claude/skills/stop-local/scripts/stop_local.py --force
+
+# Custom ports
+.venv/bin/python .claude/skills/stop-local/scripts/stop_local.py \
+  --backend-port 8080 --frontend-port 3001
+```
+
+**Development Workflow:**
+1. Start servers: `/deploy-local`
+2. Make changes (hot reload enabled)
+3. Stop servers: `/stop-local`
+4. Restart: `/deploy-local --skip-install`
+
+**Verification:**
+```bash
+# Check if servers are stopped
+lsof -i :8000  # Should return nothing
+lsof -i :3000  # Should return nothing
+```
+
+See `.claude/skills/stop-local/README.md` for detailed usage.
+
 ### create-folder
 
 Safely create directories with validation and parent directory creation.
@@ -188,10 +322,12 @@ This makes the skills available globally in Claude Code:
 ln -s "$(pwd)/.claude/skills/genie-commit" ~/.codex/skills/genie-commit
 ln -s "$(pwd)/.claude/skills/genie-deploy" ~/.codex/skills/genie-deploy
 ln -s "$(pwd)/.claude/skills/deploy-app" ~/.codex/skills/deploy-app
+ln -s "$(pwd)/.claude/skills/deploy-local" ~/.codex/skills/deploy-local
+ln -s "$(pwd)/.claude/skills/stop-local" ~/.codex/skills/stop-local
 ln -s "$(pwd)/.claude/skills/create-folder" ~/.codex/skills/create-folder
 
 # Verify
-ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-app ~/.codex/skills/create-folder
+ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-* ~/.codex/skills/stop-* ~/.codex/skills/create-folder
 ```
 
 ### Option 2: Copy to Claude Code skills directory
@@ -201,10 +337,12 @@ ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-app ~/.codex/skills/create
 cp -r .claude/skills/genie-commit ~/.codex/skills/
 cp -r .claude/skills/genie-deploy ~/.codex/skills/
 cp -r .claude/skills/deploy-app ~/.codex/skills/
+cp -r .claude/skills/deploy-local ~/.codex/skills/
+cp -r .claude/skills/stop-local ~/.codex/skills/
 cp -r .claude/skills/create-folder ~/.codex/skills/
 
 # Verify
-ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-app ~/.codex/skills/create-folder
+ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-* ~/.codex/skills/stop-* ~/.codex/skills/create-folder
 ```
 
 ### After Installation
