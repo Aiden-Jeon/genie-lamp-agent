@@ -123,6 +123,79 @@ class TableInfo:
 
 
 @dataclass
+class QueryResultExample:
+    """Sample query result for validation"""
+    query_id: str
+    sample_rows: List[Dict[str, str]] = field(default_factory=list)  # List of row dicts
+    column_names: List[str] = field(default_factory=list)
+    notes: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'QueryResultExample':
+        return cls(
+            query_id=data.get("query_id", ""),
+            sample_rows=data.get("sample_rows", []),
+            column_names=data.get("column_names", []),
+            notes=data.get("notes")
+        )
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+@dataclass
+class FormulaDefinition:
+    """Reusable metric formula definition"""
+    name: str  # e.g., "ARPU", "DAU", "Retention Rate"
+    formula: str  # SQL expression
+    description: str
+    required_columns: List[str] = field(default_factory=list)
+    required_tables: List[str] = field(default_factory=list)
+    notes: Optional[str] = None
+    example_usage: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'FormulaDefinition':
+        return cls(
+            name=data.get("name", ""),
+            formula=data.get("formula", ""),
+            description=data.get("description", ""),
+            required_columns=data.get("required_columns", []),
+            required_tables=data.get("required_tables", []),
+            notes=data.get("notes"),
+            example_usage=data.get("example_usage")
+        )
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+@dataclass
+class PlatformNote:
+    """Platform-specific logic and restrictions"""
+    platform: str  # "PUBG", "Steam", "Discord", "All"
+    note_type: str  # "restriction", "transformation", "limitation", "requirement"
+    description: str
+    affected_tables: List[str] = field(default_factory=list)
+    affected_queries: List[str] = field(default_factory=list)
+    example_code: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'PlatformNote':
+        return cls(
+            platform=data.get("platform", "All"),
+            note_type=data.get("note_type", "requirement"),
+            description=data.get("description", ""),
+            affected_tables=data.get("affected_tables", []),
+            affected_queries=data.get("affected_queries", []),
+            example_code=data.get("example_code")
+        )
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+@dataclass
 class SQLQuery:
     """SQL query information"""
     question_id: str
@@ -133,10 +206,19 @@ class SQLQuery:
     aggregation_patterns: List[str] = field(default_factory=list)  # ["COALESCE", "CTE", "UNION_ALL", "window_function"]
     filtering_rules: List[str] = field(default_factory=list)  # Extracted WHERE conditions
     join_specs: List[str] = field(default_factory=list)  # Explicit JOIN syntax with conditions
+    # Phase 2 fields
+    intent: Optional[str] = None  # "monitoring", "analysis", "reporting", "alert"
+    complexity: Optional[str] = None  # "low", "medium", "high"
+    optimization_notes: List[str] = field(default_factory=list)
+    result_example: Optional['QueryResultExample'] = None
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'SQLQuery':
         """Create from dictionary"""
+        result_example = None
+        if "result_example" in data and data["result_example"]:
+            result_example = QueryResultExample.from_dict(data["result_example"])
+
         return cls(
             question_id=data.get("question_id", ""),
             query=data.get("query", ""),
@@ -144,7 +226,11 @@ class SQLQuery:
             tables_used=data.get("tables_used", []),
             aggregation_patterns=data.get("aggregation_patterns", []),
             filtering_rules=data.get("filtering_rules", []),
-            join_specs=data.get("join_specs", [])
+            join_specs=data.get("join_specs", []),
+            intent=data.get("intent"),
+            complexity=data.get("complexity"),
+            optimization_notes=data.get("optimization_notes", []),
+            result_example=result_example
         )
 
     def to_dict(self) -> Dict:
@@ -233,6 +319,9 @@ class RequirementsDocument:
     all_questions: List[Question] = field(default_factory=list)
     all_tables: List[TableInfo] = field(default_factory=list)
     all_queries: List[SQLQuery] = field(default_factory=list)
+    # Phase 2 fields
+    all_formulas: List[FormulaDefinition] = field(default_factory=list)
+    platform_notes: List[PlatformNote] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
         """Convert to dictionary"""

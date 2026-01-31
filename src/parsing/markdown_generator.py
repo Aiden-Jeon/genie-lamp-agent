@@ -63,6 +63,26 @@ class MarkdownGenerator:
         if agg_patterns.strip():
             sections.append(agg_patterns)
 
+        # 3d. Phase 2: Formula Library
+        formula_lib = self._generate_formula_library_section(doc)
+        if formula_lib.strip():
+            sections.append(formula_lib)
+
+        # 3e. Phase 2: Platform-Specific Logic
+        platform_notes = self._generate_platform_notes_section(doc)
+        if platform_notes.strip():
+            sections.append(platform_notes)
+
+        # 3f. Phase 2: Query Analysis
+        query_analysis = self._generate_query_analysis_section(doc)
+        if query_analysis.strip():
+            sections.append(query_analysis)
+
+        # 3g. Phase 2: Result Examples
+        result_examples = self._generate_result_examples_section(doc)
+        if result_examples.strip():
+            sections.append(result_examples)
+
         # 4. Table Relationships (ERD)
         sections.append(self._generate_erd_section(doc))
 
@@ -488,6 +508,153 @@ class MarkdownGenerator:
         for pattern, question_ids in sorted(pattern_usage.items()):
             content.append(f"### {pattern}\n")
             content.append(f"**Used in:** {', '.join(question_ids)}\n\n")
+
+        return "".join(content)
+
+    def _generate_formula_library_section(self, doc: RequirementsDocument) -> str:
+        """Generate formula library section (Phase 2)"""
+        if not doc.all_formulas:
+            return ""
+
+        content = ["## 📐 Formula Library\n"]
+        content.append("Reusable metric formulas used across queries.\n\n")
+
+        for formula in doc.all_formulas:
+            content.append(f"### {formula.name}\n")
+            content.append(f"**Formula:** `{formula.formula}`\n\n")
+            content.append(f"**Description:** {formula.description}\n\n")
+
+            if formula.required_columns:
+                content.append("**Required Columns:**\n")
+                for col in formula.required_columns:
+                    content.append(f"- `{col}`\n")
+                content.append("\n")
+
+            if formula.required_tables:
+                content.append("**Required Tables:**\n")
+                for table in formula.required_tables:
+                    content.append(f"- `{table}`\n")
+                content.append("\n")
+
+            if formula.notes:
+                content.append(f"**Notes:** {formula.notes}\n\n")
+
+            if formula.example_usage:
+                content.append("**Example Usage:**\n```sql\n")
+                content.append(f"{formula.example_usage}\n")
+                content.append("```\n\n")
+
+            content.append("---\n\n")
+
+        return "".join(content)
+
+    def _generate_platform_notes_section(self, doc: RequirementsDocument) -> str:
+        """Generate platform-specific logic section (Phase 2)"""
+        if not doc.platform_notes:
+            return ""
+
+        content = ["## 🎮 Platform-Specific Logic\n"]
+        content.append("Platform restrictions, transformations, and requirements.\n\n")
+
+        # Group by platform
+        by_platform = defaultdict(list)
+        for note in doc.platform_notes:
+            by_platform[note.platform].append(note)
+
+        for platform in sorted(by_platform.keys()):
+            notes = by_platform[platform]
+            content.append(f"### {platform}\n")
+
+            # Group by note type
+            by_type = defaultdict(list)
+            for note in notes:
+                by_type[note.note_type].append(note)
+
+            for note_type in ["restriction", "requirement", "transformation", "limitation"]:
+                if note_type in by_type:
+                    type_notes = by_type[note_type]
+                    content.append(f"\n**{note_type.title()}s:**\n")
+
+                    for note in type_notes:
+                        content.append(f"\n- {note.description}\n")
+
+                        if note.affected_tables:
+                            content.append(f"  - **Tables:** {', '.join([f'`{t}`' for t in note.affected_tables[:3]])}")
+                            if len(note.affected_tables) > 3:
+                                content.append(f" (+{len(note.affected_tables)-3} more)")
+                            content.append("\n")
+
+                        if note.affected_queries:
+                            content.append(f"  - **Queries:** {', '.join(note.affected_queries[:5])}")
+                            if len(note.affected_queries) > 5:
+                                content.append(f" (+{len(note.affected_queries)-5} more)")
+                            content.append("\n")
+
+                        if note.example_code:
+                            content.append(f"  - **Example:** `{note.example_code}`\n")
+
+            content.append("\n---\n\n")
+
+        return "".join(content)
+
+    def _generate_query_analysis_section(self, doc: RequirementsDocument) -> str:
+        """Generate LLM query analysis section (Phase 2)"""
+        # Check if any queries have analysis data
+        analyzed_queries = [q for q in doc.all_queries if q.intent or q.complexity or q.optimization_notes]
+
+        if not analyzed_queries:
+            return ""
+
+        content = ["## 🤖 Query Analysis\n"]
+        content.append("AI-powered analysis of query intent, complexity, and optimization opportunities.\n\n")
+
+        for query in analyzed_queries:
+            content.append(f"### {query.question_id}: {query.description}\n")
+
+            if query.intent:
+                content.append(f"**Intent:** {query.intent.title()}\n")
+
+            if query.complexity:
+                complexity_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(query.complexity, "⚪")
+                content.append(f"**Complexity:** {complexity_emoji} {query.complexity.title()}\n")
+
+            if query.optimization_notes:
+                content.append("\n**Optimization Suggestions:**\n")
+                for note in query.optimization_notes:
+                    content.append(f"- {note}\n")
+
+            content.append("\n")
+
+        return "".join(content)
+
+    def _generate_result_examples_section(self, doc: RequirementsDocument) -> str:
+        """Generate query result examples section (Phase 2)"""
+        # Check if any queries have result examples
+        queries_with_results = [q for q in doc.all_queries if q.result_example and q.result_example.sample_rows]
+
+        if not queries_with_results:
+            return ""
+
+        content = ["## 📋 Query Result Examples\n"]
+        content.append("Sample outputs for validation and understanding.\n\n")
+
+        for query in queries_with_results:
+            result = query.result_example
+            content.append(f"### {query.question_id}\n")
+
+            if result.column_names and result.sample_rows:
+                # Generate markdown table
+                content.append("| " + " | ".join(result.column_names) + " |\n")
+                content.append("|" + "|".join(["---" for _ in result.column_names]) + "|\n")
+
+                for row in result.sample_rows[:10]:  # Limit to 10 rows
+                    values = [str(row.get(col, "-")) for col in result.column_names]
+                    content.append("| " + " | ".join(values) + " |\n")
+
+            if result.notes:
+                content.append(f"\n**Notes:** {result.notes}\n")
+
+            content.append("\n")
 
         return "".join(content)
 
