@@ -22,10 +22,6 @@ targets:
   dev:
     mode: development
     default: true
-    workspace:
-      host: ${DATABRICKS_HOST}
 
   prod:
     mode: production
-    workspace:
-      host: ${DATABRICKS_HOST}
