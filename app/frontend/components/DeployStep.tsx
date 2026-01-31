@@ -13,12 +13,14 @@ interface DeployStepProps {
   configPath: string;
   onComplete: (result: any) => void;
   onPrevious: () => void;
+  existingResult?: any;
 }
 
-export function DeployStep({ sessionId, configPath, onComplete, onPrevious }: DeployStepProps) {
+export function DeployStep({ sessionId, configPath, onComplete, onPrevious, existingResult }: DeployStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [parentPath, setParentPath] = useState('');
   const { job, isPolling, error } = useJobPolling(jobId);
+  const [showingExistingResult, setShowingExistingResult] = useState(!!existingResult);
 
   const handleDeploy = async () => {
     try {
@@ -34,10 +36,10 @@ export function DeployStep({ sessionId, configPath, onComplete, onPrevious }: De
   };
 
   useEffect(() => {
-    if (job?.status === 'completed') {
+    if (job?.status === 'completed' && !showingExistingResult) {
       onComplete(job.result);
     }
-  }, [job, onComplete]);
+  }, [job, onComplete, showingExistingResult]);
 
   return (
     <div className="space-y-4">
@@ -46,7 +48,51 @@ export function DeployStep({ sessionId, configPath, onComplete, onPrevious }: De
         Deploy your validated configuration to Databricks Genie.
       </p>
 
-      <div className="space-y-2">
+      {/* Show existing result if navigating back */}
+      {showingExistingResult && existingResult && (
+        <div className="space-y-4">
+          <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+            <h3 className="text-xl font-bold text-green-800 mb-2">✅ Deployment Complete!</h3>
+            <p className="text-gray-700 mb-3">
+              <span className="font-semibold">Space ID:</span>{' '}
+              <code className="bg-gray-100 px-2 py-1 rounded">{existingResult.space_id}</code>
+            </p>
+            <a
+              href={existingResult.space_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Open Genie Space →
+            </a>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onPrevious}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Validate
+            </button>
+            <button
+              onClick={() => setShowingExistingResult(false)}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Deploy Again
+            </button>
+            <button
+              onClick={() => onComplete(existingResult)}
+              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Continue to Complete →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showingExistingResult && (
+        <>
+          <div className="space-y-2">
         <label className="block text-sm font-medium">
           Parent Path (Optional):
         </label>
@@ -102,6 +148,8 @@ export function DeployStep({ sessionId, configPath, onComplete, onPrevious }: De
           <p className="font-semibold">Deployment Failed</p>
           <p>{job.error}</p>
         </div>
+      )}
+        </>
       )}
     </div>
   );

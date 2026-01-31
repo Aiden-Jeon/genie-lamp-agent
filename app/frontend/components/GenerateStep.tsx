@@ -14,12 +14,14 @@ interface GenerateStepProps {
   requirementsPath: string;
   onComplete: (result: any) => void;
   onPrevious: () => void;
+  existingResult?: any;
 }
 
-export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevious }: GenerateStepProps) {
+export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevious, existingResult }: GenerateStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [model, setModel] = useState('databricks-gpt-5-2');
   const { job, isPolling, error } = useJobPolling(jobId);
+  const [showingExistingResult, setShowingExistingResult] = useState(!!existingResult);
 
   const handleGenerate = async () => {
     try {
@@ -31,10 +33,10 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevio
   };
 
   useEffect(() => {
-    if (job?.status === 'completed') {
+    if (job?.status === 'completed' && !showingExistingResult) {
       onComplete(job.result);
     }
-  }, [job, onComplete]);
+  }, [job, onComplete, showingExistingResult]);
 
   return (
     <div className="space-y-4">
@@ -43,7 +45,47 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevio
         Use AI to generate a Genie space configuration from your requirements.
       </p>
 
-      <div className="space-y-2">
+      {/* Show existing result if navigating back */}
+      {showingExistingResult && existingResult && (
+        <div className="space-y-4">
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <p className="font-semibold text-green-800">✓ Configuration Generated</p>
+            <div className="text-sm text-gray-600 mt-2 space-y-1">
+              <p>Tables: {existingResult?.tables_count || 0}</p>
+              <p>Instructions: {existingResult?.instructions_count || 0}</p>
+            </div>
+          </div>
+
+          {existingResult?.reasoning && (
+            <ReasoningDisplay reasoning={existingResult.reasoning} defaultExpanded={false} />
+          )}
+
+          <div className="flex gap-3">
+            <button
+              onClick={onPrevious}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Upload & Extract
+            </button>
+            <button
+              onClick={() => setShowingExistingResult(false)}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Generate Again
+            </button>
+            <button
+              onClick={() => onComplete(existingResult)}
+              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Continue to Validate →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showingExistingResult && (
+        <>
+          <div className="space-y-2">
         <label className="block text-sm font-medium">LLM Model:</label>
         <select
           value={model}
@@ -119,6 +161,8 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevio
           >
             ← Back to Upload & Extract
           </button>
+        </>
+      )}
         </>
       )}
     </div>

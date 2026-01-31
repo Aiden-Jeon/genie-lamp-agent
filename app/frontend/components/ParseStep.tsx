@@ -14,14 +14,16 @@ import { ParsedMarkdownPreview } from './ParsedMarkdownPreview';
 interface ParseStepProps {
   sessionId: string;
   onComplete: (result: any) => void;
+  existingResult?: any;
 }
 
-export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
+export function ParseStep({ sessionId, onComplete, existingResult }: ParseStepProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [jobId, setJobId] = useState<string | null>(null);
   const [useLLM, setUseLLM] = useState(true);
   const { job, isPolling, error: pollingError } = useJobPolling(jobId);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showingExistingResult, setShowingExistingResult] = useState(!!existingResult);
 
   const handleUpload = async () => {
     if (files.length === 0) return;
@@ -54,7 +56,49 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
         Upload and extract requirements from PDF or Markdown files.
       </p>
 
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+      {/* Show existing result if navigating back */}
+      {showingExistingResult && existingResult && (
+        <div className="mt-4 space-y-4">
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <p className="font-semibold text-green-800">✓ Extraction Complete!</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Extracted {existingResult?.tables_found || 0} tables from {existingResult?.files_parsed || 0} files
+            </p>
+          </div>
+
+          {existingResult?.enrichment_reasoning && (
+            <ReasoningDisplay
+              reasoning={existingResult.enrichment_reasoning}
+              defaultExpanded={false}
+            />
+          )}
+
+          <ParsedMarkdownPreview
+            sessionId={sessionId}
+            fileStats={existingResult?.parsed_file_stats}
+            defaultExpanded={false}
+          />
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowingExistingResult(false)}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Upload New Files
+            </button>
+            <button
+              onClick={() => onComplete(existingResult)}
+              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Continue to Generate Step →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!showingExistingResult && (
+        <>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
         <input
           type="file"
           multiple
@@ -233,6 +277,8 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
             Continue to Generate Step →
           </button>
         </div>
+      )}
+        </>
       )}
     </div>
   );

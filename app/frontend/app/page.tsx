@@ -49,6 +49,7 @@ export default function Home() {
                 setWorkflowState((s: any) => ({ ...s, parseResult: result }));
                 setCurrentStep(2);
               }}
+              existingResult={workflowState.parseResult}
             />
           )}
 
@@ -61,6 +62,7 @@ export default function Home() {
                 setCurrentStep(3);
               }}
               onPrevious={() => setCurrentStep(1)}
+              existingResult={workflowState.generateResult}
             />
           )}
 
@@ -73,6 +75,7 @@ export default function Home() {
                 setCurrentStep(4);
               }}
               onPrevious={() => setCurrentStep(2)}
+              existingResult={workflowState.validateResult}
             />
           )}
 
@@ -85,6 +88,7 @@ export default function Home() {
                 setCurrentStep(5);
               }}
               onPrevious={() => setCurrentStep(3)}
+              existingResult={workflowState.deployResult}
             />
           )}
 
