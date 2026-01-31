@@ -1,6 +1,7 @@
 """FastAPI backend for Genie Lamp Agent Databricks App."""
 
 import os
+from datetime import datetime
 from typing import List
 from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from services.job_tasks import (
     run_deploy_job,
     apply_validation_fixes
 )
+from services.benchmark_validator import validate_benchmark_queries
 from middleware.auth import get_current_user
 
 
@@ -90,6 +92,20 @@ class DeployRequest(BaseModel):
     session_id: str
     config_path: str
     parent_path: str = None
+
+
+class CreateSessionRequest(BaseModel):
+    user_id: str = "default"
+    name: str = None
+
+
+class UpdateSessionNameRequest(BaseModel):
+    name: str
+
+
+class ValidateBenchmarkRequest(BaseModel):
+    session_id: str
+    benchmarks: List[dict]  # List of {question, expected_sql, ...}
 
 
 # Health check
@@ -292,6 +308,52 @@ async def deploy_space_endpoint(
     }
 
 
+# Benchmark validation endpoint
+@app.post("/api/benchmark/validate")
+async def validate_benchmarks_endpoint(
+    request: ValidateBenchmarkRequest,
+    background_tasks: BackgroundTasks,
+    # current_user: dict = Depends(get_current_user)  # Disabled for local dev
+):
+    """
+    Validate benchmark SQL queries against Unity Catalog.
+
+    Executes each benchmark's expected_sql query to verify it runs successfully.
+    """
+    # Create job
+    job = job_manager.create_job("benchmark_validate", request.session_id, {
+        "total_benchmarks": len(request.benchmarks)
+    })
+
+    # Get Databricks connection details from environment
+    databricks_server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME")
+    databricks_http_path = os.getenv("DATABRICKS_HTTP_PATH")
+    databricks_token = os.getenv("DATABRICKS_TOKEN")
+
+    # Create wrapper function that returns result or raises exception
+    # Note: run_job adds job_id to kwargs, so we need to accept **kwargs
+    def run_benchmark_validation(**kwargs):
+        return validate_benchmark_queries(
+            benchmarks=request.benchmarks,
+            databricks_server_hostname=databricks_server_hostname,
+            databricks_http_path=databricks_http_path,
+            databricks_token=databricks_token
+        )
+
+    # Start background task (run_job automatically handles completion/failure)
+    background_tasks.add_task(
+        job_manager.run_job,
+        job.job_id,
+        run_benchmark_validation
+    )
+
+    return {
+        "job_id": job.job_id,
+        "status": "running",
+        "message": f"Validating {len(request.benchmarks)} benchmark queries"
+    }
+
+
 # Job status endpoint
 @app.get("/api/jobs/{job_id}")
 async def get_job_status(
@@ -320,16 +382,112 @@ async def get_job_status(
     }
 
 
-# Session endpoint
+# List sessions endpoint
+@app.get("/api/sessions")
+async def list_sessions(
+    user_id: str = None,
+    limit: int = 50,
+    offset: int = 0,
+    # current_user: dict = Depends(get_current_user)  # Disabled for local dev
+):
+    """
+    List all sessions with pagination.
+
+    Returns sessions ordered by updated_at DESC (most recent first).
+    """
+    sessions, total_count = session_store.list_sessions(user_id=user_id, limit=limit, offset=offset)
+
+    return {
+        "sessions": [
+            {
+                "session_id": session["session_id"],
+                "name": session["name"],
+                "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
+                "updated_at": session["updated_at"].isoformat() if isinstance(session["updated_at"], datetime) else session["updated_at"],
+                "job_count": session["job_count"]
+            }
+            for session in sessions
+        ],
+        "total_count": total_count
+    }
+
+
+# Create session endpoint
+@app.post("/api/sessions")
+async def create_session(
+    request: CreateSessionRequest,
+    # current_user: dict = Depends(get_current_user)  # Disabled for local dev
+):
+    """
+    Create a new session.
+
+    Optionally provide a custom name, otherwise defaults to timestamp.
+    """
+    session_id = session_store.create_session(user_id=request.user_id, name=request.name)
+    session = session_store.get_session_with_stats(session_id)
+
+    return {
+        "session_id": session_id,
+        "name": session["name"],
+        "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
+        "updated_at": session["updated_at"].isoformat() if isinstance(session["updated_at"], datetime) else session["updated_at"],
+        "job_count": 0
+    }
+
+
+# Update session name endpoint
+@app.put("/api/sessions/{session_id}")
+async def update_session_name(
+    session_id: str,
+    request: UpdateSessionNameRequest,
+    # current_user: dict = Depends(get_current_user)  # Disabled for local dev
+):
+    """
+    Update session name.
+
+    Also updates the updated_at timestamp.
+    """
+    session_store.update_session_name(session_id, request.name)
+    session = session_store.get_session_with_stats(session_id)
+
+    if not session:
+        return {"error": "Session not found"}, 404
+
+    return {
+        "session_id": session_id,
+        "name": session["name"],
+        "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
+        "updated_at": session["updated_at"].isoformat() if isinstance(session["updated_at"], datetime) else session["updated_at"],
+        "job_count": session["job_count"]
+    }
+
+
+# Delete session endpoint
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    # current_user: dict = Depends(get_current_user)  # Disabled for local dev
+):
+    """
+    Delete session and all associated jobs.
+
+    This is a hard delete with cascade to jobs (cannot be undone).
+    """
+    session_store.delete_session(session_id)
+
+    return {"success": True}
+
+
+# Get session details endpoint
 @app.get("/api/sessions/{session_id}")
 async def get_session(
     session_id: str,
     # current_user: dict = Depends(get_current_user)  # Disabled for local dev
 ):
     """
-    Get all jobs for a session.
+    Get all jobs for a session with full results.
 
-    Shows workflow progress across all steps.
+    Shows workflow progress across all steps with job results for state restoration.
     """
     jobs = session_store.get_jobs_for_session(session_id)
 
@@ -345,8 +503,10 @@ async def get_session(
                 "job_id": job.job_id,
                 "type": job.type,
                 "status": job.status,
+                "result": job.result,  # Include full result for state restoration
                 "error": job.error,
-                "created_at": job.created_at.isoformat() if job.created_at else None
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "completed_at": job.completed_at.isoformat() if job.completed_at else None
             }
             for job in jobs
         ]

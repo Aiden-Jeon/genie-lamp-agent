@@ -74,6 +74,19 @@ export interface ValidationFix {
   new_table: string;
 }
 
+export interface Session {
+  session_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  job_count: number;
+}
+
+export interface SessionListResponse {
+  sessions: Session[];
+  total_count: number;
+}
+
 export const apiClient = {
   /**
    * Upload and parse requirement documents.
@@ -185,7 +198,67 @@ export const apiClient = {
   },
 
   /**
-   * Get session information and all jobs.
+   * List all sessions with pagination.
+   */
+  async listSessions(
+    limit: number = 50,
+    offset: number = 0,
+    userId?: string
+  ): Promise<SessionListResponse> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (userId) {
+      params.append('user_id', userId);
+    }
+    const res = await fetch(`${API_BASE}/api/sessions?${params}`);
+    if (!res.ok) throw new Error(`List sessions failed: ${res.statusText}`);
+    return res.json();
+  },
+
+  /**
+   * Create a new session.
+   */
+  async createSession(name?: string, userId: string = 'default'): Promise<Session> {
+    const res = await fetch(`${API_BASE}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        name,
+      }),
+    });
+    if (!res.ok) throw new Error(`Create session failed: ${res.statusText}`);
+    return res.json();
+  },
+
+  /**
+   * Update session name.
+   */
+  async updateSessionName(sessionId: string, name: string): Promise<Session> {
+    const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) throw new Error(`Update session failed: ${res.statusText}`);
+    return res.json();
+  },
+
+  /**
+   * Delete a session and all its jobs.
+   */
+  async deleteSession(sessionId: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Delete session failed: ${res.statusText}`);
+    return res.json();
+  },
+
+  /**
+   * Get session information and all jobs with full results.
    */
   async getSession(sessionId: string): Promise<{
     session_id: string;
@@ -194,8 +267,10 @@ export const apiClient = {
       job_id: string;
       type: string;
       status: string;
+      result?: any;
       error?: string;
       created_at?: string;
+      completed_at?: string;
     }>;
   }> {
     const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`);
@@ -214,6 +289,29 @@ export const apiClient = {
       `${API_BASE}/api/files/${sessionId}/${filename}`
     );
     if (!res.ok) throw new Error(`Get file failed: ${res.statusText}`);
+    return res.json();
+  },
+
+  /**
+   * Validate benchmark SQL queries.
+   */
+  async validateBenchmarks(
+    sessionId: string,
+    benchmarks: Array<{
+      question: string;
+      expected_sql: string;
+      [key: string]: any;
+    }>
+  ): Promise<{ job_id: string; status: string }> {
+    const res = await fetch(`${API_BASE}/api/benchmark/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session_id: sessionId,
+        benchmarks,
+      }),
+    });
+    if (!res.ok) throw new Error(`Benchmark validation failed: ${res.statusText}`);
     return res.json();
   },
 };

@@ -49,6 +49,10 @@ class JobManager:
             created_at=datetime.now()
         )
         self.store.save_job(job)
+
+        # Update session activity timestamp
+        self.store.update_session_activity(session_id)
+
         return job
 
     async def run_job(self, job_id: str, task_func: Callable, *args, **kwargs) -> None:

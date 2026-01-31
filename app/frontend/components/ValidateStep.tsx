@@ -19,7 +19,7 @@ interface ValidateStepProps {
 
 export function ValidateStep({ sessionId, configPath, onComplete, onPrevious, existingResult }: ValidateStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
-  const [showFixer, setShowFixer] = useState(false);
+  const [showFixer, setShowFixer] = useState(existingResult?.has_errors || false);
   const [validationResult, setValidationResult] = useState<any>(existingResult || null);
   const { job, isPolling, error } = useJobPolling(jobId);
   const [showingExistingResult, setShowingExistingResult] = useState(!!existingResult);
@@ -42,6 +42,7 @@ export function ValidateStep({ sessionId, configPath, onComplete, onPrevious, ex
     try {
       setShowFixer(false);
       setValidationResult(null);
+      setShowingExistingResult(false); // Reset to allow new validation result to be processed
       const response = await apiClient.fixValidation(
         sessionId,
         configPath,
@@ -109,6 +110,34 @@ export function ValidateStep({ sessionId, configPath, onComplete, onPrevious, ex
         </div>
       )}
 
+      {/* Show existing result with errors */}
+      {showingExistingResult && validationResult && validationResult.has_errors && (
+        <div className="space-y-4">
+          <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
+            <h3 className="text-xl font-bold text-orange-800 mb-2">⚠️ Previous Validation Had Errors</h3>
+            <p className="text-orange-700">
+              {validationResult.tables_invalid || 0} table{(validationResult.tables_invalid || 0) > 1 ? 's' : ''} had validation issues.
+            </p>
+            <p className="text-sm text-gray-600 mt-2">You can fix the issues below or validate again.</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onPrevious}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Generate
+            </button>
+            <button
+              onClick={() => setShowingExistingResult(false)}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Validate Again
+            </button>
+          </div>
+        </div>
+      )}
+
       {!showingExistingResult && !validationResult && !isPolling && (
         <div className="flex gap-3">
           <button
@@ -154,12 +183,12 @@ export function ValidateStep({ sessionId, configPath, onComplete, onPrevious, ex
         <ValidationFixer issues={validationResult.issues} onApplyFixes={handleApplyFixes} />
       )}
 
-      {validationResult && !validationResult.has_errors && (
+      {validationResult && !validationResult.has_errors && !showingExistingResult && (
         <>
           <div className="bg-green-50 p-6 rounded-lg border border-green-200">
             <h3 className="text-xl font-bold text-green-800 mb-2">✅ Validation Passed!</h3>
             <p className="text-green-700">
-              {validationResult.tables_valid} table{validationResult.tables_valid > 1 ? 's' : ''}{' '}
+              {validationResult.tables_valid.length} table{validationResult.tables_valid.length !== 1 ? 's' : ''}{' '}
               validated successfully.
             </p>
             <p className="text-sm text-gray-600 mt-2">Ready to deploy to Databricks Genie.</p>

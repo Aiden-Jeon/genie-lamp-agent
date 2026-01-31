@@ -4,7 +4,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useJobPolling } from '@/lib/hooks/useJobPolling';
+import { apiClient } from '@/lib/api-client';
+import { BenchmarkFixer } from './BenchmarkFixer';
 
 interface Benchmark {
   question: string;         // Required (Korean question)
@@ -28,6 +31,10 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [expandedSql, setExpandedSql] = useState<Set<number>>(new Set());
   const [validationErrors, setValidationErrors] = useState<Map<number, string[]>>(new Map());
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [sqlValidationResults, setSqlValidationResults] = useState<any>(null);
+  const [showSqlFixer, setShowSqlFixer] = useState(false);
+  const { job, isPolling, error: jobError } = useJobPolling(jobId);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -129,6 +136,61 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
     onComplete(benchmarks);
   };
 
+  const handleValidateSql = async () => {
+    if (benchmarks.length === 0) {
+      alert('No benchmarks to validate');
+      return;
+    }
+
+    try {
+      setSqlValidationResults(null);
+      const response = await apiClient.validateBenchmarks(sessionId, benchmarks);
+      setJobId(response.job_id);
+    } catch (err) {
+      console.error('Failed to start benchmark validation:', err);
+      alert('Failed to start benchmark validation: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  };
+
+  // Update SQL validation results when job completes
+  useEffect(() => {
+    if (job?.status === 'completed' && job.result) {
+      setSqlValidationResults(job.result);
+      // Show fixer if there are errors
+      if (job.result.has_errors) {
+        setShowSqlFixer(true);
+      }
+    }
+  }, [job]);
+
+  const handleFixQuery = (index: number, newSql: string) => {
+    // Update the benchmark with the fixed SQL
+    const updated = [...benchmarks];
+    updated[index] = { ...updated[index], expected_sql: newSql };
+    setBenchmarks(updated);
+  };
+
+  const handleRemoveFailedQueries = () => {
+    if (!sqlValidationResults) return;
+
+    const failedIndices = new Set(
+      sqlValidationResults.results
+        .filter((r: any) => r.status === 'failed')
+        .map((r: any) => r.index)
+    );
+
+    const filtered = benchmarks.filter((_, idx) => !failedIndices.has(idx));
+    setBenchmarks(filtered);
+    setSqlValidationResults(null);
+    setShowSqlFixer(false);
+  };
+
+  const handleRevalidate = () => {
+    setSqlValidationResults(null);
+    setShowSqlFixer(false);
+    handleValidateSql();
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">Step 4: Benchmark Questions</h2>
@@ -194,12 +256,21 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
                 <h3 className="text-lg font-semibold">
                   Benchmarks ({benchmarks.length})
                 </h3>
-                <button
-                  onClick={addNewBenchmark}
-                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-                >
-                  + Add Benchmark
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleValidateSql}
+                    disabled={isPolling}
+                    className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {isPolling ? 'Validating...' : 'Validate SQL'}
+                  </button>
+                  <button
+                    onClick={addNewBenchmark}
+                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                  >
+                    + Add Benchmark
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -319,6 +390,116 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
             </div>
           )}
 
+          {/* SQL Validation Progress */}
+          {isPolling && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="font-semibold">Validating benchmark SQL queries...</p>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div className="bg-blue-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }} />
+              </div>
+              <p className="text-sm text-gray-600 mt-2">Executing queries against Unity Catalog</p>
+            </div>
+          )}
+
+          {/* SQL Validation Error */}
+          {jobError && (
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
+              <p className="font-semibold">Validation Error</p>
+              <p>{jobError}</p>
+            </div>
+          )}
+
+          {/* SQL Validation Results */}
+          {sqlValidationResults && (
+            <div className="space-y-3">
+              {/* Success Banner */}
+              {!sqlValidationResults.has_errors && (
+                <div className="bg-green-50 p-6 rounded-lg border-2 border-green-300 shadow-lg">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="text-4xl">✅</div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-green-800">All Benchmark Queries Passed!</h3>
+                      <p className="text-green-700 text-lg">
+                        {sqlValidationResults.total_benchmarks} {sqlValidationResults.total_benchmarks === 1 ? 'query' : 'queries'} executed successfully
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    All SQL queries are valid and ready to be used as benchmarks.
+                  </p>
+                </div>
+              )}
+
+              {/* Failure Banner */}
+              {sqlValidationResults.has_errors && (
+                <div className="bg-red-50 p-6 rounded-lg border-2 border-red-300 shadow-lg">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="text-4xl">⚠️</div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-red-800">Validation Failed</h3>
+                      <p className="text-red-700 text-lg">
+                        {sqlValidationResults.failed} of {sqlValidationResults.total_benchmarks} {sqlValidationResults.total_benchmarks === 1 ? 'query' : 'queries'} failed
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Fix the errors below or exclude failing benchmarks to continue.
+                  </p>
+                </div>
+              )}
+
+              {/* Show failed queries */}
+              {sqlValidationResults.results?.filter((r: any) => r.status === 'failed').map((result: any) => (
+                <div key={result.index} className="bg-red-50 p-4 rounded-lg border border-red-300">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-semibold text-red-800">
+                      Benchmark #{result.index + 1}: {result.question}
+                    </h4>
+                    <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">FAILED</span>
+                  </div>
+                  <div className="text-sm text-red-700 mb-2">
+                    <strong>Error:</strong> {result.error}
+                  </div>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-red-600 hover:text-red-800">Show SQL</summary>
+                    <pre className="mt-2 bg-white p-2 rounded border border-red-200 overflow-x-auto">
+                      <code>{result.sql}</code>
+                    </pre>
+                  </details>
+                </div>
+              ))}
+
+              {/* Show passed queries summary */}
+              {sqlValidationResults.passed > 0 && !showSqlFixer && (
+                <details className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <summary className="cursor-pointer font-semibold text-green-800">
+                    ✓ {sqlValidationResults.passed} Passed Queries
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    {sqlValidationResults.results?.filter((r: any) => r.status === 'passed').map((result: any) => (
+                      <div key={result.index} className="text-sm">
+                        <span className="font-medium">#{result.index + 1}:</span> {result.question}
+                        <span className="text-gray-600 ml-2">
+                          ({result.row_count} rows, {result.execution_time_ms}ms)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+
+          {/* Benchmark Fixer */}
+          {showSqlFixer && sqlValidationResults?.results && (
+            <BenchmarkFixer
+              results={sqlValidationResults.results}
+              onFixQuery={handleFixQuery}
+              onRemoveFailedQueries={handleRemoveFailedQueries}
+              onRevalidate={handleRevalidate}
+            />
+          )}
+
           {/* Action buttons */}
           <div className="space-y-3 pt-4">
             {/* Show validation error summary if there are errors */}
@@ -360,6 +541,29 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
                     className="flex-1 px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
                   >
                     Skip Validation & Continue Anyway →
+                  </button>
+                </>
+              ) : sqlValidationResults && !sqlValidationResults.has_errors ? (
+                <button
+                  onClick={handleContinue}
+                  className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold"
+                >
+                  ✓ All Queries Validated - Continue to Deploy →
+                </button>
+              ) : sqlValidationResults && sqlValidationResults.has_errors ? (
+                <>
+                  <button
+                    onClick={handleValidateSql}
+                    disabled={isPolling}
+                    className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+                  >
+                    Re-validate After Fixes
+                  </button>
+                  <button
+                    onClick={handleSkipValidation}
+                    className="flex-1 px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                  >
+                    Continue Despite Errors →
                   </button>
                 </>
               ) : (
