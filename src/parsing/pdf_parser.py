@@ -214,54 +214,67 @@ class PDFParser:
             raise
     
     def _get_image_based_prompt(self) -> str:
-        """Get prompt for image-based PDF interpretation"""
-        return """You are an expert at extracting structured information from technical documents.
+        """Enhanced prompt for comprehensive extraction (concise version)"""
+        return """Extract structured information from these technical document pages as JSON.
 
-I'm providing you with images of PDF pages. Please analyze these pages and extract:
+EXTRACT:
+1. Questions: id, text, category (KPI/Social/Sentiment/Trend/Comparison/Regional/Other), tables_needed
+2. Tables: full_name, description, key_columns, related_kpi, table_remarks (special notes)
+3. SQL Queries: question_id, query (EXACT formatting), description, aggregation_patterns, filtering_rules, join_specs
+4. Joins: left_table, right_table, join_type, join_condition, is_optional
+5. Metadata: document_title, domain
 
-1. **Questions/Requirements**: Business questions or requirements mentioned in the document
-2. **Table Schemas**: Database table names, column names, and descriptions
-3. **SQL Queries**: Any SQL code present in the document
-4. **Metadata**: Document title, domain (social_analytics/kpi_analytics/combined), and other relevant info
+KEY INSTRUCTIONS:
+- Preserve exact SQL formatting and indentation
+- Mark columns as "optional" if marked "선택적" or "(optional)"
+- Extract aggregation patterns: ["COALESCE", "CTE", "UNION_ALL", "window_function", "try_divide"]
+- Extract filtering rules from WHERE clauses (e.g., "event_date >= DATE '2025-07-26'")
+- Extract join relationships with exact conditions
+- Capture table remarks: special notes about capabilities, constraints, platform restrictions
+- Distinguish column usage: event_date (filtering) vs created_at (display/sorting)
+- Note transformation rules: FROM_UNIXTIME for Steam timestamps
 
-Extract and structure this information as JSON:
-```json
+JSON SCHEMA:
 {
-  "questions": [
-    {
-      "id": "Q1",
-      "text": "question text in Korean or English (preserve original language)",
-      "category": "KPI/Social/Sentiment/Trend/Comparison/Regional/Other",
-      "tables_needed": ["catalog.schema.table"]
-    }
-  ],
-  "tables": [
-    {
-      "full_name": "catalog.schema.table",
-      "description": "brief description of what this table contains",
-      "key_columns": ["col1", "col2"],
-      "related_kpi": "DAU/ARPU/etc or null"
-    }
-  ],
-  "sql_queries": [
-    {
-      "question_id": "Q1",
-      "query": "SELECT ... (preserve exact SQL formatting and indentation)",
-      "description": "what this query does"
-    }
-  ],
+  "questions": [{
+    "id": "Q1",
+    "text": "question (preserve Korean/English)",
+    "category": "KPI/Social/...",
+    "tables_needed": ["catalog.schema.table"]
+  }],
+  "tables": [{
+    "full_name": "catalog.schema.table",
+    "description": "brief description",
+    "key_columns": [
+      {"name": "col1", "data_type": "bigint", "is_required": true, "usage_type": "join_key"},
+      {"name": "event_date", "data_type": "date", "is_required": true, "usage_type": "filtering", "transformation_rule": "partition column"},
+      {"name": "created_at", "data_type": "timestamp", "is_required": false, "usage_type": "display"}
+    ],
+    "related_kpi": "DAU/ARPU/null",
+    "table_remarks": ["week_start_day specification required", "PUBG Only"]
+  }],
+  "sql_queries": [{
+    "question_id": "Q1",
+    "query": "SELECT ... (exact SQL with formatting)",
+    "description": "what this answers",
+    "aggregation_patterns": ["COALESCE", "CTE"],
+    "filtering_rules": ["event_date >= DATE '2025-07-26'", "game_code = 'inzoi'"],
+    "join_specs": ["LEFT JOIN reaction ON message.message_id = reaction.message_id (required)", "LEFT JOIN channel_list ON message.channel_id = channel_list.channel_id (optional)"]
+  }],
+  "join_specifications": [{
+    "left_table": "main.log_discord.message",
+    "right_table": "main.log_discord.reaction",
+    "join_type": "LEFT",
+    "join_condition": "message.message_id = reaction.message_id",
+    "is_optional": false
+  }],
   "metadata": {
-    "document_title": "extracted title from the document",
+    "document_title": "extracted title",
     "domain": "social_analytics/kpi_analytics/combined"
   }
 }
-```
 
-Important:
-- Preserve Korean text exactly as written
-- Keep SQL queries with original formatting and indentation
-- Identify table relationships from JOIN clauses
-- Return ONLY valid JSON, no markdown code blocks or additional text"""
+Return ONLY valid JSON, no markdown blocks."""
     
     def _get_system_prompt(self) -> str:
         """Get system prompt for LLM interpretation"""

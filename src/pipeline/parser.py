@@ -12,6 +12,8 @@ from src.parsing.markdown_parser import MarkdownParser
 from src.parsing.requirements_structurer import RequirementsStructurer
 from src.parsing.llm_enricher import LLMEnricher
 from src.parsing.markdown_generator import generate_markdown
+from src.parsing.formula_extractor import extract_formulas
+from src.parsing.platform_analyzer import analyze_platform_logic
 from src.llm.databricks_llm import DatabricksFoundationModelClient
 from src.utils.parse_cache import ParseCacheManager
 from src.utils.page_cache import PageCacheManager
@@ -197,11 +199,27 @@ async def parse_documents_async(
     structurer = RequirementsStructurer()
     doc = structurer.structure_data(pdf_data, md_data)
     doc = structurer.update_metadata(doc)
-    
+
     if verbose:
         print(f"   ✓ Structured document: {len(doc.all_questions)} questions, "
               f"{len(doc.all_tables)} tables, {len(doc.sections)} sections")
-    
+
+    # =========================================================================
+    # STEP 3.5: Phase 2 - Extract formulas and platform logic
+    # =========================================================================
+    if verbose:
+        print("🔧 Extracting Phase 2 metadata...")
+
+    # Extract formula library
+    doc.all_formulas = extract_formulas(doc.all_queries)
+
+    # Extract platform-specific logic
+    doc.platform_notes = analyze_platform_logic(doc.all_tables, doc.all_queries)
+
+    if verbose:
+        print(f"   ✓ Extracted {len(doc.all_formulas)} formulas, "
+              f"{len(doc.platform_notes)} platform notes")
+
     # =========================================================================
     # STEP 4: Enrich with LLM (optional)
     # =========================================================================
@@ -529,6 +547,17 @@ async def parse_documents_async_with_progress(
     if verbose:
         print(f"   ✓ Structured document: {len(doc.all_questions)} questions, "
               f"{len(doc.all_tables)} tables, {len(doc.sections)} sections")
+
+    # Phase 2 - Extract formulas and platform logic
+    if verbose:
+        print("🔧 Extracting Phase 2 metadata...")
+
+    doc.all_formulas = extract_formulas(doc.all_queries)
+    doc.platform_notes = analyze_platform_logic(doc.all_tables, doc.all_queries)
+
+    if verbose:
+        print(f"   ✓ Extracted {len(doc.all_formulas)} formulas, "
+              f"{len(doc.platform_notes)} platform notes")
 
     # Enrich with LLM (optional)
     enrichment_reasoning = {}
