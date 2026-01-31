@@ -37,28 +37,28 @@ def test_imports():
         return False
     
     try:
-        from src import models
+        from genie import models
         print("  ✓ src.models")
     except ImportError as e:
         print(f"  ✗ src.models: {e}")
         return False
     
     try:
-        from src.prompt import prompt_builder
+        from genie.prompt import prompt_builder
         print("  ✓ src.prompt.prompt_builder")
     except ImportError as e:
         print(f"  ✗ src.prompt.prompt_builder: {e}")
         return False
     
     try:
-        from src.llm import databricks_llm
+        from genie.llm import databricks_llm
         print("  ✓ src.llm.databricks_llm")
     except ImportError as e:
         print(f"  ✗ src.llm.databricks_llm: {e}")
         return False
     
     try:
-        from src.api import genie_space_client
+        from genie.api import genie_space_client
         print("  ✓ src.api.genie_space_client")
     except ImportError as e:
         print(f"  ✗ src.api.genie_space_client: {e}")
@@ -140,7 +140,7 @@ def test_client_initialization():
     print("Testing client initialization...")
     
     try:
-        from src.api.genie_space_client import GenieSpaceClient
+        from genie.api.genie_space_client import GenieSpaceClient
         
         # Try to initialize with explicit credentials (won't make any API calls)
         try:

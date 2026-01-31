@@ -10,7 +10,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from dotenv import load_dotenv
-from src.pipeline import deploy_space
+from genie.pipeline import deploy_space
 
 # Load environment variables
 load_dotenv()

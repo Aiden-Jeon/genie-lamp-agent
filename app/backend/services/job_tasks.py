@@ -2,18 +2,18 @@
 
 import asyncio
 import os
-import sys
 from typing import Dict, List
 
-# Add project root to path to import existing modules
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
-sys.path.insert(0, project_root)
 
-from src.pipeline.parser import parse_documents_async, parse_documents_async_with_progress
-from src.pipeline.generator import generate_config
-from src.pipeline.validator import validate_config
-from src.pipeline.deployer import deploy_space
-from src.utils.page_cache import PageCacheManager
+
+# Project root is grandparent of app directory (../../.. from services/)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+
+from genie.pipeline.parser import parse_documents_async, parse_documents_async_with_progress
+from genie.pipeline.generator import generate_config
+from genie.pipeline.validator import validate_config
+from genie.pipeline.deployer import deploy_space
+from genie.utils.page_cache import PageCacheManager
 from genie import update_config_catalog_schema_table, update_config_catalog_schema, remove_table_from_config
 
 # Global reference to session store (set by job manager)

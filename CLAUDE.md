@@ -20,7 +20,7 @@ cp .env.example .env
 
 ### Running Tests
 ```bash
-# Run all tests (LLM tests auto-skipped if src/llm/ not modified)
+# Run all tests (LLM tests auto-skipped if genie/llm/ not modified)
 .venv/bin/python -m pytest tests/ -v
 
 # Run specific test domains
@@ -30,14 +30,14 @@ cp .env.example .env
 .venv/bin/python -m pytest tests/test_transformation_domain.py -v
 .venv/bin/python -m pytest tests/test_integration.py -v
 
-# Force run LLM tests (even if src/llm/ not modified)
+# Force run LLM tests (even if genie/llm/ not modified)
 RUN_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
 
 # Force skip LLM tests
 SKIP_LLM_TESTS=true .venv/bin/python -m pytest tests/ -v
 ```
 
-**Note:** LLM tests are automatically skipped unless `src/llm/` has been modified. This speeds up test runs and avoids unnecessary API costs. To force running LLM tests, set `RUN_LLM_TESTS=true`.
+**Note:** LLM tests are automatically skipped unless `genie/llm/` has been modified. This speeds up test runs and avoids unnecessary API costs. To force running LLM tests, set `RUN_LLM_TESTS=true`.
 
 ### Main CLI Commands
 ```bash
@@ -67,37 +67,37 @@ Requirements Doc → LLM Generation → Validation → Deployment
 
 ### Core Components
 
-1. **Pipeline Layer** (`src/pipeline/`)
+1. **Pipeline Layer** (`genie/pipeline/`)
    - **generator.py**: Orchestrates LLM-based config generation with prompt building
    - **validator.py**: Validates tables/columns against Unity Catalog with interactive replacement
    - **deployer.py**: Deploys configurations via Genie Space API
    - **parser.py**: Async PDF/markdown parsing with concurrent processing
 
-2. **LLM Integration** (`src/llm/`)
+2. **LLM Integration** (`genie/llm/`)
    - **databricks_llm.py**: Databricks Foundation Model client with structured output support
    - Handles both text models (databricks-gpt-5-2) and vision models (databricks-claude-sonnet-4)
 
-3. **Prompt Construction** (`src/prompt/`)
+3. **Prompt Construction** (`genie/prompt/`)
    - **prompt_builder.py**: Builds multi-part prompts from templates and requirements
    - Combines best practices, API specs, and user requirements into structured prompts
-   - Templates in `src/prompt/templates/`:
+   - Templates in `genie/prompt/templates/`:
      - `curate_effective_genie.md`: Databricks Genie best practices
      - `genie_api.md`: Genie Space API specification
 
-4. **Validation & Utilities** (`src/utils/`)
+4. **Validation & Utilities** (`genie/utils/`)
    - **table_validator.py**: Unity Catalog table/column verification
    - **config_transformer.py**: Converts user-friendly format to Databricks `serialized_space` format
 
-5. **API Integration** (`src/api/`)
+5. **API Integration** (`genie/api/`)
    - **genie_space_client.py**: Complete Genie Space API wrapper (create, update, list, trash)
 
-6. **Parsing System** (`src/parsing/`)
+6. **Parsing System** (`genie/parsing/`)
    - **pdf_parser.py**: Hybrid PDF parsing (pdfplumber + LLM vision models)
    - **markdown_parser.py**: Regex-based markdown extraction
    - **requirements_structurer.py**: Unified data models for requirements
    - **llm_enricher.py**: Optional LLM-based enrichment
 
-### Key Data Models (`src/models.py`)
+### Key Data Models (`genie/models.py`)
 
 All models use Pydantic v2 for validation:
 - **LLMResponseWithReasoning**: LLM output with reasoning and confidence
@@ -249,7 +249,7 @@ From `.cursor/rules/python-standards.mdc`:
 - Reports detailed validation errors with suggestions
 
 ### Genie Space API
-Complete API wrapper in `src/api/genie_space_client.py`:
+Complete API wrapper in `genie/api/genie_space_client.py`:
 - `create_space()`: Deploy new spaces
 - `update_space()`: Full or partial updates
 - `list_spaces()`: Paginated listing
@@ -286,8 +286,8 @@ cp -r .claude/skills/genie-commit ~/.codex/skills/
 ## Common Workflows
 
 ### Adding New Features to Config Generation
-1. Update Pydantic models in `src/models.py`
-2. Modify prompt templates in `src/prompt/templates/`
+1. Update Pydantic models in `genie/models.py`
+2. Modify prompt templates in `genie/prompt/templates/`
 3. Update `config_transformer.py` for serialized format
 4. Add tests in `tests/test_generation.py`
 
@@ -297,7 +297,7 @@ cp -r .claude/skills/genie-commit ~/.codex/skills/
 3. Add tests in `tests/test_table_validator.py`
 
 ### Modifying Prompt Templates
-Templates are markdown files in `src/prompt/templates/`:
+Templates are markdown files in `genie/prompt/templates/`:
 - Edit `curate_effective_genie.md` for best practices
 - Edit `genie_api.md` for API specifications
 - Prompts are assembled by `PromptBuilder` class

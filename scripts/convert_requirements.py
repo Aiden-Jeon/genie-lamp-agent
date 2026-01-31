@@ -13,12 +13,12 @@ import os
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.parsing.pdf_parser import PDFParser
-from src.parsing.markdown_parser import MarkdownParser
-from src.parsing.requirements_structurer import RequirementsStructurer
-from src.parsing.llm_enricher import LLMEnricher
-from src.parsing.markdown_generator import generate_markdown
-from src.llm.databricks_llm import DatabricksFoundationModelClient
+from genie.parsing.pdf_parser import PDFParser
+from genie.parsing.markdown_parser import MarkdownParser
+from genie.parsing.requirements_structurer import RequirementsStructurer
+from genie.parsing.llm_enricher import LLMEnricher
+from genie.parsing.markdown_generator import generate_markdown
+from genie.llm.databricks_llm import DatabricksFoundationModelClient
 
 # Setup logging
 logging.basicConfig(

@@ -10,7 +10,7 @@ from collections import Counter
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.parsing.feedback_parser import parse_feedback_file
+from genie.parsing.feedback_parser import parse_feedback_file
 
 
 def print_separator(char="=", length=80):

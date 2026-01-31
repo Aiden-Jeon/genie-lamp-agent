@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.parsing.feedback_parser import parse_feedback_file
+from genie.parsing.feedback_parser import parse_feedback_file
 
 
 def export_to_csv(filepath: str, output_path: str = None):

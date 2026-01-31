@@ -28,7 +28,7 @@ load_dotenv()
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from src.pipeline import generate_config, validate_config, deploy_space, parse_documents
+from genie.pipeline import generate_config, validate_config, deploy_space, parse_documents
 
 
 def update_config_catalog_schema_table(
@@ -1217,13 +1217,13 @@ Environment Variables:
     create_parser.add_argument(
         "--context-doc",
         type=str,
-        default="src/prompt/templates/curate_effective_genie.md",
+        default="genie/prompt/templates/curate_effective_genie.md",
         help="Path to context document"
     )
     create_parser.add_argument(
         "--output-doc",
         type=str,
-        default="src/prompt/templates/genie_api.md",
+        default="genie/prompt/templates/genie_api.md",
         help="Path to output format document"
     )
     
@@ -1320,13 +1320,13 @@ Environment Variables:
     generate_parser.add_argument(
         "--context-doc",
         type=str,
-        default="src/prompt/templates/curate_effective_genie.md",
+        default="genie/prompt/templates/curate_effective_genie.md",
         help="Context document path"
     )
     generate_parser.add_argument(
         "--output-doc",
         type=str,
-        default="src/prompt/templates/genie_api.md",
+        default="genie/prompt/templates/genie_api.md",
         help="Output format document path"
     )
     generate_parser.add_argument(
