@@ -122,6 +122,11 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
     onComplete(benchmarks);
   };
 
+  const handleSkipValidation = () => {
+    setValidationErrors(new Map()); // Clear validation errors
+    onComplete(benchmarks);
+  };
+
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold">Step 4: Benchmark Questions</h2>
@@ -313,28 +318,57 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
           )}
 
           {/* Action buttons */}
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={onPrevious}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              ← Previous
-            </button>
-            {benchmarks.length === 0 ? (
-              <button
-                onClick={() => onComplete([])}
-                className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Skip Benchmarks & Continue to Deploy →
-              </button>
-            ) : (
-              <button
-                onClick={handleContinue}
-                className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Save {benchmarks.length} Benchmark{benchmarks.length > 1 ? 's' : ''} & Continue →
-              </button>
+          <div className="space-y-3 pt-4">
+            {/* Show validation error summary if there are errors */}
+            {validationErrors.size > 0 && (
+              <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                <p className="text-sm font-semibold text-red-800 mb-2">
+                  ⚠️ {validationErrors.size} benchmark{validationErrors.size > 1 ? 's have' : ' has'} validation errors
+                </p>
+                <p className="text-xs text-red-700">
+                  Fix the errors and try again, or skip validation to continue anyway.
+                </p>
+              </div>
             )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={onPrevious}
+                className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                ← Previous
+              </button>
+              {benchmarks.length === 0 ? (
+                <button
+                  onClick={() => onComplete([])}
+                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Skip Benchmarks & Continue to Deploy →
+                </button>
+              ) : validationErrors.size > 0 ? (
+                <>
+                  <button
+                    onClick={handleContinue}
+                    className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Fix Errors & Validate Again
+                  </button>
+                  <button
+                    onClick={handleSkipValidation}
+                    className="flex-1 px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                  >
+                    Skip Validation & Continue Anyway →
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleContinue}
+                  className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Save {benchmarks.length} Benchmark{benchmarks.length > 1 ? 's' : ''} & Continue →
+                </button>
+              )}
+            </div>
           </div>
         </>
       )}
