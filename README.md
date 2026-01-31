@@ -120,7 +120,7 @@ python genie.py parse --input-dir docs/ --output data/requirements.md --cache-fi
 
 **Python API:**
 ```python
-from src.pipeline.parser import parse_documents, parse_documents_async
+from genie.pipeline.parser import parse_documents, parse_documents_async
 
 # Synchronous (with async under the hood)
 result = parse_documents(
@@ -617,7 +617,7 @@ Done!
 You can use the pipeline functions programmatically:
 
 ```python
-from src.pipeline import generate_config, validate_config, deploy_space
+from genie.pipeline import generate_config, validate_config, deploy_space
 
 # Generate configuration with full quality validation
 config = generate_config(
@@ -663,14 +663,14 @@ print(f"Space URL: {result['space_url']}")
 For more control, use the underlying components directly:
 
 ```python
-from src.prompt.prompt_builder import PromptBuilder
-from src.llm.databricks_llm import DatabricksFoundationModelClient
-from src.benchmark.benchmark_extractor import extract_all_benchmarks
+from genie.prompt.prompt_builder import PromptBuilder
+from genie.llm.databricks_llm import DatabricksFoundationModelClient
+from genie.benchmark.benchmark_extractor import extract_all_benchmarks
 
 # Build prompt
 builder = PromptBuilder(
-    context_doc_path="src/prompt/templates/curate_effective_genie.md",
-    output_doc_path="src/prompt/templates/genie_api.md",
+    context_doc_path="genie/prompt/templates/curate_effective_genie.md",
+    output_doc_path="genie/prompt/templates/genie_api.md",
     input_data_path="sample/inputs/demo_requirements.md"
 )
 prompt = builder.build_prompt_with_reasoning()
@@ -691,7 +691,7 @@ print(f"Number of tables: {len(config.tables)}")
 #### Managing Genie Spaces
 
 ```python
-from src.api.genie_space_client import GenieSpaceClient
+from genie.api.genie_space_client import GenieSpaceClient
 
 client = GenieSpaceClient()
 
@@ -731,7 +731,7 @@ response = client.create_space(
 
 ### Customizing the Prompt
 
-You can modify `src/prompt/prompt_builder.py` to customize:
+You can modify `genie/prompt/prompt_builder.py` to customize:
 
 - Instruction format
 - Additional context
@@ -771,9 +771,9 @@ databricks serving-endpoints list
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture, component details, and integration flows
 
 ### Template Documentation
-- **[src/prompt/templates/curate_effective_genie.md](src/prompt/templates/curate_effective_genie.md)**: Databricks Genie best practices
-- **[src/prompt/templates/genie_api.md](src/prompt/templates/genie_api.md)**: Genie Space API specification
-- **[src/prompt/templates/guide_prompt_with_reasoning.md](src/prompt/templates/guide_prompt_with_reasoning.md)**: Enhanced prompt template with SQL quality criteria and few-shot examples
+- **[genie/prompt/templates/curate_effective_genie.md](genie/prompt/templates/curate_effective_genie.md)**: Databricks Genie best practices
+- **[genie/prompt/templates/genie_api.md](genie/prompt/templates/genie_api.md)**: Genie Space API specification
+- **[genie/prompt/templates/guide_prompt_with_reasoning.md](genie/prompt/templates/guide_prompt_with_reasoning.md)**: Enhanced prompt template with SQL quality criteria and few-shot examples
 
 ### Configuration Format
 The system supports a user-friendly configuration format that includes:
@@ -876,7 +876,7 @@ When users ask about performance but don't specify time range, ask:
 > "To analyze performance, please specify: (1) time period (e.g., last month, Q1 2024)"
 ```
 
-All configurations are automatically transformed to Databricks' internal `serialized_space` format when creating or updating Genie spaces. The transformation is handled transparently by `src/utils/config_transformer.py`.
+All configurations are automatically transformed to Databricks' internal `serialized_space` format when creating or updating Genie spaces. The transformation is handled transparently by `genie/utils/config_transformer.py`.
 
 ## Parsing Module
 
@@ -885,7 +885,7 @@ The parsing module provides a complete pipeline for extracting, structuring, and
 ### Module Structure
 
 ```
-src/parsing/
+genie/parsing/
 ├── __init__.py                    # Module exports
 ├── pdf_parser.py                  # PDF extraction (hybrid: pdfplumber + LLM)
 ├── markdown_parser.py             # Markdown extraction (regex-based)
@@ -907,7 +907,7 @@ src/parsing/
 
 **Usage:**
 ```python
-from src.parsing import PDFParser, extract_pdf
+from genie.parsing import PDFParser, extract_pdf
 
 parser = PDFParser(llm_client=llm_client)
 data = parser.parse_pdf("document.pdf", use_llm=True)
@@ -923,7 +923,7 @@ data = parser.parse_pdf("document.pdf", use_llm=True)
 
 **Usage:**
 ```python
-from src.parsing import MarkdownParser, parse_markdown_file
+from genie.parsing import MarkdownParser, parse_markdown_file
 
 parser = MarkdownParser()
 data = parser.parse_file("requirements.md")
@@ -941,7 +941,7 @@ data = parser.parse_file("requirements.md")
 
 **Usage:**
 ```python
-from src.parsing import RequirementsStructurer, structure_requirements
+from genie.parsing import RequirementsStructurer, structure_requirements
 
 structurer = RequirementsStructurer()
 doc = structurer.structure_data(pdf_data, md_data)
@@ -958,7 +958,7 @@ doc = structurer.structure_data(pdf_data, md_data)
 
 **Usage:**
 ```python
-from src.parsing import LLMEnricher, enrich_requirements
+from genie.parsing import LLMEnricher, enrich_requirements
 
 enricher = LLMEnricher(llm_client)
 enriched_doc = enricher.enrich_document(doc)
@@ -975,7 +975,7 @@ enriched_doc = enricher.enrich_document(doc)
 
 **Usage:**
 ```python
-from src.parsing import MarkdownGenerator, generate_markdown
+from genie.parsing import MarkdownGenerator, generate_markdown
 
 markdown = generate_markdown(doc, "output.md")
 ```
@@ -985,7 +985,7 @@ markdown = generate_markdown(doc, "output.md")
 #### Basic Usage (All-in-one)
 
 ```python
-from src.parsing import (
+from genie.parsing import (
     PDFParser,
     MarkdownParser,
     RequirementsStructurer,
@@ -1010,14 +1010,14 @@ markdown = generate_markdown(doc, "output.md")
 #### With LLM Enrichment
 
 ```python
-from src.parsing import (
+from genie.parsing import (
     PDFParser,
     MarkdownParser,
     RequirementsStructurer,
     LLMEnricher,
     generate_markdown
 )
-from src.llm.databricks_llm import DatabricksFoundationModelClient
+from genie.llm.databricks_llm import DatabricksFoundationModelClient
 
 # Initialize LLM
 llm_client = DatabricksFoundationModelClient(model_name="databricks-gpt-5-2")
@@ -1226,7 +1226,7 @@ cd genie-lamp-agent
 # Create a feature branch
 git checkout -b feature/your-feature-name
 
-# Make your changes and test (LLM tests auto-skipped if src/llm/ not modified)
+# Make your changes and test (LLM tests auto-skipped if genie/llm/ not modified)
 .venv/bin/python -m pytest tests/
 
 # To force run LLM tests:
@@ -1254,11 +1254,11 @@ See `.claude/skills/README.md` for details.
 
 ### Extension Points
 
-1. **Add new Pydantic models** in `src/models.py`
-2. **Enhance prompt templates** in `src/prompt/prompt_builder.py`
-3. **Add new LLM providers** in `src/llm/databricks_llm.py`
-4. **Add new API clients** in `src/api/`
-5. **Add new utilities** in `src/utils/`
+1. **Add new Pydantic models** in `genie/models.py`
+2. **Enhance prompt templates** in `genie/prompt/prompt_builder.py`
+3. **Add new LLM providers** in `genie/llm/databricks_llm.py`
+4. **Add new API clients** in `genie/api/`
+5. **Add new utilities** in `genie/utils/`
 6. **Update the main script** for new features
 
 ### Pull Request Process

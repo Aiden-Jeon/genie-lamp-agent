@@ -306,7 +306,18 @@
 ├── CONVERSION_PIPELINE.md          # Requirements conversion guide
 ├── SIMPLIFIED_WORKFLOW.md          # Simplified workflow details
 │
-├── src/                            # Core source code
+├── app/                            # 🌟 Databricks App (Web UI Mode)
+│   ├── databricks.yml              # Asset bundle configuration
+│   ├── app.yaml                    # Databricks App configuration
+│   ├── backend/                    # FastAPI backend
+│   │   ├── services/               # Business logic services
+│   │   │   └── job_tasks.py        # Job task orchestration
+│   │   └── middleware/             # Request middleware
+│   └── frontend/                   # Next.js UI application
+│       ├── src/                    # React components
+│       └── public/                 # Static assets
+│
+├── genie/                            # Core source code (Python package)
 │   ├── __init__.py
 │   ├── models.py                   # Pydantic models for Genie space config
 │   ├── pipeline/                   # 🌟 Pipeline orchestration
@@ -401,21 +412,21 @@
 
 **Key Changes in Structure:**
 - 🌟 **genie.py**: Unified CLI (main entry point) that combines parse, generate, validate, and deploy
-- 🌟 **src/pipeline/**: Orchestration layer with generator, validator, deployer, and parser modules
+- 🌟 **genie/pipeline/**: Orchestration layer with generator, validator, deployer, and parser modules
   - **parser.py**: Async/concurrent document parsing module with progress tracking and caching
-- **src/parsing/**: Complete requirements parsing pipeline (PDF, Markdown, structuring, enrichment)
-- 🆕 **src/benchmark/**: Benchmark extraction, loading, and SQL generation (modular)
-- 🆕 **src/extractor/**: Domain knowledge, example queries, and table extraction (modular)
-- 🆕 **src/validation/**: SQL validation, instruction scoring, and table validation (modular)
+- **genie/parsing/**: Complete requirements parsing pipeline (PDF, Markdown, structuring, enrichment)
+- 🆕 **genie/benchmark/**: Benchmark extraction, loading, and SQL generation (modular)
+- 🆕 **genie/extractor/**: Domain knowledge, example queries, and table extraction (modular)
+- 🆕 **genie/validation/**: SQL validation, instruction scoring, and table validation (modular)
 - 🆕 **sample/**: Sample data directory with demo requirements and benchmarks
 
 ### Modular Reorganization (2026)
 
 The codebase has been refactored into a more modular structure for better maintainability and clarity:
 
-**Before (monolithic `src/utils/`):**
+**Before (monolithic `genie/utils/`):**
 ```
-src/utils/
+genie/utils/
 ├── benchmark_extractor.py
 ├── benchmark_sql_generator.py
 ├── domain_extractor.py
@@ -430,7 +441,7 @@ src/utils/
 
 **After (organized by domain):**
 ```
-src/
+genie/
 ├── benchmark/              # Benchmark-related functionality
 │   ├── benchmark_extractor.py
 │   ├── benchmark_loader.py
@@ -561,8 +572,8 @@ This improves instruction clarity and makes configurations more maintainable.
 **Purpose**: Provide comprehensive context for LLM generation
 
 **Components**:
-- `src/prompt/templates/curate_effective_genie.md`: Best practices and principles
-- `src/prompt/templates/genie_api.md`: API documentation and schema information
+- `genie/prompt/templates/curate_effective_genie.md`: Best practices and principles
+- `genie/prompt/templates/genie_api.md`: API documentation and schema information
 - `sample/inputs/demo_requirements.md`: Example business requirements (Fashion Retail Analytics demo)
 
 **Format**: Markdown documents with structured information
@@ -674,7 +685,7 @@ LLMResponse
 
 ### 5. Document Parsing Layer (Enhanced 2026)
 
-**Module**: `src/pipeline/parser.py`
+**Module**: `genie/pipeline/parser.py`
 
 **Responsibilities**:
 ```python
@@ -741,7 +752,7 @@ def parse_documents(...):
 - **Query Analysis** section (intent, complexity, optimization)
 - Metadata about extracted content
 
-**Data Models** (see `src/parsing/requirements_structurer.py`):
+**Data Models** (see `genie/parsing/requirements_structurer.py`):
 
 ```python
 @dataclass
@@ -921,7 +932,7 @@ This section describes the three-priority quality assurance system that ensures 
 #### 8.1 Domain Knowledge Extractor (Priority 3)
 
 **Class**: `DomainKnowledgeExtractor`
-**Module**: `src/extractor/domain_extractor.py`
+**Module**: `genie/extractor/domain_extractor.py`
 
 **Purpose**: Extract structured domain knowledge from requirements documents to provide explicit context to the LLM.
 
@@ -988,7 +999,7 @@ class DomainKnowledge:
 #### 8.2 SQL Validator (Priority 2)
 
 **Class**: `SQLValidator`
-**Module**: `src/validation/sql_validator.py`
+**Module**: `genie/validation/sql_validator.py`
 
 **Purpose**: Comprehensive SQL syntax, table/column validation, and quality checking.
 
@@ -1035,7 +1046,7 @@ Score = 100 - (errors × 10) - (warnings × 2)
 #### 8.3 Instruction Quality Scorer (Priority 2)
 
 **Class**: `InstructionQualityScorer`
-**Module**: `src/validation/instruction_scorer.py`
+**Module**: `genie/validation/instruction_scorer.py`
 
 **Purpose**: Score instruction quality across 3 dimensions to ensure clear, specific, well-structured guidance.
 
@@ -1091,8 +1102,8 @@ class ConfigInstructionQualityReport:
 
 #### 8.4 Benchmark SQL Generator (New 2026)
 
-**Module**: `src/utils/benchmark_sql_generator.py`
-**Prompt Template**: `src/prompt/templates/benchmark_sql_prompt.md`
+**Module**: `genie/utils/benchmark_sql_generator.py`
+**Prompt Template**: `genie/prompt/templates/benchmark_sql_prompt.md`
 
 **Purpose**: Generate SQL queries for benchmark questions using a two-pass approach that scales to 100+ benchmarks without token limit issues.
 
@@ -1221,7 +1232,7 @@ genie.py generate --requirements data/requirements.md \
 #### 8.5 Configuration Review Agent (Priority 3)
 
 **Class**: `ConfigReviewAgent`
-**Module**: `src/pipeline/reviewer.py`
+**Module**: `genie/pipeline/reviewer.py`
 
 **Purpose**: Comprehensive 4-dimension quality assessment of generated configurations before deployment.
 
@@ -1398,10 +1409,10 @@ STEP 2: 🆕 Enhanced Prompt Building (P1 + P3)
 ─────────────────────────────────────────────
 PromptBuilder.build_prompt_with_reasoning(domain_knowledge)
     │
-    ├─── Read src/prompt/templates/curate_effective_genie.md
+    ├─── Read genie/prompt/templates/curate_effective_genie.md
     │        (Best practices, principles, guidelines)
     │
-    ├─── Read src/prompt/templates/genie_api.md
+    ├─── Read genie/prompt/templates/genie_api.md
     │        (API schema, output format, examples)
     │
     ├─── Read sample/inputs/demo_requirements.md
@@ -1451,7 +1462,7 @@ DatabricksFoundationModelClient.generate_genie_config()
             │
             ▼
 
-Pydantic Validation (src/models.py)
+Pydantic Validation (genie/models.py)
     │
     ├─── Parse JSON string
     ├─── Validate against LLMResponse schema
@@ -3366,8 +3377,8 @@ from src.prompt.prompt_builder import PromptBuilder
 from src.llm.databricks_llm import DatabricksFoundationModelClient
 
 builder = PromptBuilder(
-    context_doc_path="src/prompt/templates/curate_effective_genie.md",
-    output_doc_path="src/prompt/templates/genie_api.md",
+    context_doc_path="genie/prompt/templates/curate_effective_genie.md",
+    output_doc_path="genie/prompt/templates/genie_api.md",
     input_data_path="sample/inputs/demo_requirements.md"
 )
 prompt = builder.build_prompt_with_reasoning()
@@ -3494,36 +3505,36 @@ config, serialized = load_and_transform_config("config.json")
 | `scripts/analyze_feedback.py` | Feedback analysis |
 | `scripts/export_feedback_csv.py` | Feedback export to CSV |
 | `examples/create_genie_space_example.py` | Python API examples |
-| `src/pipeline/parser.py` | Document parsing module (async/concurrent) |
-| `src/pipeline/generator.py` | Configuration generation module |
-| `src/pipeline/validator.py` | Table validation module |
-| `src/pipeline/deployer.py` | Space deployment module |
-| `src/models.py` | Pydantic schema models |
-| `src/prompt/prompt_builder.py` | Prompt construction |
-| `src/llm/databricks_llm.py` | Databricks LLM client |
-| `src/api/genie_space_client.py` | Genie Space API client |
-| `src/utils/config_transformer.py` | Config transformation |
-| `src/validation/table_validator.py` | Table & column validator |
-| `src/benchmark/benchmark_extractor.py` | Benchmark extractor (Pass 1) |
-| `src/benchmark/benchmark_loader.py` | Benchmark JSON loader |
-| `src/benchmark/benchmark_sql_generator.py` | Benchmark SQL generator (Pass 2) |
-| `src/extractor/domain_extractor.py` | Domain knowledge extractor |
-| `src/extractor/example_extractor.py` | Example SQL query extractor |
-| `src/extractor/table_extractor.py` | Table information extractor |
-| `src/validation/sql_validator.py` | SQL syntax & quality validator |
-| `src/validation/instruction_scorer.py` | Instruction quality scorer |
-| `src/utils/benchmark_sql_generator.py` | 🆕 Benchmark SQL generator (Pass 2, 2026) |
-| `src/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) with enhanced prompt |
-| `src/parsing/markdown_parser.py` | Markdown extraction (regex) with Phase 1 enhancements |
-| `src/parsing/requirements_structurer.py` | Data models & structuring (Phase 1 + Phase 2 fields) |
-| `src/parsing/llm_enricher.py` | LLM-based enrichment |
-| `src/parsing/markdown_generator.py` | Markdown output generation with 7 enhanced sections |
-| `src/parsing/formula_extractor.py` | 🆕 Formula pattern detection (Phase 2) |
-| `src/parsing/platform_analyzer.py` | 🆕 Platform-specific logic analysis (Phase 2) |
-| `src/parsing/feedback_parser.py` | Feedback analysis parser |
-| `src/prompt/templates/curate_effective_genie.md` | Best practices context |
-| `src/prompt/templates/genie_api.md` | API documentation |
-| `src/prompt/templates/benchmark_sql_prompt.md` | 🆕 Benchmark SQL prompt (2026) |
+| `genie/pipeline/parser.py` | Document parsing module (async/concurrent) |
+| `genie/pipeline/generator.py` | Configuration generation module |
+| `genie/pipeline/validator.py` | Table validation module |
+| `genie/pipeline/deployer.py` | Space deployment module |
+| `genie/models.py` | Pydantic schema models |
+| `genie/prompt/prompt_builder.py` | Prompt construction |
+| `genie/llm/databricks_llm.py` | Databricks LLM client |
+| `genie/api/genie_space_client.py` | Genie Space API client |
+| `genie/utils/config_transformer.py` | Config transformation |
+| `genie/validation/table_validator.py` | Table & column validator |
+| `genie/benchmark/benchmark_extractor.py` | Benchmark extractor (Pass 1) |
+| `genie/benchmark/benchmark_loader.py` | Benchmark JSON loader |
+| `genie/benchmark/benchmark_sql_generator.py` | Benchmark SQL generator (Pass 2) |
+| `genie/extractor/domain_extractor.py` | Domain knowledge extractor |
+| `genie/extractor/example_extractor.py` | Example SQL query extractor |
+| `genie/extractor/table_extractor.py` | Table information extractor |
+| `genie/validation/sql_validator.py` | SQL syntax & quality validator |
+| `genie/validation/instruction_scorer.py` | Instruction quality scorer |
+| `genie/utils/benchmark_sql_generator.py` | 🆕 Benchmark SQL generator (Pass 2, 2026) |
+| `genie/parsing/pdf_parser.py` | PDF extraction (pdfplumber + LLM) with enhanced prompt |
+| `genie/parsing/markdown_parser.py` | Markdown extraction (regex) with Phase 1 enhancements |
+| `genie/parsing/requirements_structurer.py` | Data models & structuring (Phase 1 + Phase 2 fields) |
+| `genie/parsing/llm_enricher.py` | LLM-based enrichment |
+| `genie/parsing/markdown_generator.py` | Markdown output generation with 7 enhanced sections |
+| `genie/parsing/formula_extractor.py` | 🆕 Formula pattern detection (Phase 2) |
+| `genie/parsing/platform_analyzer.py` | 🆕 Platform-specific logic analysis (Phase 2) |
+| `genie/parsing/feedback_parser.py` | Feedback analysis parser |
+| `genie/prompt/templates/curate_effective_genie.md` | Best practices context |
+| `genie/prompt/templates/genie_api.md` | API documentation |
+| `genie/prompt/templates/benchmark_sql_prompt.md` | 🆕 Benchmark SQL prompt (2026) |
 | `sample/inputs/demo_requirements.md` | Example requirements (Fashion Retail Analytics) |
 | `sample/benchmarks/benchmarks.json` | Example benchmark questions |
 | `output/genie_space_config.json` | Generated configuration |
