@@ -35,6 +35,14 @@ export interface JobProgress {
   enrichment_progress?: EnrichmentProgress[];
 }
 
+export interface FileContentResponse {
+  content: string;
+  filename: string;
+  size_bytes: number;
+  line_count: number;
+  char_count: number;
+}
+
 export interface JobStatus {
   job_id: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
@@ -44,6 +52,11 @@ export interface JobStatus {
     reasoning?: Record<string, string>;
     tables_count?: number;
     instructions_count?: number;
+    parsed_file_stats?: {
+      size_bytes: number;
+      line_count: number;
+      char_count: number;
+    };
     [key: string]: any;
   };
   error?: string | null;
@@ -187,6 +200,20 @@ export const apiClient = {
   }> {
     const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`);
     if (!res.ok) throw new Error(`Get session failed: ${res.statusText}`);
+    return res.json();
+  },
+
+  /**
+   * Get file content from session directory.
+   */
+  async getFileContent(
+    sessionId: string,
+    filename: string
+  ): Promise<FileContentResponse> {
+    const res = await fetch(
+      `${API_BASE}/api/files/${sessionId}/${filename}`
+    );
+    if (!res.ok) throw new Error(`Get file failed: ${res.statusText}`);
     return res.json();
   },
 };

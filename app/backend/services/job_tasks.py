@@ -144,12 +144,25 @@ def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str, job_id
                 verbose=False
             ))
 
+        # Calculate file stats for frontend
+        file_stats = {}
+        if os.path.exists(output_path):
+            stats = os.stat(output_path)
+            with open(output_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            file_stats = {
+                "size_bytes": stats.st_size,
+                "line_count": len(content.splitlines()),
+                "char_count": len(content)
+            }
+
         return {
             "output_path": output_path,
             "tables_found": result.get("tables_count", 0),
             "files_parsed": len(file_paths),
             "cache_stats": result.get("cache_stats", {}),
-            "enrichment_reasoning": result.get("enrichment_reasoning")
+            "enrichment_reasoning": result.get("enrichment_reasoning"),
+            "parsed_file_stats": file_stats
         }
     finally:
         # Restore original directory

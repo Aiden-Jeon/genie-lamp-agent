@@ -9,6 +9,7 @@ import { useJobPolling } from '@/lib/hooks/useJobPolling';
 import { apiClient } from '@/lib/api-client';
 import { FileProgressList } from './FileProgressList';
 import { ReasoningDisplay } from './ReasoningDisplay';
+import { ParsedMarkdownPreview } from './ParsedMarkdownPreview';
 
 interface ParseStepProps {
   sessionId: string;
@@ -217,6 +218,13 @@ export function ParseStep({ sessionId, onComplete }: ParseStepProps) {
               defaultExpanded={true}
             />
           )}
+
+          {/* Show parsed markdown preview */}
+          <ParsedMarkdownPreview
+            sessionId={sessionId}
+            fileStats={job.result?.parsed_file_stats}
+            defaultExpanded={false}
+          />
 
           <button
             onClick={() => onComplete(job.result)}

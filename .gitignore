@@ -1,3 +1,6 @@
+*.pid
+
+change_logs/
 feedback/
 data/
 real_requirements/
@@ -58,3 +61,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Git worktrees
+worktrees/

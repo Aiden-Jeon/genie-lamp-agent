@@ -111,6 +111,66 @@ All models use Pydantic v2 for validation:
 
 ## Important Patterns
 
+### Git Worktree Workflow
+**MANDATORY: Always use Git worktrees for new tasks.** Never work directly on the main branch.
+
+#### Creating a New Worktree
+When starting any new task, feature, or fix, create a dedicated worktree:
+
+```bash
+# Create worktree with branch name
+git worktree add worktrees/<branch-name> -b <branch-name>
+
+# Examples
+git worktree add worktrees/feat/add-validation -b feat/add-validation
+git worktree add worktrees/fix/parsing-bug -b fix/parsing-bug
+git worktree add worktrees/refactor/cleanup-llm -b refactor/cleanup-llm
+```
+
+#### Working in Worktrees
+Change to the worktree directory and work normally:
+
+```bash
+cd worktrees/feat/add-validation
+
+# Work normally - virtual environment is shared
+.venv/bin/python -m pytest tests/ -v
+
+# Commit changes
+git add .
+git commit -m "feat: Add validation feature"
+```
+
+#### After Merging to Main
+Clean up the worktree after the branch is merged:
+
+```bash
+# Return to main repository
+cd ../..
+
+# Remove the worktree
+git worktree remove worktrees/feat/add-validation
+
+# Delete the merged branch
+git branch -d feat/add-validation
+```
+
+#### Listing and Managing Worktrees
+```bash
+# List all worktrees
+git worktree list
+
+# Remove worktree if branch is deleted
+git worktree prune
+```
+
+#### Why Use Worktrees?
+1. **Isolation**: Each task has its own working directory
+2. **Context switching**: No need to stash or commit incomplete work
+3. **Parallel work**: Work on multiple tasks simultaneously
+4. **Safety**: Main branch stays clean and untouched
+5. **Easy cleanup**: Remove worktree directory after merge
+
 ### Virtual Environment Requirement
 **ALWAYS use `.venv/bin/python` instead of `python` or `python3`**. This is enforced by `.cursor/rules/python-standards.mdc`.
 

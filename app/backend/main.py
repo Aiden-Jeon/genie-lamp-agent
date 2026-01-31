@@ -353,6 +353,54 @@ async def get_session(
     }
 
 
+# File content endpoint
+@app.get("/api/files/{session_id}/{filename}")
+async def get_file_content(
+    session_id: str,
+    filename: str,
+    # current_user: dict = Depends(get_current_user)  # Disabled for local dev
+):
+    """
+    Get file content from session directory.
+
+    Security: Only allows whitelisted files to prevent path traversal attacks.
+    """
+    # Security: Validate filename (prevent path traversal)
+    allowed_files = [
+        'parsed_requirements.md',
+        'genie_space_config.json',
+        'validation_report.json'
+    ]
+
+    if filename not in allowed_files:
+        return {"error": "File not allowed"}, 403
+
+    # Get file path
+    session_dir = file_storage.get_session_dir(session_id)
+    file_path = f"{session_dir}/{filename}"
+
+    # Check existence
+    if not os.path.exists(file_path):
+        return {"error": "File not found"}, 404
+
+    # Read with stats
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        stats = os.stat(file_path)
+
+        return {
+            "content": content,
+            "filename": filename,
+            "size_bytes": stats.st_size,
+            "line_count": len(content.splitlines()),
+            "char_count": len(content)
+        }
+    except Exception as e:
+        return {"error": f"Failed to read file: {str(e)}"}, 500
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
