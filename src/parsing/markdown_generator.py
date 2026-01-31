@@ -47,16 +47,31 @@ class MarkdownGenerator:
         
         # 3. Table Sections with Sample Queries
         sections.append(self._generate_table_sections(doc))
-        
+
+        # 3a. Enhanced: Column Details (Phase 1)
+        column_details = self._generate_column_details_section(doc)
+        if column_details.strip():
+            sections.append(column_details)
+
+        # 3b. Enhanced: Join Specifications (Phase 1)
+        join_specs = self._generate_join_specs_section(doc)
+        if join_specs.strip():
+            sections.append(join_specs)
+
+        # 3c. Enhanced: Aggregation Patterns (Phase 1)
+        agg_patterns = self._generate_aggregation_patterns_section(doc)
+        if agg_patterns.strip():
+            sections.append(agg_patterns)
+
         # 4. Table Relationships (ERD)
         sections.append(self._generate_erd_section(doc))
-        
+
         # 5. Common Filters & Dimensions
         sections.append(self._generate_filters_section(doc))
-        
+
         # 6. Table Mapping for Business Questions
         sections.append(self._generate_table_mapping(doc))
-        
+
         # 7. Meta Tables
         sections.append(self._generate_meta_tables_section(doc))
         
@@ -392,6 +407,89 @@ class MarkdownGenerator:
             lines.append("Metadata tables provide reference data for dimensions and lookups.")
         
         return "\n".join(lines)
+
+    def _generate_column_details_section(self, doc: RequirementsDocument) -> str:
+        """Generate detailed column metadata section"""
+        content = ["## 📋 Column Details\n"]
+
+        has_content = False
+        for table in doc.all_tables:
+            # Only show tables with enhanced column info
+            if not table.columns:
+                continue
+
+            # Check if any column has enhanced metadata
+            has_enhanced = any(
+                col.usage_type or col.transformation_rule or not col.is_required
+                for col in table.columns
+            )
+
+            if not has_enhanced:
+                continue
+
+            has_content = True
+            content.append(f"### {table.full_name}\n")
+            content.append("| Column | Type | Required | Usage | Notes |\n")
+            content.append("|--------|------|----------|-------|-------|\n")
+
+            for col in table.columns:
+                req = "✓" if col.is_required else "○"
+                usage = col.usage_type or "-"
+                notes = col.transformation_rule or "-"
+                data_type = col.data_type or "-"
+                content.append(f"| `{col.name}` | {data_type} | {req} | {usage} | {notes} |\n")
+
+            if table.table_remarks:
+                content.append("\n**Remarks:**\n")
+                for remark in table.table_remarks:
+                    content.append(f"- {remark}\n")
+
+            content.append("\n")
+
+        if not has_content:
+            return ""
+
+        return "".join(content)
+
+    def _generate_join_specs_section(self, doc: RequirementsDocument) -> str:
+        """Generate join specifications section"""
+        content = ["## 🔗 Join Relationships\n"]
+
+        has_content = False
+        for query in doc.all_queries:
+            if not query.join_specs:
+                continue
+
+            has_content = True
+            content.append(f"### {query.question_id}\n")
+            for join_spec in query.join_specs:
+                optional = " (optional)" if "optional" in join_spec.lower() else " (required)"
+                content.append(f"- {join_spec}{optional}\n")
+            content.append("\n")
+
+        if not has_content:
+            return ""
+
+        return "".join(content)
+
+    def _generate_aggregation_patterns_section(self, doc: RequirementsDocument) -> str:
+        """Generate aggregation patterns section"""
+        content = ["## 📊 Aggregation Patterns\n"]
+
+        # Collect patterns from all queries
+        pattern_usage = defaultdict(list)
+        for query in doc.all_queries:
+            for pattern in query.aggregation_patterns:
+                pattern_usage[pattern].append(query.question_id)
+
+        if not pattern_usage:
+            return ""
+
+        for pattern, question_ids in sorted(pattern_usage.items()):
+            content.append(f"### {pattern}\n")
+            content.append(f"**Used in:** {', '.join(question_ids)}\n\n")
+
+        return "".join(content)
 
 
 def generate_markdown(doc: RequirementsDocument, output_path: str) -> str:

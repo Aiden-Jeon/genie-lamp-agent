@@ -36,6 +36,10 @@ class ColumnInfo:
     name: str
     description: Optional[str] = None
     data_type: Optional[str] = None
+    # Enhanced fields for Phase 1
+    is_required: bool = True  # False if marked "선택적" or "optional"
+    usage_type: Optional[str] = None  # "filtering" | "display" | "aggregation" | "join_key"
+    transformation_rule: Optional[str] = None  # e.g., "FROM_UNIXTIME(timestamp_created)"
 
 
 @dataclass
@@ -48,6 +52,8 @@ class TableInfo:
     columns: List[ColumnInfo] = field(default_factory=list)
     related_kpi: Optional[str] = None
     sample_query: Optional[str] = None
+    # Enhanced field for Phase 1
+    table_remarks: List[str] = field(default_factory=list)  # Special notes
     
     @property
     def full_name(self) -> str:
@@ -59,7 +65,7 @@ class TableInfo:
         """Create from dictionary"""
         full_name = data.get("full_name", "")
         parts = full_name.split(".")
-        
+
         if len(parts) == 3:
             catalog, schema, table = parts
         elif len(parts) == 2:
@@ -68,12 +74,29 @@ class TableInfo:
         else:
             catalog = schema = "unknown"
             table = full_name
-        
+
         # Convert columns if present
         columns = []
         if "key_columns" in data:
-            columns = [ColumnInfo(name=col) for col in data["key_columns"]]
-        
+            # Check if it's a list of strings or dicts
+            key_columns = data["key_columns"]
+            if key_columns and isinstance(key_columns[0], dict):
+                # Enhanced format with metadata
+                columns = [
+                    ColumnInfo(
+                        name=col.get("name", ""),
+                        description=col.get("description"),
+                        data_type=col.get("data_type"),
+                        is_required=col.get("is_required", True),
+                        usage_type=col.get("usage_type"),
+                        transformation_rule=col.get("transformation_rule")
+                    )
+                    for col in key_columns
+                ]
+            else:
+                # Legacy format (list of strings)
+                columns = [ColumnInfo(name=col) for col in key_columns]
+
         return cls(
             catalog=catalog,
             schema=schema,
@@ -81,7 +104,8 @@ class TableInfo:
             description=data.get("description", ""),
             columns=columns,
             related_kpi=data.get("related_kpi"),
-            sample_query=data.get("sample_query")
+            sample_query=data.get("sample_query"),
+            table_remarks=data.get("table_remarks", [])
         )
     
     def to_dict(self) -> Dict:
@@ -105,7 +129,11 @@ class SQLQuery:
     query: str
     description: str
     tables_used: List[str] = field(default_factory=list)
-    
+    # Enhanced fields for Phase 1
+    aggregation_patterns: List[str] = field(default_factory=list)  # ["COALESCE", "CTE", "UNION_ALL", "window_function"]
+    filtering_rules: List[str] = field(default_factory=list)  # Extracted WHERE conditions
+    join_specs: List[str] = field(default_factory=list)  # Explicit JOIN syntax with conditions
+
     @classmethod
     def from_dict(cls, data: Dict) -> 'SQLQuery':
         """Create from dictionary"""
@@ -113,9 +141,36 @@ class SQLQuery:
             question_id=data.get("question_id", ""),
             query=data.get("query", ""),
             description=data.get("description", ""),
-            tables_used=data.get("tables_used", [])
+            tables_used=data.get("tables_used", []),
+            aggregation_patterns=data.get("aggregation_patterns", []),
+            filtering_rules=data.get("filtering_rules", []),
+            join_specs=data.get("join_specs", [])
         )
-    
+
+    def to_dict(self) -> Dict:
+        """Convert to dictionary"""
+        return asdict(self)
+
+
+@dataclass
+class JoinSpec:
+    """Explicit join relationship"""
+    left_table: str
+    right_table: str
+    join_type: str  # "INNER" | "LEFT" | "RIGHT" | "FULL"
+    join_condition: str  # e.g., "m.message_id = r.message_id"
+    is_optional: bool = False  # True if marked "선택적"
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'JoinSpec':
+        return cls(
+            left_table=data.get("left_table", ""),
+            right_table=data.get("right_table", ""),
+            join_type=data.get("join_type", "LEFT"),
+            join_condition=data.get("join_condition", ""),
+            is_optional=data.get("is_optional", False)
+        )
+
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
         return asdict(self)
