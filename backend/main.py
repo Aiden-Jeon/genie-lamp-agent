@@ -7,9 +7,9 @@ from fastapi import FastAPI, File, UploadFile, BackgroundTasks, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend.services.session_store import SessionStore
+from backend.services.session_store import SQLiteSessionStore
 from backend.services.job_manager import JobManager
-from backend.services.file_storage import FileStorageService
+from backend.services.file_storage import LocalFileStorageService
 from backend.services.job_tasks import (
     run_parse_job,
     run_generate_job,
@@ -65,9 +65,9 @@ else:
     print(f"WARNING: Frontend export directory not found at {frontend_export_path.absolute()}")
 
 # Initialize services
-session_store = SessionStore()
+session_store = SQLiteSessionStore()
 job_manager = JobManager(session_store)
-file_storage = FileStorageService()
+file_storage = LocalFileStorageService()
 
 
 # Request/Response models

@@ -71,7 +71,7 @@ Before deploying, ensure:
 The skill needs:
 
 1. **Environment**: Target environment (`dev` or `prod`)
-2. **Profile**: Databricks profile name (usually `DEFAULT`)
+2. **Profile**: Databricks profile name (use `krafton-sandbox` for this project)
 3. **Source Code Path**: Workspace path to the bundled files
 4. **Deployment Type**: Whether this is an initial deployment or an update
 
@@ -84,10 +84,11 @@ The source code path for Genie Lamp Agent follows this pattern:
 
 **Example for dev environment:**
 ```
-/Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/dev/files
+/Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files
 ```
 
-If the username is not known, ask the user for their Databricks email address.
+**To find the correct source code path:**
+Get the current app configuration with `databricks apps get genie-lamp-agent -p krafton-sandbox` and look for the `source_code_path` field.
 
 ### Environment Configuration
 
@@ -132,22 +133,22 @@ Execute the deployment using `.claude/skills/deploy-app/scripts/deploy_app.py`:
 # Initial deployment to dev environment
 .venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target dev \
-  --profile DEFAULT \
-  --source-code-path /Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/dev/files \
+  --profile krafton-sandbox \
+  --source-code-path /Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files \
   --initial
 
 # Update deployment to dev environment
 .venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target dev \
-  --profile DEFAULT \
-  --source-code-path /Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/dev/files \
+  --profile krafton-sandbox \
+  --source-code-path /Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files \
   --update
 
 # Production deployment (update)
 .venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target prod \
-  --profile DEFAULT \
-  --source-code-path /Workspace/Users/jongseob.jeon@databricks.com/.bundle/genie-lamp-agent/prod/files \
+  --profile krafton-sandbox \
+  --source-code-path /Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/prod/files \
   --update
 ```
 
@@ -196,7 +197,7 @@ cd ..
 # From project root
 .venv/bin/python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
   --target dev \
-  --profile DEFAULT \
+  --profile krafton-sandbox \
   --source-code-path /Workspace/Users/<username>/.bundle/genie-lamp-agent/dev/files \
   --update
 ```
@@ -227,7 +228,7 @@ cd ..
 - Or: `brew install databricks`
 
 **Error: "Profile DEFAULT not found"**
-- Configure Databricks CLI: `databricks configure --profile DEFAULT`
+- Configure Databricks CLI: `databricks configure --profile krafton-sandbox`
 - Provide host and token
 - Or ensure `.env` file contains `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
 
@@ -251,10 +252,10 @@ After deployment, verify the app is running:
 
 ```bash
 # Check app status
-databricks apps list -p DEFAULT
+databricks apps list -p krafton-sandbox
 
 # View app logs (if needed)
-databricks apps logs genie-lamp-agent -p DEFAULT
+databricks apps logs genie-lamp-agent -p krafton-sandbox
 ```
 
 Access the app through the Databricks workspace:

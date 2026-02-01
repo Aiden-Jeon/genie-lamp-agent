@@ -94,12 +94,12 @@ The Genie Lamp Agent app has been granted permissions through the Databricks UI.
 
 **The app's identity and permissions enable:**
 - ✅ App authentication with Databricks APIs
-- ✅ Access to Unity Catalog tables for Genie space generation
+- ✅ Access to Unity Catalog tables for validation
 - ✅ Reading secrets from the genie-lamp scope (service-token, sql-warehouse-http-path)
-- ✅ Executing SQL queries via SQL Warehouse
+- ✅ Executing validation queries via SQL Warehouse
 - ✅ Creating and deploying Genie spaces
-- ✅ Processing user-uploaded requirements (PDFs, markdown)
-- ✅ Running validation queries against Unity Catalog
+- ✅ Processing user-uploaded requirements (local storage)
+- ✅ Session persistence (local SQLite)
 
 **If the app or its permissions are deleted:**
 - ❌ App completely stops functioning

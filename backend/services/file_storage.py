@@ -1,28 +1,25 @@
-"""File storage service using Unity Catalog Volumes."""
+"""File storage service using local file system."""
 
 import os
 from typing import List
 from fastapi import UploadFile
+from backend.services.file_storage_base import FileStorageBase
 
 
-class FileStorageService:
-    """Manages file uploads to Unity Catalog Volumes."""
+class LocalFileStorageService(FileStorageBase):
+    """Manages file uploads using local file system."""
 
-    def __init__(self, volume_path: str = "/Volumes/main/genie_lamp/uploads"):
+    def __init__(self, volume_path: str = None, **kwargs):
         """
-        Initialize file storage service.
+        Initialize file storage service with local file system.
 
         Args:
-            volume_path: Base path in Unity Catalog Volume
+            volume_path: Ignored - always uses local storage
         """
-        # Use local storage if Volumes path is not accessible
-        if volume_path.startswith("/Volumes"):
-            local_storage = os.path.join(os.getcwd(), "storage", "uploads")
-            print(f"Warning: Using local storage at {local_storage} (Unity Catalog Volumes not available locally)")
-            self.volume_path = local_storage
-        else:
-            self.volume_path = volume_path
+        # Always use local storage
+        self.volume_path = os.path.join(os.getcwd(), "storage", "uploads")
         os.makedirs(self.volume_path, exist_ok=True)
+        print(f"Using local file storage: {self.volume_path}")
 
     async def save_uploads(self, files: List[UploadFile], session_id: str) -> List[str]:
         """

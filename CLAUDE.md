@@ -295,13 +295,53 @@ All generated files go to `output/` directory:
 
 ## Configuration & Environment
 
-Required environment variables (`.env`):
-- `DATABRICKS_HOST`: Workspace URL
-- `DATABRICKS_TOKEN`: Personal access token
+### Environment Variables
 
-Optional environment variables:
-- `LLM_MODEL`: Text model (default: databricks-gpt-5-2)
-- `VISION_MODEL`: Vision model for PDFs (default: databricks-claude-sonnet-4)
+Required environment variables (`.env` file):
+
+**Databricks Connection:**
+- `DATABRICKS_HOST`: Workspace URL (e.g., https://your-workspace.cloud.databricks.com)
+- `DATABRICKS_TOKEN`: Personal access token
+- `DATABRICKS_SERVER_HOSTNAME`: Hostname without protocol (e.g., your-workspace.cloud.databricks.com)
+- `DATABRICKS_HTTP_PATH`: SQL Warehouse path (e.g., /sql/1.0/warehouses/<id>)
+
+**Model Configuration (Optional):**
+- `LLM_MODEL`: Text model name (default: databricks-gpt-5-2)
+- `VISION_MODEL`: Vision model name (default: databricks-claude-sonnet-4)
+
+### Storage Configuration
+
+**File Storage:** Local file system (`storage/uploads/`)
+- Session files organized by session ID
+- Supports PDF and markdown uploads
+
+**Session Storage:** SQLite database (`storage/sessions.db`)
+- Persistent session and job tracking
+- Automatically created on first run
+
+**Note:** Unity Catalog Volumes and Lakebase (Databricks SQL warehouse storage) have been removed for simplicity. All storage is local to the deployment environment.
+
+### App Deployment Authentication
+
+For app deployment, credentials come from Databricks secrets:
+
+**Secrets Scope:** `genie-lamp`
+
+**Required Secrets:**
+- `service-token`: Personal Databricks access token
+- `sql-warehouse-http-path`: SQL Warehouse HTTP path
+
+**Setup:**
+```bash
+# Create secrets scope (if not exists)
+databricks secrets create-scope genie-lamp
+
+# Add service token
+databricks secrets put-secret genie-lamp service-token
+
+# Add SQL warehouse path
+databricks secrets put-secret genie-lamp sql-warehouse-http-path
+```
 
 ## Code Organization Standards
 

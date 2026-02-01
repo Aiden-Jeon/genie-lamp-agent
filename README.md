@@ -96,6 +96,13 @@ The agent follows a structured pipeline with **Enhanced Parsing**:
 - Clear separation of concerns for better maintainability
 - Improved import structure: `from genie.benchmark import ...`
 
+**🗄️ Storage Abstraction Layer**
+- Introduced abstract base classes for pluggable storage backends
+- `FileStorageBase` → `LocalFileStorageService` (supports future S3, Azure Blob, Volumes)
+- `SessionStoreBase` → `SQLiteSessionStore` (supports future PostgreSQL, Redis)
+- Clean dependency injection pattern with `JobManager` using base class interfaces
+- Easy extension for cloud storage and enterprise databases
+
 **⚡ Performance Improvements**
 - Per-page PDF parsing (2.21x faster than batch processing)
 - Async concurrent processing with progress tracking
@@ -229,6 +236,9 @@ The web application consists of two main components:
 **Backend (`backend/`)**
 - **FastAPI Service**: Async REST API for handling requests
 - **Job Management**: Background job processing with SQLite storage
+- **Storage Abstraction Layer**: Abstract base classes for pluggable storage backends
+  - `FileStorageBase` → `LocalFileStorageService` (default, supports S3, Azure Blob, Volumes)
+  - `SessionStoreBase` → `SQLiteSessionStore` (default, supports PostgreSQL, Redis)
 - **File Handling**: Secure upload and storage of requirements documents
 - **Session Management**: Multi-user session tracking and history
 - **Databricks Authentication**: Middleware for secure workspace access

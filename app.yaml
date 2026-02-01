@@ -15,16 +15,17 @@ env:
   - name: DATABRICKS_SERVER_HOSTNAME
     value: "{{workspace.server_hostname}}"
 
-  # Databricks authentication token (automatically uses workspace token)
-  # Note: This uses the workspace's built-in authentication, no secrets needed
+  # Databricks authentication token (from secrets scope)
+  # Default: dev environment secrets
+  # Override per target in databricks.yml (dev uses -dev suffix, prod uses -prod suffix)
   - name: DATABRICKS_TOKEN
-    value: "{{workspace.access_token}}"
+    value: "{{secrets/genie-lamp/service-token-dev}}"
 
-  # SQL Warehouse HTTP Path (update this with your SQL Warehouse ID)
-  # Find this in SQL Warehouse settings under "Connection Details"
+  # SQL Warehouse HTTP Path (from secrets scope)
   # Format: /sql/1.0/warehouses/<warehouse-id>
+  # Override per target in databricks.yml
   - name: DATABRICKS_HTTP_PATH
-    value: "/sql/1.0/warehouses/your-warehouse-id"
+    value: "{{secrets/genie-lamp/sql-warehouse-http-path-dev}}"
 
   # Frontend static export location (Next.js output: 'export')
   # Path is relative to /app/python/source_code (the working directory)

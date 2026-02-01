@@ -6,13 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Callable, Any
 
-from .session_store import SessionStore, Job
+from .session_store_base import SessionStoreBase, Job
 
 
 class JobManager:
     """Manages background job execution with process pool."""
 
-    def __init__(self, session_store: SessionStore, max_workers: int = 4):
+    def __init__(self, session_store: SessionStoreBase, max_workers: int = 4):
         """
         Initialize job manager.
 

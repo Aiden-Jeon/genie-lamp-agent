@@ -314,11 +314,18 @@
 │   ├── main.py                     # FastAPI app entry point
 │   ├── services/                   # Business logic services
 │   │   ├── job_tasks.py            # Job task orchestration
-│   │   ├── file_storage.py         # File upload handling
+│   │   ├── job_manager.py          # Job execution manager
+│   │   ├── file_storage_base.py    # 🆕 Abstract base for file storage
+│   │   ├── file_storage.py         # Local file storage implementation
+│   │   ├── session_store_base.py   # 🆕 Abstract base for session storage
+│   │   ├── session_store.py        # SQLite session storage implementation
+│   │   ├── benchmark_validator.py  # Benchmark validation
 │   │   └── validators.py           # Validation services
 │   ├── middleware/                 # Request middleware
-│   │   └── databricks_auth.py      # Databricks authentication
-│   ├── storage/                    # Session and job storage
+│   │   └── auth.py                 # Databricks authentication
+│   ├── storage/                    # Data storage (local files & SQLite)
+│   │   ├── uploads/                # User-uploaded files
+│   │   └── sessions.db             # SQLite session database
 │   └── requirements.txt            # Backend Python dependencies
 │
 ├── frontend/                       # 🌟 Next.js UI application (Web UI Mode)
@@ -1371,6 +1378,189 @@ Issues Found:
   "confidence_score": 0.95
 }
 ```
+
+## Storage Abstraction Layer
+
+**Purpose**: Enable multiple storage backends for file storage and session persistence through abstract base classes.
+
+**Architecture**: The backend uses abstract base classes to decouple storage implementation from business logic, allowing easy extension to cloud storage (S3, Azure Blob) and different databases (PostgreSQL, Redis).
+
+### File Storage Hierarchy
+
+```
+FileStorageBase (ABC)                    # Abstract interface
+├── LocalFileStorageService              # Local filesystem (default)
+└── [Future Extensions]
+    ├── S3FileStorageService             # AWS S3 storage
+    ├── AzureBlobStorageService          # Azure Blob storage
+    └── VolumeFileStorageService         # Unity Catalog Volumes
+```
+
+**Interface** (`backend/services/file_storage_base.py`):
+- **Abstract Methods** (must implement):
+  - `save_uploads(files, session_id)` → Save uploaded files (async)
+  - `get_session_dir(session_id)` → Get session storage path
+  - `create_session_dir(session_id)` → Create session directory
+  - `__init__(volume_path, **kwargs)` → Initialize storage backend
+
+- **Helper Methods** (can override):
+  - `validate_session_id(session_id)` → Validate session ID format
+  - `cleanup_session(session_id)` → Clean up session storage
+
+**Current Implementation**:
+- `LocalFileStorageService`: Stores files in `storage/uploads/{session_id}/`
+- Used by: File upload endpoints, job tasks
+
+### Session Storage Hierarchy
+
+```
+SessionStoreBase (ABC)                   # Abstract interface
+├── SQLiteSessionStore                   # SQLite database (default)
+└── [Future Extensions]
+    ├── PostgreSQLSessionStore           # PostgreSQL database
+    ├── RedisSessionStore                # Redis in-memory storage
+    └── InMemorySessionStore             # Testing/development
+```
+
+**Interface** (`backend/services/session_store_base.py`):
+- **Abstract Methods** (must implement):
+  - Session CRUD (6 methods):
+    - `create_session(user_id, name)` → Create new session
+    - `get_session_with_stats(session_id)` → Get session with job count
+    - `list_sessions(user_id, limit, offset)` → List sessions with pagination
+    - `update_session_name(session_id, name)` → Update session name
+    - `update_session_activity(session_id)` → Update timestamp
+    - `delete_session(session_id)` → Delete session and jobs (cascade)
+
+  - Job CRUD (4 methods):
+    - `save_job(job)` → Save new job record
+    - `get_job(job_id)` → Retrieve job by ID
+    - `update_job(job)` → Update job status/result
+    - `get_jobs_for_session(session_id)` → Get all session jobs
+
+  - Initialization (1 method):
+    - `__init__(**kwargs)` → Initialize storage backend
+
+- **Hook Methods** (can override):
+  - `setup_schema()` → Create database schema
+  - `migrate_schema()` → Run schema migrations
+  - `health_check()` → Check storage health
+  - `close()` → Close connections
+
+**Current Implementation**:
+- `SQLiteSessionStore`: Stores sessions and jobs in `storage/sessions.db`
+- Schema:
+  - `genie_sessions`: session_id, user_id, name, created_at, updated_at
+  - `genie_jobs`: job_id, session_id, type, status, inputs, result, error, created_at, completed_at, progress
+- Used by: JobManager, session endpoints, job status tracking
+
+### Job Model
+
+**Defined in**: `backend/services/session_store_base.py`
+
+```python
+class Job(BaseModel):
+    job_id: str                    # UUID
+    session_id: str                # Parent session
+    type: str                      # parse, generate, validate, deploy
+    status: str                    # pending, running, completed, failed
+    inputs: dict                   # Job input parameters
+    result: Optional[dict]         # Job output (on completion)
+    error: Optional[str]           # Error message (on failure)
+    created_at: Optional[datetime] # Creation timestamp
+    completed_at: Optional[datetime]  # Completion timestamp
+    progress: Optional[dict]       # Progress tracking data
+```
+
+### Usage Examples
+
+**File Storage**:
+```python
+from backend.services.file_storage import LocalFileStorageService
+
+# Initialize
+storage = LocalFileStorageService()
+
+# Save files
+paths = await storage.save_uploads(files, session_id)
+
+# Get session directory
+session_dir = storage.get_session_dir(session_id)
+```
+
+**Session Storage**:
+```python
+from backend.services.session_store import SQLiteSessionStore
+
+# Initialize
+store = SQLiteSessionStore()
+
+# Create session
+session_id = store.create_session(user_id="user-123", name="My Session")
+
+# Save job
+job = Job(job_id=str(uuid.uuid4()), session_id=session_id,
+          type="generate", status="pending", inputs={"config": "data"})
+store.save_job(job)
+
+# Get job
+job = store.get_job(job_id)
+
+# Update job
+job.status = "completed"
+job.result = {"output": "data"}
+store.update_job(job)
+```
+
+### Dependency Injection
+
+**JobManager** (`backend/services/job_manager.py`):
+- Accepts `SessionStoreBase` in constructor (not concrete implementation)
+- Enables testing with mock stores
+- Supports runtime backend selection
+
+```python
+from backend.services.job_manager import JobManager
+from backend.services.session_store import SQLiteSessionStore
+
+store = SQLiteSessionStore()
+manager = JobManager(session_store=store)
+```
+
+### Extension Pattern
+
+To add a new storage backend:
+
+1. **Create new implementation**:
+   ```python
+   from backend.services.file_storage_base import FileStorageBase
+
+   class S3FileStorageService(FileStorageBase):
+       def __init__(self, bucket: str, **kwargs):
+           self.bucket = bucket
+           self.s3 = boto3.client('s3')
+
+       async def save_uploads(self, files, session_id):
+           # Implement S3 upload logic
+           ...
+   ```
+
+2. **Add factory function** (in `backend/main.py`):
+   ```python
+   def create_file_storage():
+       backend = os.getenv("FILE_STORAGE_BACKEND", "local")
+       if backend == "s3":
+           return S3FileStorageService(bucket=os.getenv("S3_BUCKET"))
+       return LocalFileStorageService()
+
+   file_storage = create_file_storage()
+   ```
+
+3. **Configure via environment variables**:
+   ```bash
+   FILE_STORAGE_BACKEND=s3
+   S3_BUCKET=my-genie-bucket
+   ```
 
 ## Data Flow Diagram
 
