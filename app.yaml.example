@@ -1,0 +1,82 @@
+# Runtime configuration for Genie Lamp Agent
+# Copy this file to app.yaml and replace placeholder values with your actual configuration
+
+command:
+  - uvicorn
+  - backend.main:app
+  - --host
+  - '0.0.0.0'
+  - --port
+  - '8000'
+
+env:
+  # Databricks workspace connection
+  - name: DATABRICKS_HOST
+    value: "https://your-workspace.cloud.databricks.com"
+
+  - name: DATABRICKS_SERVER_HOSTNAME
+    value: "your-workspace.cloud.databricks.com"
+
+  # Note: DATABRICKS_TOKEN is NOT set here - we use user tokens from request headers
+  # for proper on-behalf authentication. Each user's requests use their own token.
+
+  # SQL Warehouse ID (injected from UI-configured resource)
+  # Databricks automatically injects the warehouse ID from the resource configured in the UI
+  # References the resource key "sql-warehouse" (configured in Databricks UI)
+  - name: "SQL_WAREHOUSE_ID"
+    valueFrom: "sql-warehouse"
+
+  # Frontend static export location (Next.js output: 'export')
+  # Path is relative to /app/python/source_code (the working directory)
+  - name: FRONTEND_EXPORT_DIR
+    value: "frontend/out"
+
+  # Python unbuffered output
+  - name: PYTHONUNBUFFERED
+    value: "1"
+
+  # Lakebase Configuration (Production PostgreSQL Backend with Autoscaling)
+  # Enable Lakebase storage for production-ready session management
+  - name: USE_LAKEBASE_STORAGE
+    value: "true"
+
+  # Lakebase project ID (required when USE_LAKEBASE_STORAGE=true)
+  # Replace with your project UUID from Lakebase UI
+  - name: LAKEBASE_PROJECT_ID
+    value: "your-project-uuid-here"
+
+  # Lakebase branch name (use the branch UID, not the display name)
+  # Replace with your branch UID (starts with 'br-') from Lakebase UI
+  - name: LAKEBASE_BRANCH
+    value: "your-branch-uid-here"
+
+  # Lakebase database name (default: databricks_postgres)
+  - name: LAKEBASE_DATABASE
+    value: "databricks_postgres"
+
+  # Lakebase database user (default: databricks)
+  - name: LAKEBASE_USER
+    value: "databricks"
+
+  # Lakebase connection pool settings (Production)
+  # For dev environments, use smaller values (min: 2, max: 10)
+  - name: LAKEBASE_POOL_MIN_CONN
+    value: "5"
+
+  - name: LAKEBASE_POOL_MAX_CONN
+    value: "20"
+
+  # Token refresh interval in seconds (55 minutes for OAuth token refresh)
+  - name: LAKEBASE_TOKEN_REFRESH_INTERVAL
+    value: "3300"
+
+  # Disable SQLite when using Lakebase
+  - name: USE_SQLITE_STORAGE
+    value: "false"
+
+  # Unity Catalog Volumes Configuration
+  # Path for file uploads (should exist in your workspace)
+  # Format: /Volumes/<catalog>/<schema>/<volume>
+  # Replace with your actual volume path
+  - name: VOLUME_PATH
+    value: "/Volumes/your-catalog/your-schema/your-volume"

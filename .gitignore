@@ -1,7 +1,8 @@
+# Storage and runtime data
 storage/
-frontend/out/
-
 *.pid
+
+# Change logs and feedback (business artifacts)
 change_logs/
 feedback/
 data/
@@ -29,31 +30,29 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environments (all locations)
+# Virtual environments
 .venv/
 venv/
 ENV/
 env/
-backend/.venv/
-backend/venv/
 
-# Frontend build artifacts
+# Frontend
 frontend/node_modules/
 frontend/.next/
+frontend/out/
 frontend/.env.local
 frontend/package-lock.json
 
-# Backend artifacts
-backend/__pycache__/
+# Backend
+backend/.env
 backend/.parse_cache.json
 backend/storage/uploads/
-backend/.env
 
 # Output and generated files
 output/
 *.log
 
-# JSON files (with exceptions for essential configs)
+# JSON files (with exceptions)
 *.json
 !sample/benchmarks/benchmarks.json
 !frontend/package.json
@@ -74,11 +73,11 @@ output/
 .DS_Store
 Thumbs.db
 
-# Environment variables
+# Environment
 .env
 .env.local
 
-# Claude Code local settings (but track skills)
+# Claude Code
 .claude/settings.local.json
 
 # Git worktrees

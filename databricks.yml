@@ -3,6 +3,54 @@
 bundle:
   name: genie-lamp-agent
 
+sync:
+  exclude:
+    # Virtual environments
+    - ".venv"
+    - "venv"
+    - "ENV"
+    - "env"
+    - "backend/.venv"
+    - "backend/venv"
+
+    # Node modules and frontend build
+    - "frontend/node_modules"
+    - "frontend/.next"
+    - "frontend/out"
+
+    # Local storage and runtime data
+    - "storage"
+    - "output"
+
+    # Git and development
+    - ".git"
+    - ".databricks"
+    - "worktrees"
+
+    # Python bytecode
+    - "__pycache__"
+    - "*.pyc"
+    - "*.pyo"
+    - "*.pyd"
+
+    # Environment and secrets
+    - ".env"
+    - ".env.local"
+    - "backend/.env"
+    - "frontend/.env.local"
+
+    # Cache and temporary files
+    - "*.log"
+    - "*.pid"
+    - ".parse_cache.json"
+    - "backend/.parse_cache.json"
+    - ".last_test_run"
+
+    # IDE and OS
+    - ".vscode"
+    - ".idea"
+    - ".DS_Store"
+
 resources:
   apps:
     genie_lamp_app:
@@ -22,6 +70,28 @@ targets:
   dev:
     mode: development
     default: true
+    resources:
+      apps:
+        genie_lamp_app:
+          config:
+            env:
+              # Override with dev-specific secrets
+              - name: DATABRICKS_TOKEN
+                value: "{{secrets/genie-lamp/service-token-dev}}"
+
+              - name: DATABRICKS_HTTP_PATH
+                value: "{{secrets/genie-lamp/sql-warehouse-http-path-dev}}"
 
   prod:
     mode: production
+    resources:
+      apps:
+        genie_lamp_app:
+          config:
+            env:
+              # Override with prod-specific secrets
+              - name: DATABRICKS_TOKEN
+                value: "{{secrets/genie-lamp/service-token-prod}}"
+
+              - name: DATABRICKS_HTTP_PATH
+                value: "{{secrets/genie-lamp/sql-warehouse-http-path-prod}}"
