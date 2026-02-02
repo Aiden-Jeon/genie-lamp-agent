@@ -171,92 +171,139 @@ class TableValidator:
     def get_table_schema(self, catalog: str, schema: str, table: str) -> Optional[Dict[str, Any]]:
         """
         Get the schema of a table from Unity Catalog.
-        
+
         Args:
             catalog: Catalog name
             schema: Schema name
             table: Table name
-            
+
         Returns:
             Dictionary containing table metadata including columns, or None if table doesn't exist
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         full_name = f"{catalog}.{schema}.{table}"
-        
+
         # Check cache first
         if full_name in self._table_cache:
+            logger.debug(f"Table {full_name}: cache hit")
             return self._table_cache[full_name]
-        
+
         try:
             # Use Unity Catalog API to get table information
             url = f"{self.databricks_host}/api/2.1/unity-catalog/tables/{catalog}.{schema}.{table}"
+            logger.info(f"Validating table {full_name} via Unity Catalog API")
             response = requests.get(url, headers=self._get_headers(), timeout=30)
-            
+
             if response.status_code == 200:
                 table_info = response.json()
                 self._table_cache[full_name] = table_info
+                logger.info(f"Table {full_name}: found via Unity Catalog API")
                 return table_info
             elif response.status_code == 404:
+                logger.warning(f"Table {full_name}: not found (404), no fallback needed")
                 return None
+            elif response.status_code == 403:
+                # Permission denied for Unity Catalog API - might be metadata permissions
+                # Try SQL fallback as user might have SELECT permission but not UC metadata permissions
+                logger.warning(f"Table {full_name}: Unity Catalog API permission denied (403), trying SQL fallback")
+                return self._get_table_schema_via_sql(catalog, schema, table)
             else:
-                response.raise_for_status()
+                logger.error(f"Table {full_name}: unexpected status {response.status_code}, trying SQL fallback")
+                # Try SQL fallback for any other error
+                return self._get_table_schema_via_sql(catalog, schema, table)
+        except requests.exceptions.HTTPError as e:
+            # For any HTTP error (including 403), try SQL fallback
+            # User might have SELECT permission but not UC metadata permissions
+            logger.warning(f"Table {full_name}: Unity Catalog API HTTPError {e.response.status_code}, trying SQL fallback")
+            return self._get_table_schema_via_sql(catalog, schema, table)
         except requests.exceptions.RequestException as e:
             # If Unity Catalog API fails, try SQL execution API
+            logger.warning(f"Table {full_name}: Unity Catalog API request failed with {e}, trying SQL fallback")
             return self._get_table_schema_via_sql(catalog, schema, table)
     
     def _get_table_schema_via_sql(self, catalog: str, schema: str, table: str) -> Optional[Dict[str, Any]]:
         """
-        Fallback method to get table schema using DESCRIBE TABLE SQL command.
-        
+        Fallback method to check table existence using SQL connector.
+
         Args:
             catalog: Catalog name
             schema: Schema name
             table: Table name
-            
+
         Returns:
-            Dictionary containing column information, or None if table doesn't exist
+            Dictionary containing table metadata, or None if table doesn't exist or no access
         """
+        import logging
+        from databricks import sql as databricks_sql
+
+        logger = logging.getLogger(__name__)
+
         full_name = f"{catalog}.{schema}.{table}"
-        
+        logger.info(f"Table {full_name}: trying SQL connector fallback")
+
         try:
-            # Use SQL execution API to describe the table
-            url = f"{self.databricks_host}/api/2.0/sql/statements"
-            sql = f"DESCRIBE TABLE {full_name}"
-            
-            payload = {
-                "statement": sql,
-                "warehouse_id": os.getenv("DATABRICKS_WAREHOUSE_ID")  # Optional, will use default if not set
-            }
-            
-            response = requests.post(url, headers=self._get_headers(), json=payload, timeout=60)
-            
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Parse the DESCRIBE output to extract columns
-                columns = []
-                if "manifest" in result and "schema" in result["manifest"]:
-                    schema_info = result["manifest"]["schema"]
-                    if "columns" in schema_info:
-                        for col in schema_info["columns"]:
-                            columns.append({
-                                "name": col.get("name"),
-                                "type_text": col.get("type_text"),
-                                "type_name": col.get("type_name")
-                            })
-                
-                table_info = {
-                    "full_name": full_name,
-                    "catalog_name": catalog,
-                    "schema_name": schema,
-                    "name": table,
-                    "columns": columns
-                }
-                
-                self._table_cache[full_name] = table_info
-                return table_info
-            else:
+            # Derive connection parameters from DATABRICKS_HOST
+            server_hostname = self.databricks_host.replace("https://", "").replace("http://", "")
+
+            # Get warehouse ID from environment (automatically provided by Databricks Apps)
+            warehouse_id = os.getenv("WAREHOUSE_ID")
+            if not warehouse_id:
+                logger.error(f"Table {full_name}: WAREHOUSE_ID not set, cannot use SQL fallback")
                 return None
-        except Exception:
+
+            http_path = f"/sql/1.0/warehouses/{warehouse_id}"
+
+            logger.debug(f"Table {full_name}: connecting to warehouse {warehouse_id} on {server_hostname}")
+
+            with databricks_sql.connect(
+                server_hostname=server_hostname,
+                http_path=http_path,
+                access_token=self.databricks_token,  # User token
+                timeout=30
+            ) as connection:
+                with connection.cursor() as cursor:
+                    # Simple existence check - SELECT 1 to verify access
+                    cursor.execute(f"SELECT 1 FROM {full_name} LIMIT 0")
+
+                    # If we get here, table exists and user has access
+                    # Now get column info
+                    cursor.execute(f"DESCRIBE TABLE {full_name}")
+                    columns = []
+                    for row in cursor.fetchall():
+                        # DESCRIBE returns: col_name, data_type, comment
+                        columns.append({
+                            "name": row[0],
+                            "type_text": row[1],
+                            "type_name": row[1]
+                        })
+
+                    logger.info(f"Table {full_name}: found via SQL connector with {len(columns)} columns")
+
+                    table_info = {
+                        "full_name": full_name,
+                        "catalog_name": catalog,
+                        "schema_name": schema,
+                        "name": table,
+                        "columns": columns
+                    }
+
+                    self._table_cache[full_name] = table_info
+                    return table_info
+
+        except Exception as e:
+            # Any error means table doesn't exist or no permission
+            error_msg = str(e).lower()
+            if "permission" in error_msg or "denied" in error_msg or "access" in error_msg:
+                logger.warning(f"Table {full_name}: SQL permission denied - {e}")
+            elif "not found" in error_msg or "does not exist" in error_msg:
+                logger.warning(f"Table {full_name}: table not found via SQL - {e}")
+            else:
+                logger.error(f"Table {full_name}: SQL connector error - {e}")
+
+            # Cache as None to avoid repeated attempts
+            self._table_cache[full_name] = None
             return None
     
     def validate_table(self, catalog: str, schema: str, table: str) -> bool:

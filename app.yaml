@@ -14,11 +14,9 @@ env:
   # NOTE: DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are automatically provided
   # for the app's service principal. Use WorkspaceClient for OAuth authentication.
 
-  # SQL Warehouse HTTP Path (from secrets scope)
-  # Format: /sql/1.0/warehouses/<warehouse-id>
-  # Override per target in databricks.yml
-  - name: DATABRICKS_HTTP_PATH
-    value: "{{secrets/genie-lamp/sql-warehouse-http-path-dev}}"
+  # SQL Warehouse configuration (automatically provided by Databricks Apps)
+  - name: WAREHOUSE_ID
+    valueFrom: sql_warehouse
 
   # Frontend static export location (Next.js output: 'export')
   # Path is relative to /app/python/source_code (the working directory)

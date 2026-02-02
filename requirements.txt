@@ -1,11 +1,29 @@
+# Core dependencies
 pydantic>=2.0.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 pytest>=7.4.0  # For running tests
+
+# Backend API dependencies
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+aiofiles>=23.0.0
+
+# Databricks SDK and connectors
+databricks-sql-connector>=3.0.0
+databricks-sdk>=0.12.0
+
+# PDF and document parsing
 pdfplumber>=0.10.0  # PDF parsing with table extraction
-sqlparse>=0.4.0  # SQL validation and formatting
 pdf2image>=1.16.0  # Convert PDF pages to images
 Pillow>=10.0.0  # Image processing
-aiohttp>=3.9.0  # Async HTTP requests
-tqdm>=4.66.0  # Progress bars
+
+# LLM and API clients
 openai>=1.0.0  # OpenAI SDK for LLM client
+aiohttp>=3.9.0  # Async HTTP requests
+
+# Utilities
+sqlparse>=0.4.0  # SQL validation and formatting
+tqdm>=4.66.0  # Progress bars
+PyJWT==2.8.0  # JWT token decoding for user authentication

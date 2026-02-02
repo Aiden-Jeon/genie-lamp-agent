@@ -77,7 +77,14 @@ targets:
           name: genie-lamp-agent-dev
           # Use bundle deployment path
           source_code_path: ${workspace.file_path}/files/
-          # Grant app access to serving endpoints
+          # User authorization scopes
+          user_api_scopes:
+            - sql
+            - catalog.tables:read
+            - catalog.schemas:read
+            - catalog.catalogs:read
+            - dashboards.genie
+          # Grant app access to resources
           resources:
             - name: "databricks-gpt-5-2"
               description: "LLM endpoint for text generation"
@@ -89,14 +96,16 @@ targets:
               serving_endpoint:
                 name: "databricks-claude-sonnet-4"
                 permission: "CAN_QUERY"
+            - name: "validation-warehouse"
+              description: "SQL Warehouse for table validation"
+              sql_warehouse:
+                id: "05e0cdbe4f29bff8"
+                permission: "CAN_USE"
           config:
             env:
               # NOTE: DATABRICKS_HOST is automatically provided by system - do not override
               # NOTE: DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are automatically provided
-
-              # SQL Warehouse HTTP Path
-              - name: DATABRICKS_HTTP_PATH
-                value: "{{secrets/genie-lamp/sql-warehouse-http-path-dev}}"
+              # NOTE: WAREHOUSE_ID is automatically provided via sql_warehouse resource (see app.yaml)
 
   prod:
     mode: production
@@ -108,7 +117,14 @@ targets:
           # Keep base name for prod
           name: genie-lamp-agent
           source_code_path: /Workspace/Shared/databricks-agent-poc/genie-lamp-app/files/
-          # Grant app access to serving endpoints
+          # User authorization scopes
+          user_api_scopes:
+            - sql
+            - catalog.tables:read
+            - catalog.schemas:read
+            - catalog.catalogs:read
+            - dashboards.genie
+          # Grant app access to resources
           resources:
             - name: "databricks-gpt-5-2"
               description: "LLM endpoint for text generation"
@@ -120,6 +136,11 @@ targets:
               serving_endpoint:
                 name: "databricks-claude-sonnet-4"
                 permission: "CAN_QUERY"
+            - name: "validation-warehouse"
+              description: "SQL Warehouse for table validation"
+              sql_warehouse:
+                id: "05e0cdbe4f29bff8"
+                permission: "CAN_USE"
           config:
             env:
               # NOTE: DATABRICKS_HOST is automatically provided by system - do not override
