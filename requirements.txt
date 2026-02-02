@@ -16,7 +16,7 @@ databricks-sdk>=0.12.0
 
 # PDF and document parsing
 pdfplumber>=0.10.0  # PDF parsing with table extraction
-pdf2image>=1.16.0  # Convert PDF pages to images
+PyMuPDF>=1.23.0  # PDF rendering to images (no poppler dependency)
 Pillow>=10.0.0  # Image processing
 
 # LLM and API clients

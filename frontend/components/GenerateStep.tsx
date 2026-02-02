@@ -32,6 +32,12 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevio
     }
   };
 
+  const handleDownloadConfig = () => {
+    // Download the generated config using proper API base URL
+    const downloadUrl = apiClient.getDownloadConfigUrl(sessionId);
+    window.open(downloadUrl, '_blank');
+  };
+
   useEffect(() => {
     if (job?.status === 'completed' && !showingExistingResult) {
       onComplete(job.result);
@@ -54,6 +60,12 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevio
               <p>Tables: {existingResult?.tables_count || 0}</p>
               <p>Instructions: {existingResult?.instructions_count || 0}</p>
             </div>
+            <button
+              onClick={handleDownloadConfig}
+              className="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            >
+              ⬇ Download Config JSON
+            </button>
           </div>
 
           {existingResult?.reasoning && (
@@ -154,6 +166,12 @@ export function GenerateStep({ sessionId, requirementsPath, onComplete, onPrevio
               <p>Tables: {job.result?.tables_count || 0}</p>
               <p>Instructions: {job.result?.instructions_count || 0}</p>
             </div>
+            <button
+              onClick={handleDownloadConfig}
+              className="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            >
+              ⬇ Download Config JSON
+            </button>
           </div>
           <button
             onClick={onPrevious}

@@ -236,6 +236,9 @@ class TableValidator:
             Dictionary containing table metadata, or None if table doesn't exist or no access
         """
         import logging
+        import sys
+        from io import StringIO
+        from contextlib import redirect_stdout, redirect_stderr
         from databricks import sql as databricks_sql
 
         logger = logging.getLogger(__name__)
@@ -243,65 +246,103 @@ class TableValidator:
         full_name = f"{catalog}.{schema}.{table}"
         logger.info(f"Table {full_name}: trying SQL connector fallback")
 
+        connection = None
+        cursor = None
+        columns = []
+        table_info = None
+
+        # Redirect stdout/stderr to prevent file descriptor issues in thread pool
+        stdout_buffer = StringIO()
+        stderr_buffer = StringIO()
+
         try:
-            # Derive connection parameters from DATABRICKS_HOST
-            server_hostname = self.databricks_host.replace("https://", "").replace("http://", "")
+            # Wrap all SQL operations in stdout/stderr redirection
+            with redirect_stdout(stdout_buffer), redirect_stderr(stderr_buffer):
+                # Derive connection parameters from DATABRICKS_HOST
+                server_hostname = self.databricks_host.replace("https://", "").replace("http://", "")
 
-            # Get warehouse ID from environment (automatically provided by Databricks Apps)
-            warehouse_id = os.getenv("WAREHOUSE_ID")
-            if not warehouse_id:
-                logger.error(f"Table {full_name}: WAREHOUSE_ID not set, cannot use SQL fallback")
-                return None
+                # Get warehouse ID from environment (automatically provided by Databricks Apps)
+                warehouse_id = os.getenv("WAREHOUSE_ID")
+                if not warehouse_id:
+                    logger.error(f"Table {full_name}: WAREHOUSE_ID not set, cannot use SQL fallback")
+                    return None
 
-            http_path = f"/sql/1.0/warehouses/{warehouse_id}"
+                http_path = f"/sql/1.0/warehouses/{warehouse_id}"
 
-            logger.debug(f"Table {full_name}: connecting to warehouse {warehouse_id} on {server_hostname}")
+                logger.debug(f"Table {full_name}: connecting to warehouse {warehouse_id} on {server_hostname}")
 
-            with databricks_sql.connect(
-                server_hostname=server_hostname,
-                http_path=http_path,
-                access_token=self.databricks_token,  # User token
-                timeout=30
-            ) as connection:
-                with connection.cursor() as cursor:
-                    # Simple existence check - SELECT 1 to verify access
-                    cursor.execute(f"SELECT 1 FROM {full_name} LIMIT 0")
+                # Create connection explicitly (not using context manager to control lifecycle better)
+                connection = databricks_sql.connect(
+                    server_hostname=server_hostname,
+                    http_path=http_path,
+                    access_token=self.databricks_token,  # User token
+                    timeout=30
+                )
 
-                    # If we get here, table exists and user has access
-                    # Now get column info
-                    cursor.execute(f"DESCRIBE TABLE {full_name}")
-                    columns = []
-                    for row in cursor.fetchall():
-                        # DESCRIBE returns: col_name, data_type, comment
-                        columns.append({
-                            "name": row[0],
-                            "type_text": row[1],
-                            "type_name": row[1]
-                        })
+                # Create cursor
+                cursor = connection.cursor()
 
-                    logger.info(f"Table {full_name}: found via SQL connector with {len(columns)} columns")
+                # Simple existence check - SELECT 1 to verify access
+                cursor.execute(f"SELECT 1 FROM {full_name} LIMIT 0")
+                # Fetch the result to clear the cursor state
+                _ = cursor.fetchall()
 
-                    table_info = {
-                        "full_name": full_name,
-                        "catalog_name": catalog,
-                        "schema_name": schema,
-                        "name": table,
-                        "columns": columns
-                    }
+                # If we get here, table exists and user has access
+                # Now get column info
+                cursor.execute(f"DESCRIBE TABLE {full_name}")
+                rows = cursor.fetchall()
 
-                    self._table_cache[full_name] = table_info
-                    return table_info
+                # Build columns list while cursor is still open
+                for row in rows:
+                    # DESCRIBE returns: col_name, data_type, comment
+                    columns.append({
+                        "name": row[0],
+                        "type_text": row[1],
+                        "type_name": row[1]
+                    })
 
-        except Exception as e:
-            # Any error means table doesn't exist or no permission
-            error_msg = str(e).lower()
-            if "permission" in error_msg or "denied" in error_msg or "access" in error_msg:
-                logger.warning(f"Table {full_name}: SQL permission denied - {e}")
-            elif "not found" in error_msg or "does not exist" in error_msg:
-                logger.warning(f"Table {full_name}: table not found via SQL - {e}")
-            else:
-                logger.error(f"Table {full_name}: SQL connector error - {e}")
+                logger.info(f"Table {full_name}: found via SQL connector with {len(columns)} columns")
 
+                # Build table_info before closing resources
+                table_info = {
+                    "full_name": full_name,
+                    "catalog_name": catalog,
+                    "schema_name": schema,
+                    "name": table,
+                    "columns": columns
+                }
+
+        except Exception:
+            # Don't log here to avoid I/O on closed file descriptors
+            # Just set table_info to None - will log after cleanup
+            table_info = None
+
+        finally:
+            # Explicitly close resources in reverse order
+            # Suppress ALL exceptions during cleanup to avoid I/O errors
+            # Also redirect stdout/stderr during cleanup to prevent file descriptor issues
+            try:
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    if cursor is not None:
+                        cursor.close()
+            except Exception:
+                pass  # Suppress all cleanup errors
+
+            try:
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    if connection is not None:
+                        connection.close()
+            except Exception:
+                pass  # Suppress all cleanup errors
+
+        # NOW we can safely log (after all file descriptors are closed)
+        if table_info is not None:
+            # Success case - already logged above
+            self._table_cache[full_name] = table_info
+            return table_info
+        else:
+            # Failure case - safe to log now
+            logger.warning(f"Table {full_name}: SQL connector fallback failed")
             # Cache as None to avoid repeated attempts
             self._table_cache[full_name] = None
             return None
@@ -393,6 +434,79 @@ class TableValidator:
         
         return columns
     
+    def validate_tables_only(self, config_path: str) -> ValidationReport:
+        """
+        Simplified validation: only check if tables exist in Unity Catalog.
+        Does not validate columns.
+
+        Args:
+            config_path: Path to the Genie space configuration JSON file
+
+        Returns:
+            ValidationReport containing table existence results
+        """
+        report = ValidationReport()
+
+        # Load configuration
+        config_file = Path(config_path)
+        if not config_file.exists():
+            report.add_issue(
+                severity="error",
+                type="config_not_found",
+                message=f"Configuration file not found: {config_path}"
+            )
+            return report
+
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        # Extract genie_space_config
+        if "genie_space_config" in config:
+            genie_config = config["genie_space_config"]
+        else:
+            genie_config = config
+
+        # Get all unique tables from the configuration
+        tables_to_check = set()
+
+        # 1. Tables from table definitions
+        for table_def in genie_config.get("tables", []):
+            catalog = table_def.get("catalog_name")
+            schema = table_def.get("schema_name")
+            table = table_def.get("table_name")
+            if catalog and schema and table:
+                tables_to_check.add((catalog, schema, table))
+
+        # 2. Tables from join specifications
+        for join_spec in genie_config.get("join_specifications", []):
+            for table_key in ["left_table", "right_table"]:
+                full_name = join_spec.get(table_key, "")
+                parts = full_name.split(".")
+                if len(parts) == 3:
+                    tables_to_check.add(tuple(parts))
+
+        # Validate each unique table
+        for catalog, schema, table in tables_to_check:
+            full_name = f"{catalog}.{schema}.{table}"
+            report.tables_checked.append(full_name)
+
+            # Check if table exists
+            table_exists = self.validate_table(catalog, schema, table)
+
+            if table_exists:
+                report.tables_valid.append(full_name)
+            else:
+                report.tables_invalid.append(full_name)
+                report.add_issue(
+                    severity="error",
+                    type="table_not_found",
+                    message=f"Table does not exist or is not accessible: {full_name}",
+                    table=full_name,
+                    location="table_definitions"
+                )
+
+        return report
+
     def validate_config(self, config_path: str) -> ValidationReport:
         """
         Validate all tables and columns in a Genie space configuration.
@@ -482,8 +596,76 @@ class TableValidator:
         self._validate_example_queries(genie_config, table_map, report)
         self._validate_benchmark_queries(genie_config, table_map, report)
 
+        # Validate join specifications
+        self._validate_join_specifications(genie_config, report)
+
         return report
-    
+
+    def _validate_join_specifications(
+        self,
+        genie_config: Dict[str, Any],
+        report: ValidationReport
+    ):
+        """Validate join specifications for invalid self-joins."""
+        join_specifications = genie_config.get("join_specifications", [])
+
+        if not join_specifications:
+            return
+
+        report.add_issue(
+            severity="info",
+            type="validation_section",
+            message=f"Validating {len(join_specifications)} join specifications"
+        )
+
+        for i, join_spec in enumerate(join_specifications):
+            left_table = join_spec.get("left_table", "")
+            right_table = join_spec.get("right_table", "")
+            join_condition = join_spec.get("join_condition", "")
+
+            # Check for self-joins
+            if left_table == right_table:
+                # Parse the join condition to check if it's invalid
+                if "=" in join_condition:
+                    parts = [p.strip() for p in join_condition.split("=")]
+
+                    if len(parts) == 2:
+                        left_expr = parts[0]
+                        right_expr = parts[1]
+
+                        # Check if both sides are identical (tautology)
+                        if left_expr == right_expr:
+                            report.add_issue(
+                                severity="error",
+                                type="invalid_self_join",
+                                message=f"Invalid self-join with tautological condition: {join_condition}",
+                                table=left_table,
+                                location=f"join_specifications[{i}]"
+                            )
+                            continue
+
+                        # Check if both sides reference the same column (likely invalid)
+                        left_col = left_expr.split(".")[-1]
+                        right_col = right_expr.split(".")[-1]
+
+                        if left_col == right_col:
+                            report.add_issue(
+                                severity="warning",
+                                type="suspicious_self_join",
+                                message=f"Suspicious self-join on same column '{left_col}': {join_condition}. "
+                                        f"Self-joins should typically compare different columns.",
+                                table=left_table,
+                                location=f"join_specifications[{i}]"
+                            )
+                else:
+                    report.add_issue(
+                        severity="error",
+                        type="invalid_join_condition",
+                        message=f"Join condition must contain '=': {join_condition}",
+                        table=left_table,
+                        location=f"join_specifications[{i}]"
+                    )
+
     def _validate_sql_snippets(
         self,
         genie_config: Dict[str, Any],

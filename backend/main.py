@@ -104,6 +104,7 @@ class DeployRequest(BaseModel):
     session_id: str
     config_path: str
     parent_path: str = None
+    space_name: str = None  # Optional override for space name
 
 
 class CreateSessionRequest(BaseModel):
@@ -125,6 +126,157 @@ class ValidateBenchmarkRequest(BaseModel):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+# Debug endpoint
+@app.get("/api/debug/auth")
+async def debug_auth(current_user: dict = Depends(get_current_user)):
+    """
+    Debug endpoint to check authentication and permissions.
+
+    Returns information about:
+    - User identity
+    - Token validity
+    - SQL warehouse access
+    - Genie space permissions
+    """
+    import jwt
+    from genie.api.genie_space_client import GenieSpaceClient
+
+    user_token = current_user["token"]
+    databricks_host = os.getenv("DATABRICKS_HOST")
+
+    # Decode token
+    try:
+        payload = jwt.decode(user_token, options={"verify_signature": False})
+        token_info = {
+            "email": payload.get("email"),
+            "sub": payload.get("sub"),
+            "scopes": payload.get("scope", "").split() if payload.get("scope") else [],
+            "exp": payload.get("exp"),
+            "iss": payload.get("iss"),
+        }
+    except Exception as e:
+        token_info = {"error": str(e)}
+
+    # Test Genie Space API access
+    try:
+        client = GenieSpaceClient(
+            databricks_host=databricks_host,
+            databricks_token=user_token
+        )
+
+        # Try to list spaces
+        spaces_response = client.list_spaces(page_size=1)
+        genie_access = {
+            "can_list_spaces": True,
+            "spaces_count": len(spaces_response.get("spaces", []))
+        }
+
+        # Try to get warehouse
+        warehouse_id = client.get_available_warehouse()
+        genie_access["warehouse_id"] = warehouse_id
+        genie_access["has_warehouse_access"] = warehouse_id is not None
+
+    except Exception as e:
+        genie_access = {
+            "error": str(e),
+            "can_list_spaces": False
+        }
+
+    return {
+        "user_id": current_user["user_id"],
+        "token_info": token_info,
+        "genie_access": genie_access,
+        "databricks_host": databricks_host
+    }
+
+
+# Download config endpoint
+@app.get("/api/download/config/{session_id}")
+async def download_config(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Download the generated Genie space configuration as JSON.
+
+    Args:
+        session_id: Session ID
+
+    Returns:
+        JSON file download response
+    """
+    from fastapi.responses import JSONResponse
+    import json
+
+    # Get config path
+    session_dir = file_storage.get_session_dir(session_id)
+    config_path = f"{session_dir}/genie_space_config.json"
+
+    # Check if file exists
+    if not os.path.exists(config_path):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Configuration file not found")
+
+    # Read config
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+
+    # Return as downloadable JSON
+    return JSONResponse(
+        content=config,
+        headers={
+            "Content-Disposition": f"attachment; filename=genie_space_config_{session_id}.json"
+        }
+    )
+
+
+@app.get("/api/config/metadata")
+async def get_config_metadata(
+    config_path: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get metadata from a configuration file (space_name, description, etc.)
+
+    Args:
+        config_path: Path to config file (relative to session storage)
+
+    Returns:
+        Dict with space_name, description, purpose
+    """
+    import json
+    from fastapi import HTTPException
+
+    # Security: Only allow reading from storage directory
+    if not config_path.startswith("storage/"):
+        raise HTTPException(status_code=400, detail="Invalid config path")
+
+    # Check if file exists
+    if not os.path.exists(config_path):
+        raise HTTPException(status_code=404, detail="Configuration file not found")
+
+    # Read config
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        # Extract metadata
+        if "genie_space_config" in config:
+            cfg = config["genie_space_config"]
+        else:
+            cfg = config
+
+        return {
+            "space_name": cfg.get("space_name", ""),
+            "description": cfg.get("description", ""),
+            "purpose": cfg.get("purpose", ""),
+            "table_count": len(cfg.get("tables", [])),
+            "join_count": len(cfg.get("join_specifications", []))
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read config: {str(e)}")
 
 
 # Parse endpoint
@@ -321,7 +473,8 @@ async def deploy_space_endpoint(
     # Create job
     job = job_manager.create_job("deploy", request.session_id, {
         "config_path": request.config_path,
-        "parent_path": request.parent_path
+        "parent_path": request.parent_path,
+        "space_name": request.space_name
     })
 
     # Start background task
@@ -331,7 +484,8 @@ async def deploy_space_endpoint(
         run_deploy_job,
         request.config_path,
         request.parent_path,
-        user_token  # REQUIRED: User token for on-behalf deployment
+        user_token,  # REQUIRED: User token for on-behalf deployment
+        request.space_name  # Optional: Override space name
     )
 
     return {

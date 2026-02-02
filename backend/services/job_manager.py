@@ -97,8 +97,23 @@ class JobManager:
 
         except Exception as e:
             # Update with error
+            # Safely extract error message to avoid "I/O operation on closed file" errors
+            # when exception contains closed file descriptors
+            try:
+                error_msg = str(e)
+            except:
+                # If str() fails, try to get type and args
+                try:
+                    error_type = type(e).__name__
+                    if hasattr(e, 'args') and e.args:
+                        error_msg = f"{error_type}: {e.args[0]}"
+                    else:
+                        error_msg = f"{error_type}: Error occurred during job execution"
+                except:
+                    error_msg = "Error occurred during job execution (details unavailable)"
+
             job.status = "failed"
-            job.error = str(e)
+            job.error = error_msg
             job.completed_at = datetime.now()
 
         finally:

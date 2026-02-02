@@ -198,7 +198,7 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
         Upload benchmark questions to test your Genie space (optional).
       </p>
 
-      {/* Show existing result if navigating back */}
+      {/* Show existing result if navigating back with benchmarks */}
       {showingExistingResult && existingResult && existingResult.length > 0 && (
         <div className="space-y-4">
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
@@ -220,6 +220,39 @@ export function BenchmarkStep({ sessionId, onComplete, onPrevious, existingResul
               className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
             >
               Edit Benchmarks
+            </button>
+            <button
+              onClick={handleContinue}
+              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Continue to Deploy →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Show existing result if navigating back WITHOUT benchmarks (skipped) */}
+      {showingExistingResult && existingResult && existingResult.length === 0 && (
+        <div className="space-y-4">
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <p className="font-semibold text-gray-700">No Benchmarks</p>
+            <p className="text-sm text-gray-600 mt-1">
+              You skipped benchmarks in the previous step.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onPrevious}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Validate
+            </button>
+            <button
+              onClick={() => setShowingExistingResult(false)}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Add Benchmarks
             </button>
             <button
               onClick={handleContinue}

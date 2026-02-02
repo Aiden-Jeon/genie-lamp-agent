@@ -24,8 +24,19 @@ Use this skill when you want to:
 - Python 3.8+
 - Node.js 18+
 - npm
+- **Databricks CLI** (for authentication)
 - Virtual environment at `.venv/`
-- `.env` file with `DATABRICKS_HOST` and `DATABRICKS_TOKEN`
+- `.env` file with `DATABRICKS_HOST`
+
+**Important:** The backend uses Databricks CLI OAuth tokens for authentication in local development. You must have the Databricks CLI installed and authenticated:
+
+```bash
+# Install Databricks CLI
+pip install databricks-cli
+
+# Authenticate with your workspace
+databricks auth login --host https://your-workspace.cloud.databricks.com
+```
 
 ## Quick Start
 
@@ -69,12 +80,15 @@ After successful deployment:
 
 1. **Prerequisites Check**
    - Verifies Python 3.8+, Node.js 18+, npm
+   - Checks Databricks CLI is installed
    - Checks virtual environment exists
    - Validates project structure
 
 2. **Environment Validation**
    - Checks `.env` file exists
-   - Verifies required variables are set (DATABRICKS_HOST, DATABRICKS_TOKEN)
+   - Verifies `DATABRICKS_HOST` is set
+   - Tests Databricks CLI authentication
+   - Displays authenticated user email
 
 3. **Backend Setup**
    - Installs dependencies from `backend/requirements.txt`
@@ -120,6 +134,23 @@ After successful deployment:
 
 ## Troubleshooting
 
+### Databricks CLI Authentication Failed
+```bash
+# Install Databricks CLI if not installed
+pip install databricks-cli
+
+# Authenticate with your workspace
+databricks auth login --host https://your-workspace.cloud.databricks.com
+
+# Verify authentication works
+databricks auth token --host https://your-workspace.cloud.databricks.com
+```
+
+If authentication still fails, check:
+- Your Databricks workspace URL is correct in `.env`
+- You have access to the workspace
+- Your CLI session hasn't expired (re-run `databricks auth login`)
+
 ### Port Already in Use
 ```bash
 # Use different ports
@@ -160,15 +191,15 @@ vim .env
 - Hot reload enabled (fast development)
 - Debug logging
 - CORS allows all origins
-- No authentication required
+- Authentication via Databricks CLI token
 - Local file storage
 - SQLite session management
 
-**Production (Databricks):**
+**Production (Databricks Apps):**
 - Built frontend (optimized)
 - Production logging
 - CORS restricted
-- Databricks authentication
+- Authentication via Databricks Apps (x-forwarded-access-token header)
 - Workspace file storage
 - Persistent storage
 

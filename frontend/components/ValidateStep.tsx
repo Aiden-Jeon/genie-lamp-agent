@@ -81,9 +81,19 @@ export function ValidateStep({ sessionId, configPath, onComplete, onPrevious, ex
           <div className="bg-green-50 p-6 rounded-lg border border-green-200">
             <h3 className="text-xl font-bold text-green-800 mb-2">✅ Validation Passed!</h3>
             <p className="text-green-700">
-              {validationResult.tables_valid} table{validationResult.tables_valid > 1 ? 's' : ''}{' '}
+              {validationResult.tables_valid?.length || 0} table{(validationResult.tables_valid?.length || 0) !== 1 ? 's' : ''}{' '}
               validated successfully.
             </p>
+            {validationResult.tables_valid && validationResult.tables_valid.length > 0 && (
+              <div className="mt-3 bg-white p-3 rounded border border-green-300">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Validated Tables:</p>
+                <ul className="text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto">
+                  {validationResult.tables_valid.map((table: string, idx: number) => (
+                    <li key={idx} className="font-mono">• {table}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p className="text-sm text-gray-600 mt-2">Ready to deploy to Databricks Genie.</p>
           </div>
 
@@ -184,22 +194,41 @@ export function ValidateStep({ sessionId, configPath, onComplete, onPrevious, ex
       )}
 
       {validationResult && !validationResult.has_errors && !showingExistingResult && (
-        <>
+        <div className="space-y-4">
           <div className="bg-green-50 p-6 rounded-lg border border-green-200">
             <h3 className="text-xl font-bold text-green-800 mb-2">✅ Validation Passed!</h3>
             <p className="text-green-700">
-              {validationResult.tables_valid.length} table{validationResult.tables_valid.length !== 1 ? 's' : ''}{' '}
+              {validationResult.tables_valid?.length || 0} table{(validationResult.tables_valid?.length || 0) !== 1 ? 's' : ''}{' '}
               validated successfully.
             </p>
+            {validationResult.tables_valid && validationResult.tables_valid.length > 0 && (
+              <div className="mt-3 bg-white p-3 rounded border border-green-300">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Validated Tables:</p>
+                <ul className="text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto">
+                  {validationResult.tables_valid.map((table: string, idx: number) => (
+                    <li key={idx} className="font-mono">• {table}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p className="text-sm text-gray-600 mt-2">Ready to deploy to Databricks Genie.</p>
           </div>
-          <button
-            onClick={onPrevious}
-            className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-          >
-            ← Back to Generate
-          </button>
-        </>
+
+          <div className="flex gap-3">
+            <button
+              onClick={onPrevious}
+              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              ← Back to Generate
+            </button>
+            <button
+              onClick={() => onComplete(validationResult)}
+              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Continue to Deploy →
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

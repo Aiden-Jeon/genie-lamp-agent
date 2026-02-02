@@ -58,17 +58,31 @@ def is_pymupdf_available() -> bool:
 
 
 @dataclass
+class EmbeddedImage:
+    """Metadata for an embedded image extracted from PDF"""
+    image: Image.Image
+    page_number: int
+    image_index: int  # Index of image on the page
+    width: int
+    height: int
+    format: str  # e.g., 'JPEG', 'PNG'
+    xref: int  # PyMuPDF cross-reference number
+
+
+@dataclass
 class PDFContent:
     """Raw content extracted from PDF"""
     text_by_page: List[str]
     tables_by_page: List[List[List[str]]]
-    images: List[Image.Image]
+    images: List[Image.Image]  # Full page images
+    embedded_images: List[EmbeddedImage]  # Embedded images from within PDF
     metadata: Dict[str, str]
-    
+
     def to_dict(self) -> dict:
         # Don't include images in dict representation
         data = asdict(self)
         data['images'] = f"<{len(self.images)} PIL Image objects>"
+        data['embedded_images'] = f"<{len(self.embedded_images)} embedded images>"
         return data
 
 
@@ -105,6 +119,71 @@ class PDFParser:
         else:
             self.use_images = use_images
     
+    def _extract_embedded_images(self, pdf_path: str) -> List[EmbeddedImage]:
+        """
+        Extract embedded images from PDF using PyMuPDF.
+
+        Args:
+            pdf_path: Path to PDF file
+
+        Returns:
+            List of EmbeddedImage objects with metadata
+        """
+        embedded_images = []
+
+        if not is_pymupdf_available():
+            logger.warning("PyMuPDF not available - cannot extract embedded images")
+            return embedded_images
+
+        try:
+            doc = fitz.open(pdf_path)
+
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                image_list = page.get_images(full=True)
+
+                logger.debug(f"Page {page_num + 1}: Found {len(image_list)} embedded images")
+
+                for img_index, img_info in enumerate(image_list):
+                    try:
+                        xref = img_info[0]  # Cross-reference number
+                        base_image = doc.extract_image(xref)
+
+                        if base_image:
+                            image_bytes = base_image["image"]
+                            image_ext = base_image["ext"]  # Format like 'png', 'jpeg'
+
+                            # Convert to PIL Image
+                            pil_image = Image.open(BytesIO(image_bytes))
+
+                            # Create metadata object
+                            embedded_img = EmbeddedImage(
+                                image=pil_image,
+                                page_number=page_num + 1,
+                                image_index=img_index,
+                                width=pil_image.width,
+                                height=pil_image.height,
+                                format=image_ext.upper(),
+                                xref=xref
+                            )
+
+                            embedded_images.append(embedded_img)
+                            logger.debug(f"Extracted image {img_index} from page {page_num + 1}: "
+                                       f"{pil_image.width}x{pil_image.height} {image_ext}")
+
+                    except Exception as e:
+                        logger.warning(f"Failed to extract image {img_index} from page {page_num + 1}: {e}")
+                        continue
+
+            doc.close()
+
+            logger.info(f"Extracted {len(embedded_images)} embedded images from PDF")
+
+        except Exception as e:
+            logger.error(f"Error extracting embedded images: {e}")
+
+        return embedded_images
+
     def extract_raw_content(self, pdf_path: str) -> PDFContent:
         """
         Extract raw content from PDF (text, tables, and optionally images).
@@ -189,15 +268,20 @@ class PDFParser:
         except Exception as e:
             logger.error(f"Error extracting PDF content: {e}")
             raise
-        
+
+        # Extract embedded images from PDF
+        embedded_images = self._extract_embedded_images(pdf_path)
+
         logger.info(f"Extracted {len(text_by_page)} pages, "
                    f"{sum(len(t) for t in tables_by_page)} tables, "
-                   f"{len(images)} images")
-        
+                   f"{len(images)} page images, "
+                   f"{len(embedded_images)} embedded images")
+
         return PDFContent(
             text_by_page=text_by_page,
             tables_by_page=tables_by_page,
             images=images,
+            embedded_images=embedded_images,
             metadata=metadata
         )
     
@@ -532,6 +616,7 @@ Important:
             text_by_page=[],
             tables_by_page=[],
             images=[image],
+            embedded_images=[],  # Single page processing doesn't extract embedded images
             metadata={"page": page_num}
         )
 

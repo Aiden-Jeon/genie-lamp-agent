@@ -335,6 +335,7 @@ def run_deploy_job(
     config_path: str,
     parent_path: str = None,
     user_token: Optional[str] = None,
+    space_name: Optional[str] = None,
     job_id: str = None
 ) -> Dict:  # noqa: ARG001
     """
@@ -347,6 +348,7 @@ def run_deploy_job(
         config_path: Path to config JSON
         parent_path: Optional parent folder path
         user_token: User's OAuth token (REQUIRED for on-behalf deployment)
+        space_name: Optional override for space name (replaces config value)
         job_id: Optional job ID for progress updates
 
     Returns:
@@ -363,18 +365,51 @@ def run_deploy_job(
 
     logger.info("Using user token for deployment (Genie space created on user's behalf)")
     logger.debug(f"User token prefix: {user_token[:10]}...")
+    logger.debug(f"Databricks host: {databricks_host}")
+    logger.debug(f"Config path: {config_path}")
+    logger.debug(f"Parent path: {parent_path}")
 
     try:
         # Change to project root
         os.chdir(project_root)
 
+        # Override space_name if provided
+        if space_name:
+            import json
+            logger.info(f"Overriding space_name with: {space_name}")
+
+            # Load config
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+
+            # Override space_name
+            if "genie_space_config" in config_data:
+                config_data["genie_space_config"]["space_name"] = space_name
+            else:
+                config_data["space_name"] = space_name
+
+            # Save modified config to temp file
+            import tempfile
+            temp_fd, temp_config_path = tempfile.mkstemp(suffix='.json', prefix='genie_config_')
+            os.close(temp_fd)
+
+            with open(temp_config_path, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2, ensure_ascii=False)
+
+            logger.debug(f"Saved modified config to: {temp_config_path}")
+            config_path = temp_config_path
+
+        # Enable verbose logging to capture debug output
         result = deploy_space(
             config_path=config_path,
             databricks_host=databricks_host,
             databricks_token=user_token,  # Use user token for deployment
             parent_path=parent_path,
-            verbose=False
+            verbose=True  # Enable debug output
         )
+
+        logger.info(f"Deployment successful: space_id={result.get('space_id')}")
+        logger.debug(f"Full deployment result: {result}")
 
         return {
             "space_id": result["space_id"],

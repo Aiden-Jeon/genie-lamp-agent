@@ -300,6 +300,72 @@ def _validate_and_fix_join_table_references(
     return corrected_joins
 
 
+def _filter_invalid_self_joins(joins: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filter out invalid self-joins that would cause API errors.
+
+    An invalid self-join is detected when:
+    1. left_table == right_table (self-join)
+    2. The join condition has identical left and right sides (e.g., table.col = table.col)
+
+    Args:
+        joins: List of join specifications
+
+    Returns:
+        Filtered list of joins with invalid self-joins removed
+    """
+    valid_joins = []
+
+    for join in joins:
+        left_table = join.get("left_table", "")
+        right_table = join.get("right_table", "")
+        join_condition = join.get("join_condition", "")
+
+        # Check if this is a self-join
+        if left_table == right_table:
+            # Parse the join condition to check if it's invalid
+            # Invalid: table.col = table.col (same column on both sides)
+            # Valid: table.col1 = table.col2 (different columns for self-comparison)
+
+            if "=" in join_condition:
+                # Split by = and normalize whitespace
+                parts = [p.strip() for p in join_condition.split("=")]
+
+                if len(parts) == 2:
+                    left_expr = parts[0]
+                    right_expr = parts[1]
+
+                    # Check if both sides are identical
+                    if left_expr == right_expr:
+                        print(f"Warning: Filtering invalid self-join on '{left_table}' with condition '{join_condition}'")
+                        print(f"  Reason: Join condition has identical left and right sides (tautology)")
+                        continue
+
+                    # Additional check: If both sides reference the same column name
+                    # e.g., "topic_url = topic_url" or "table.topic_url = table.topic_url"
+                    left_col = left_expr.split(".")[-1]
+                    right_col = right_expr.split(".")[-1]
+
+                    if left_col == right_col:
+                        print(f"Warning: Filtering suspicious self-join on '{left_table}' with condition '{join_condition}'")
+                        print(f"  Reason: Self-join on the same column '{left_col}' (likely not meaningful)")
+                        continue
+            else:
+                # No = in condition - this is suspicious for any join
+                print(f"Warning: Filtering self-join on '{left_table}' with invalid condition '{join_condition}'")
+                print(f"  Reason: Join condition must contain '='")
+                continue
+
+        # If we got here, the join is valid
+        valid_joins.append(join)
+
+    if len(valid_joins) < len(joins):
+        filtered_count = len(joins) - len(valid_joins)
+        print(f"Filtered {filtered_count} invalid self-join(s) from configuration")
+
+    return valid_joins
+
+
 def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     """
     Transform our configuration format to Databricks serialized_space format.
@@ -322,6 +388,31 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     Returns:
         JSON string in serialized_space format
     """
+    # Validate: Remove empty "joins" field if present
+    # This field conflicts with "join_specifications"
+    if "joins" in config and config.get("joins") == []:
+        import warnings
+        warnings.warn(
+            "Config contains empty 'joins' field - removing it. "
+            "This field conflicts with 'join_specifications'."
+        )
+        config = config.copy()
+        del config["joins"]
+
+    # Validate and fix: Replace forward slashes in metadata fields
+    # Forward slashes in space_name cause INTERNAL_ERROR
+    metadata_fields = ['space_name', 'description', 'purpose']
+    for field in metadata_fields:
+        if field in config and isinstance(config[field], str):
+            if '/' in config[field]:
+                import warnings
+                warnings.warn(
+                    f"Config contains forward slash (/) in '{field}' field. "
+                    f"Replacing with ' and ' to avoid API errors."
+                )
+                config = config.copy() if config is not config else config
+                config[field] = config[field].replace('/', ' and ')
+
     # Extract tables from our config
     tables = config.get("tables", [])
     
@@ -470,6 +561,10 @@ def transform_to_serialized_space(config: Dict[str, Any]) -> str:
     # VALIDATE AND FIX JOIN TABLE REFERENCES
     if joins and tables:
         joins = _validate_and_fix_join_table_references(joins, tables)
+
+    # FILTER OUT INVALID SELF-JOINS
+    if joins:
+        joins = _filter_invalid_self_joins(joins)
 
     if joins:
         join_specs = []

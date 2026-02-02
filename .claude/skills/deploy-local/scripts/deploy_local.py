@@ -19,6 +19,7 @@ Usage:
 
 import os
 import sys
+import json
 import argparse
 import subprocess
 import shutil
@@ -122,6 +123,15 @@ def check_prerequisites(project_root: Path) -> bool:
         print_error(f"npm required: {npm_version}")
         all_ok = False
 
+    # Check Databricks CLI
+    databricks_ok, databricks_version = check_command("databricks")
+    if databricks_ok:
+        print_success(f"Databricks CLI: {databricks_version}")
+    else:
+        print_error(f"Databricks CLI required for authentication: {databricks_version}")
+        print_info("Install with: pip install databricks-cli")
+        all_ok = False
+
     # Check virtual environment
     venv_path = project_root / ".venv"
     if venv_path.exists():
@@ -150,9 +160,55 @@ def check_prerequisites(project_root: Path) -> bool:
     return all_ok
 
 
+def check_databricks_cli_auth(databricks_host: str) -> Tuple[bool, Optional[str]]:
+    """
+    Check if Databricks CLI can authenticate.
+
+    Args:
+        databricks_host: Databricks workspace URL
+
+    Returns:
+        Tuple of (is_authenticated, user_email_or_error)
+    """
+    try:
+        result = subprocess.run(
+            ["databricks", "auth", "token", "--host", databricks_host],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False
+        )
+
+        if result.returncode == 0:
+            import json
+            token_data = json.loads(result.stdout)
+            access_token = token_data.get("access_token")
+
+            if access_token:
+                # Try to decode token to get user email
+                try:
+                    import jwt
+                    payload = jwt.decode(access_token, options={"verify_signature": False})
+                    user_email = payload.get("email") or payload.get("sub") or "authenticated"
+                    return True, user_email
+                except Exception:
+                    return True, "authenticated"
+
+            return False, "No access token in response"
+        else:
+            return False, result.stderr.strip() or "Authentication failed"
+
+    except FileNotFoundError:
+        return False, "databricks CLI not found in PATH"
+    except subprocess.TimeoutExpired:
+        return False, "Authentication timeout (5s)"
+    except Exception as e:
+        return False, str(e)
+
+
 def validate_environment(project_root: Path, skip_check: bool = False) -> bool:
     """
-    Validate environment variables.
+    Validate environment variables and Databricks CLI authentication.
 
     Returns:
         True if environment is valid, False otherwise
@@ -183,7 +239,7 @@ def validate_environment(project_root: Path, skip_check: bool = False) -> bool:
                 env_vars[key.strip()] = value.strip()
 
     # Check required variables
-    required_vars = ['DATABRICKS_HOST', 'DATABRICKS_TOKEN']
+    required_vars = ['DATABRICKS_HOST']
     all_ok = True
 
     for var in required_vars:
@@ -192,6 +248,22 @@ def validate_environment(project_root: Path, skip_check: bool = False) -> bool:
         else:
             print_error(f"{var} is not set or empty")
             all_ok = False
+
+    # Check Databricks CLI authentication
+    databricks_host = env_vars.get('DATABRICKS_HOST', '')
+    if databricks_host:
+        print_info("Checking Databricks CLI authentication...")
+        auth_ok, auth_result = check_databricks_cli_auth(databricks_host)
+
+        if auth_ok:
+            print_success(f"Databricks CLI authenticated: {auth_result}")
+            print_info("Backend will use CLI token for authentication")
+        else:
+            print_error(f"Databricks CLI authentication failed: {auth_result}")
+            print_info("Run: databricks auth login --host " + databricks_host)
+            all_ok = False
+    else:
+        print_warning("DATABRICKS_HOST not set, skipping CLI auth check")
 
     return all_ok
 

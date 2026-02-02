@@ -16,7 +16,7 @@ env:
 
   # SQL Warehouse configuration (automatically provided by Databricks Apps)
   - name: WAREHOUSE_ID
-    valueFrom: sql_warehouse
+    valueFrom: validation-warehouse
 
   # Frontend static export location (Next.js output: 'export')
   # Path is relative to /app/python/source_code (the working directory)

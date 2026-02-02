@@ -19,15 +19,42 @@ interface DeployStepProps {
 export function DeployStep({ sessionId, configPath, onComplete, onPrevious, existingResult }: DeployStepProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [parentPath, setParentPath] = useState('');
+  const [spaceName, setSpaceName] = useState('');
+  const [originalSpaceName, setOriginalSpaceName] = useState('');
+  const [loadingMetadata, setLoadingMetadata] = useState(true);
   const { job, isPolling, error } = useJobPolling(jobId);
   const [showingExistingResult, setShowingExistingResult] = useState(!!existingResult);
 
+  // Load space name from config
+  useEffect(() => {
+    const loadMetadata = async () => {
+      try {
+        setLoadingMetadata(true);
+        const metadata = await apiClient.getConfigMetadata(configPath);
+        setOriginalSpaceName(metadata.space_name);
+        setSpaceName(metadata.space_name);
+      } catch (err) {
+        console.error('Failed to load config metadata:', err);
+      } finally {
+        setLoadingMetadata(false);
+      }
+    };
+
+    if (configPath && !showingExistingResult) {
+      loadMetadata();
+    }
+  }, [configPath, showingExistingResult]);
+
   const handleDeploy = async () => {
     try {
+      // Sanitize space name (remove forward slashes)
+      const sanitizedSpaceName = spaceName.replace(/\//g, ' and ');
+
       const response = await apiClient.deploy(
         sessionId,
         configPath,
-        parentPath || undefined
+        parentPath || undefined,
+        sanitizedSpaceName || undefined
       );
       setJobId(response.job_id);
     } catch (err) {
@@ -92,6 +119,41 @@ export function DeployStep({ sessionId, configPath, onComplete, onPrevious, exis
 
       {!showingExistingResult && (
         <>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">
+              Genie Space Name:
+            </label>
+            {loadingMetadata ? (
+              <div className="w-full p-2 border border-gray-200 rounded-lg bg-gray-50">
+                <p className="text-gray-500">Loading...</p>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={spaceName}
+                  onChange={(e) => setSpaceName(e.target.value)}
+                  disabled={isPolling}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  placeholder="Enter space name"
+                />
+                {spaceName !== originalSpaceName && (
+                  <p className="text-xs text-blue-600">
+                    ✏️ Modified from original: &quot;{originalSpaceName}&quot;
+                  </p>
+                )}
+                {spaceName.includes('/') && (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ Forward slashes (/) will be replaced with &quot; and &quot; to prevent deployment errors
+                  </p>
+                )}
+                <p className="text-xs text-gray-500">
+                  This will be the display name of your Genie space
+                </p>
+              </>
+            )}
+          </div>
+
           <div className="space-y-2">
         <label className="block text-sm font-medium">
           Parent Path (Optional):

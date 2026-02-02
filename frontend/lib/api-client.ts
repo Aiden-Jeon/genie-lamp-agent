@@ -176,7 +176,7 @@ export const apiClient = {
   },
 
   // Deploy
-  async deploy(sessionId: string, configPath: string, parentPath?: string): Promise<{ job_id: string }> {
+  async deploy(sessionId: string, configPath: string, parentPath?: string, spaceName?: string): Promise<{ job_id: string }> {
     const response = await fetch(`${API_BASE}/api/deploy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -184,9 +184,23 @@ export const apiClient = {
         session_id: sessionId,
         config_path: configPath,
         parent_path: parentPath,
+        space_name: spaceName,
       }),
     });
     if (!response.ok) throw new Error('Failed to start deploy job');
+    return response.json();
+  },
+
+  // Get config metadata (space_name, description, etc.)
+  async getConfigMetadata(configPath: string): Promise<{
+    space_name: string;
+    description: string;
+    purpose: string;
+    table_count: number;
+    join_count: number;
+  }> {
+    const response = await fetch(`${API_BASE}/api/config/metadata?config_path=${encodeURIComponent(configPath)}`);
+    if (!response.ok) throw new Error('Failed to get config metadata');
     return response.json();
   },
 
@@ -209,5 +223,10 @@ export const apiClient = {
     const response = await fetch(`${API_BASE}/api/files/${sessionId}/${filename}`);
     if (!response.ok) throw new Error('Failed to get file content');
     return response.json();
+  },
+
+  // Download config
+  getDownloadConfigUrl(sessionId: string): string {
+    return `${API_BASE}/api/download/config/${sessionId}`;
   },
 };

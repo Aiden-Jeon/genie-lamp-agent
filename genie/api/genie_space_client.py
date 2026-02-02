@@ -198,7 +198,7 @@ class GenieSpaceClient:
         # Transform our config to Databricks serialized_space format
         serialized_space = transform_to_serialized_space(config_copy)
         
-        # Debug: Save serialized space if verbose
+        # Debug: Save serialized space and full payload for debugging
         if verbose:
             try:
                 debug_path = "output/debug_serialized_space.json"
@@ -207,8 +207,20 @@ class GenieSpaceClient:
                 with open(debug_path, 'w', encoding='utf-8') as f:
                     f.write(serialized_space)
                 print(f"   Debug: Saved serialized space to {debug_path}")
-            except Exception:
-                pass  # Don't fail deployment if debug save fails
+
+                # Also save the full API payload
+                payload_debug_path = "output/debug_api_payload.json"
+                with open(payload_debug_path, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        "warehouse_id": warehouse_id,
+                        "title": title,
+                        "description": description,
+                        "parent_path": parent_path,
+                        "serialized_space_length": len(serialized_space)
+                    }, f, indent=2)
+                print(f"   Debug: Saved API payload metadata to {payload_debug_path}")
+            except Exception as e:
+                print(f"   Warning: Failed to save debug files: {e}")
         
         # Build the API request payload according to Databricks API spec
         payload = {
