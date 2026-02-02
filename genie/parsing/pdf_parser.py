@@ -26,6 +26,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Prompt version for cache invalidation (bump when prompt changes)
+PROMPT_VERSION = "v2-exhaustive-extraction"
+
 # Suppress pdfplumber font warnings
 warnings.filterwarnings('ignore', message='.*Could not get FontBBox.*')
 warnings.filterwarnings('ignore', message='.*cannot be parsed as 4 floats.*')
@@ -516,8 +519,9 @@ Important:
         # Check cache first
         if self.page_cache_manager and pdf_path and self.llm_client:
             vision_model = getattr(self.llm_client, 'model_name', 'unknown')
+            config_hash = self.page_cache_manager._compute_config_hash(vision_model, PROMPT_VERSION)
             cached = self.page_cache_manager.get_cached_page(
-                pdf_path, page_num, vision_model
+                pdf_path, page_num, vision_model, config_hash=config_hash
             )
             if cached:
                 logger.debug(f"Cache HIT for page {page_num}")
@@ -548,8 +552,9 @@ Important:
             # Save to cache
             if self.page_cache_manager and pdf_path and self.llm_client:
                 vision_model = getattr(self.llm_client, 'model_name', 'unknown')
+                config_hash = self.page_cache_manager._compute_config_hash(vision_model, PROMPT_VERSION)
                 self.page_cache_manager.save_page_result(
-                    pdf_path, page_num, structured_data, total_pages or page_num, vision_model
+                    pdf_path, page_num, structured_data, total_pages or page_num, vision_model, config_hash=config_hash
                 )
 
             return structured_data, False  # Cache MISS
