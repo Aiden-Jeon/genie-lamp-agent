@@ -147,6 +147,107 @@ python .claude/skills/deploy-app/scripts/deploy_app.py genie-lamp-agent \
 
 See `.claude/skills/deploy-app/SKILL.md` for detailed deployment workflows and troubleshooting.
 
+### deploy-dev
+
+Automated development deployment with frontend build and deployment.
+
+**Triggers:** When you ask to "deploy to dev", "publish to dev", "update dev app", or "deploy development"
+
+**Features:**
+- Fully automated development deployment workflow
+- Frontend build included automatically
+- Deploys to dev environment with correct source code path
+- Support for both initial and update deployments
+- Hardcoded configuration for consistency
+
+**Example Usage:**
+```
+User: "deploy to dev"
+
+Claude will:
+1. Build frontend (npm run build)
+2. Deploy bundle to dev environment
+3. Start app (if initial deployment)
+4. Deploy app with dev source code path
+5. Provide access URL and verification commands
+```
+
+**Script:** `.claude/skills/deploy-dev/scripts/deploy_dev.py`
+
+**Configuration:**
+- App Name: `genie-lamp-agent-dev`
+- Environment: `dev`
+- Profile: `krafton-sandbox`
+- Source Code Path: `/Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files`
+
+**Common Commands:**
+```bash
+# Update existing dev app (most common)
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --update
+
+# Initial dev deployment (first time only)
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --initial
+```
+
+**Development Workflow:**
+1. Make code changes
+2. Deploy to dev: `/deploy-dev`
+3. Test in dev environment
+4. Deploy to prod when ready: `/deploy-prod`
+
+See `.claude/skills/deploy-dev/SKILL.md` for detailed documentation.
+
+### deploy-prod
+
+Automated production deployment with frontend build and deployment.
+
+**Triggers:** When you ask to "deploy to prod", "deploy to production", "publish to prod", or "update production"
+
+**Features:**
+- Fully automated production deployment workflow
+- Frontend build included automatically
+- Deploys to prod environment with correct source code path
+- Support for both initial and update deployments
+- Hardcoded configuration for consistency
+- Safety checks and best practices
+
+**Example Usage:**
+```
+User: "deploy to production"
+
+Claude will:
+1. Build frontend (npm run build)
+2. Deploy bundle to prod environment
+3. Start app (if initial deployment)
+4. Deploy app with production source code path
+5. Provide access URL and verification commands
+```
+
+**Script:** `.claude/skills/deploy-prod/scripts/deploy_prod.py`
+
+**Configuration:**
+- App Name: `genie-lamp-agent`
+- Environment: `prod`
+- Profile: `krafton-sandbox`
+- Source Code Path: `/Workspace/Shared/databricks-agent-poc/genie-lamp-app/files`
+
+**Common Commands:**
+```bash
+# Update existing prod app (most common)
+.venv/bin/python .claude/skills/deploy-prod/scripts/deploy_prod.py --update
+
+# Initial prod deployment (first time only)
+.venv/bin/python .claude/skills/deploy-prod/scripts/deploy_prod.py --initial
+```
+
+**Safety Checklist:**
+- [ ] Code tested in dev environment first
+- [ ] Changes reviewed and approved
+- [ ] Using `--update` flag (not `--initial`)
+- [ ] Ready for production deployment
+
+See `.claude/skills/deploy-prod/SKILL.md` for detailed documentation and safety guidelines.
+
 ### deploy-local
 
 Deploy the Genie Lamp Agent locally for development and testing.
@@ -322,6 +423,8 @@ This makes the skills available globally in Claude Code:
 ln -s "$(pwd)/.claude/skills/genie-commit" ~/.codex/skills/genie-commit
 ln -s "$(pwd)/.claude/skills/genie-deploy" ~/.codex/skills/genie-deploy
 ln -s "$(pwd)/.claude/skills/deploy-app" ~/.codex/skills/deploy-app
+ln -s "$(pwd)/.claude/skills/deploy-dev" ~/.codex/skills/deploy-dev
+ln -s "$(pwd)/.claude/skills/deploy-prod" ~/.codex/skills/deploy-prod
 ln -s "$(pwd)/.claude/skills/deploy-local" ~/.codex/skills/deploy-local
 ln -s "$(pwd)/.claude/skills/stop-local" ~/.codex/skills/stop-local
 ln -s "$(pwd)/.claude/skills/create-folder" ~/.codex/skills/create-folder
@@ -337,6 +440,8 @@ ls -la ~/.codex/skills/genie-* ~/.codex/skills/deploy-* ~/.codex/skills/stop-* ~
 cp -r .claude/skills/genie-commit ~/.codex/skills/
 cp -r .claude/skills/genie-deploy ~/.codex/skills/
 cp -r .claude/skills/deploy-app ~/.codex/skills/
+cp -r .claude/skills/deploy-dev ~/.codex/skills/
+cp -r .claude/skills/deploy-prod ~/.codex/skills/
 cp -r .claude/skills/deploy-local ~/.codex/skills/
 cp -r .claude/skills/stop-local ~/.codex/skills/
 cp -r .claude/skills/create-folder ~/.codex/skills/

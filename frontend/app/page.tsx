@@ -19,6 +19,8 @@ export default function Home() {
   const [workflowState, setWorkflowState] = useState<any>({});
   const [restoringSession, setRestoringSession] = useState(false);
   const isInitialMount = useRef(true);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Session management
   const {
@@ -82,10 +84,19 @@ export default function Home() {
 
   // Handle session creation
   const handleSessionCreate = async () => {
-    await createSession();
-    // New sessions start at step 1 with empty state
-    setCurrentStep(1);
-    setWorkflowState({});
+    setCreatingSession(true);
+    setCreateError(null);
+    try {
+      await createSession();
+      // New sessions start at step 1 with empty state
+      setCurrentStep(1);
+      setWorkflowState({});
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      setCreateError(error instanceof Error ? error.message : 'Failed to create session');
+    } finally {
+      setCreatingSession(false);
+    }
   };
 
   return (
@@ -133,6 +144,47 @@ export default function Home() {
           <Stepper currentStep={currentStep} steps={steps} />
 
           <div className="bg-white rounded-lg shadow-lg p-8 mt-8">
+            {/* Empty State - Show when no session exists */}
+            {!currentSessionId && (
+              <div className="text-center py-12">
+                <div className="bg-blue-50 p-8 rounded-lg border border-blue-200 inline-block">
+                  <h2 className="text-3xl font-bold text-blue-900 mb-4">
+                    ✨ Welcome to Genie Lamp Agent
+                  </h2>
+                  <p className="text-gray-700 mb-6 max-w-md">
+                    Get started by creating your first session. Each session tracks a complete workflow from requirements to deployment.
+                  </p>
+
+                  {createError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <p className="text-red-800 text-sm">
+                        <span className="font-semibold">Error:</span> {createError}
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSessionCreate}
+                    disabled={creatingSession}
+                    className="px-8 py-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg font-medium"
+                  >
+                    {creatingSession ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="animate-spin h-5 w-5 border-3 border-white border-t-transparent rounded-full" />
+                        Creating session...
+                      </span>
+                    ) : (
+                      'Create New Session'
+                    )}
+                  </button>
+
+                  <p className="text-sm text-gray-500 mt-4">
+                    Your session will be saved automatically as you progress through the workflow.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {currentStep === 1 && currentSessionId && (
               <ParseStep
                 sessionId={currentSessionId}

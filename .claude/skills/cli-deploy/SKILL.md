@@ -1,9 +1,9 @@
 ---
-name: genie-deploy
+name: cli-deploy
 description: Automated Genie space deployment from real_requirements/inputs with automatic catalog replacement to sandbox.agent_poc. Use when the user asks to deploy genie, create a genie space from real requirements, or wants to automate the full deployment workflow with the real requirements.
 ---
 
-# Genie Deploy
+# CLI Deploy
 
 Automate the complete Genie space deployment workflow including document parsing, generation, validation with automatic catalog replacement, and deployment.
 

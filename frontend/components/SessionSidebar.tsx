@@ -6,7 +6,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Session } from '@/lib/api-client';
-import { formatDistanceToNow } from 'date-fns';
 
 interface SessionSidebarProps {
   currentSessionId: string | null;
@@ -114,12 +113,25 @@ export default function SessionSidebar({
     }
   };
 
-  const formatTimeAgo = (timestamp: string) => {
+  const formatLocalTime = (timestamp: string) => {
     try {
-      return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+      const date = new Date(timestamp);
+      return date.toLocaleString();
     } catch {
       return 'Unknown';
     }
+  };
+
+  const getStepName = (step: number) => {
+    const stepNames = [
+      'Upload & Extract',
+      'Generate',
+      'Validate',
+      'Benchmark',
+      'Deploy',
+      'Complete'
+    ];
+    return stepNames[step - 1] || 'Unknown';
   };
 
   return (
@@ -187,8 +199,10 @@ export default function SessionSidebar({
                           )}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          {session.job_count} {session.job_count === 1 ? 'job' : 'jobs'} •{' '}
-                          {formatTimeAgo(session.updated_at)}
+                          Step {session.current_step}: {getStepName(session.current_step)}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          {formatLocalTime(session.updated_at)}
                         </div>
                       </div>
 

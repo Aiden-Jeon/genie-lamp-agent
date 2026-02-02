@@ -1,9 +1,9 @@
 ---
-name: genie-commit
+name: project-commit
 description: Create git commits for the Genie Lamp Agent project with automated testing, validation, and conventional commit messages. Use when the user asks to commit changes, create a commit, or save work to git. Includes pre-commit testing workflow, virtual environment handling, and project-specific commit message patterns (feat/fix/refactor/docs/test).
 ---
 
-# Genie Commit
+# Project Commit
 
 Automate git commits for the Genie Lamp Agent project with proper testing, validation, and conventional commit messages.
 

@@ -409,17 +409,24 @@ async def list_sessions(
     """
     sessions, total_count = session_store.list_sessions(user_id=user_id, limit=limit, offset=offset)
 
+    # Calculate current step for each session
+    sessions_with_step = []
+    for session in sessions:
+        jobs = session_store.get_jobs_for_session(session["session_id"])
+        completed_types = {job.type for job in jobs if job.status == "completed"}
+        current_step = len(completed_types) + 1
+
+        sessions_with_step.append({
+            "session_id": session["session_id"],
+            "name": session["name"],
+            "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
+            "updated_at": session["updated_at"].isoformat() if isinstance(session["updated_at"], datetime) else session["updated_at"],
+            "job_count": session["job_count"],
+            "current_step": current_step
+        })
+
     return {
-        "sessions": [
-            {
-                "session_id": session["session_id"],
-                "name": session["name"],
-                "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
-                "updated_at": session["updated_at"].isoformat() if isinstance(session["updated_at"], datetime) else session["updated_at"],
-                "job_count": session["job_count"]
-            }
-            for session in sessions
-        ],
+        "sessions": sessions_with_step,
         "total_count": total_count
     }
 

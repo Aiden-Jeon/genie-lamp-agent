@@ -20,6 +20,7 @@ export interface Session {
   created_at: string;
   updated_at: string;
   job_count: number;
+  current_step: number;
 }
 
 export interface Job {

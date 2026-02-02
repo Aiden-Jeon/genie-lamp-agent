@@ -30,10 +30,8 @@ export function useSessionManager() {
       setHasMore(result.sessions.length === LIMIT && result.total_count > currentOffset + LIMIT);
       setOffset(currentOffset + result.sessions.length);
 
-      // If no current session, select the most recent one
-      if (!currentSessionId && result.sessions.length > 0) {
-        setCurrentSessionId(result.sessions[0].session_id);
-      }
+      // Don't auto-select a session - let users start with the empty state
+      // Users can click on a session in the sidebar or create a new one
     } catch (error) {
       console.error('Error loading sessions:', error);
     } finally {
