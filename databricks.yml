@@ -59,6 +59,9 @@ resources:
     genie_lamp_app:
       name: genie-lamp-agent
       description: Genie Lamp Agent - LLM-powered Databricks Genie space configuration generator
+      permissions:
+        - group_name: databricks-partners
+          level: CAN_USE
 
 # Target environments
 targets:
