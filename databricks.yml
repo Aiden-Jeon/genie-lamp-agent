@@ -8,6 +8,8 @@ sync:
     - frontend/out
 
   exclude:
+    - .claude/
+
     # Virtual environments
     - ".venv"
     - "venv"
@@ -75,12 +77,24 @@ targets:
           name: genie-lamp-agent-dev
           # Use bundle deployment path
           source_code_path: ${workspace.file_path}/files/
+          # Grant app access to serving endpoints
+          resources:
+            - name: "databricks-gpt-5-2"
+              description: "LLM endpoint for text generation"
+              serving_endpoint:
+                name: "databricks-gpt-5-2"
+                permission: "CAN_QUERY"
+            - name: "databricks-claude-sonnet-4"
+              description: "Vision model endpoint for PDF parsing"
+              serving_endpoint:
+                name: "databricks-claude-sonnet-4"
+                permission: "CAN_QUERY"
           config:
             env:
-              # Override with dev-specific secrets
-              - name: DATABRICKS_TOKEN
-                value: "{{secrets/genie-lamp/service-token-dev}}"
+              # NOTE: DATABRICKS_HOST is automatically provided by system - do not override
+              # NOTE: DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are automatically provided
 
+              # SQL Warehouse HTTP Path
               - name: DATABRICKS_HTTP_PATH
                 value: "{{secrets/genie-lamp/sql-warehouse-http-path-dev}}"
 
@@ -94,11 +108,23 @@ targets:
           # Keep base name for prod
           name: genie-lamp-agent
           source_code_path: /Workspace/Shared/databricks-agent-poc/genie-lamp-app/files/
+          # Grant app access to serving endpoints
+          resources:
+            - name: "databricks-gpt-5-2"
+              description: "LLM endpoint for text generation"
+              serving_endpoint:
+                name: "databricks-gpt-5-2"
+                permission: "CAN_QUERY"
+            - name: "databricks-claude-sonnet-4"
+              description: "Vision model endpoint for PDF parsing"
+              serving_endpoint:
+                name: "databricks-claude-sonnet-4"
+                permission: "CAN_QUERY"
           config:
             env:
-              # Override with prod-specific secrets
-              - name: DATABRICKS_TOKEN
-                value: "{{secrets/genie-lamp/service-token-prod}}"
+              # NOTE: DATABRICKS_HOST is automatically provided by system - do not override
+              # NOTE: DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are automatically provided
 
+              # SQL Warehouse HTTP Path
               - name: DATABRICKS_HTTP_PATH
                 value: "{{secrets/genie-lamp/sql-warehouse-http-path-prod}}"

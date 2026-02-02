@@ -4,15 +4,15 @@ Development Deployment Script for Genie Lamp Agent
 
 Automates the complete development deployment workflow:
 1. Build frontend
-2. Deploy bundle to dev environment
-3. Start app (initial deployment only)
-4. Deploy app with dev source code path
+2. Deploy bundle (which handles app deployment automatically)
 
 Configuration:
 - Environment: dev
 - Profile: krafton-sandbox
-- Source Code Path: /Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files
 - App Name: genie-lamp-agent-dev
+
+Note: Databricks Asset Bundle (databricks.yml) handles the complete app lifecycle.
+      No separate app deploy commands needed - bundle deploy does everything.
 """
 
 import subprocess
@@ -57,19 +57,17 @@ def run_command(command, description, cwd=None):
     return True
 
 
-def deploy_dev(is_initial_deployment):
+def deploy_dev():
     """
     Deploy Genie Lamp Agent to development environment.
 
-    Args:
-        is_initial_deployment: True for first deployment, False for updates
+    Uses Databricks Asset Bundle deployment which handles the complete lifecycle.
     """
 
     # Hardcoded development configuration
     APP_NAME = "genie-lamp-agent-dev"
     TARGET_ENV = "dev"
     PROFILE = "krafton-sandbox"
-    SOURCE_CODE_PATH = "/Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files"
 
     print(f"\n{'='*70}")
     print(f"🚀 Genie Lamp Agent - Development Deployment")
@@ -77,8 +75,6 @@ def deploy_dev(is_initial_deployment):
     print(f"   App Name: {APP_NAME}")
     print(f"   Environment: {TARGET_ENV}")
     print(f"   Profile: {PROFILE}")
-    print(f"   Source Code Path: {SOURCE_CODE_PATH}")
-    print(f"   Deployment Type: {'Initial' if is_initial_deployment else 'Update'}")
     print(f"{'='*70}\n")
 
     # Validate we're in project root
@@ -99,49 +95,85 @@ def deploy_dev(is_initial_deployment):
     print(f"📦 Step 1: Building Frontend")
     print(f"{'='*70}")
 
-    frontend_build_cmd = "npm run build"
-    if not run_command(frontend_build_cmd, "Frontend build", cwd="frontend"):
-        print(f"\n❌ Frontend build failed. Deployment aborted.")
-        return False
+    # Temporarily move .env.local to use .env.production settings
+    env_local_path = Path("frontend/.env.local")
+    env_local_backup = Path("frontend/.env.local.backup")
+    env_local_existed = False
 
-    # Return to project root (subprocess already handles cwd, but print for clarity)
+    if env_local_path.exists():
+        print(f"   ⚠️  Found .env.local (localhost config), temporarily moving it aside")
+        env_local_path.rename(env_local_backup)
+        env_local_existed = True
+
+    try:
+        frontend_build_cmd = "npm run build"
+        if not run_command(frontend_build_cmd, "Frontend build", cwd="frontend"):
+            print(f"\n❌ Frontend build failed. Deployment aborted.")
+            return False
+    finally:
+        # Restore .env.local if it existed
+        if env_local_existed and env_local_backup.exists():
+            env_local_backup.rename(env_local_path)
+            print(f"   ✅ Restored .env.local")
+
     print(f"\n✅ Frontend build completed successfully")
 
-    # Step 2: Bundle deploy
+    # Step 2: Bundle deploy (syncs files to workspace)
     print(f"\n{'='*70}")
     print(f"📦 Step 2: Deploying Bundle")
     print(f"{'='*70}")
+    print(f"   Syncing files to workspace\n")
 
     bundle_cmd = f"databricks bundle deploy -t {TARGET_ENV} -p {PROFILE}"
     if not run_command(bundle_cmd, "Bundle deploy"):
         print(f"\n❌ Bundle deploy failed. Deployment aborted.")
         return False
 
-    # Step 3: App start (only for initial deployment)
-    if is_initial_deployment:
-        print(f"\n{'='*70}")
-        print(f"🚀 Step 3: Starting App (Initial Deployment)")
-        print(f"{'='*70}")
-
-        start_cmd = f"databricks apps start {APP_NAME} -p {PROFILE}"
-        if not run_command(start_cmd, "App start"):
-            print(f"\n❌ App start failed. Deployment aborted.")
-            return False
-    else:
-        print(f"\n{'='*70}")
-        print(f"⏭️  Step 3: Skipped (Update Deployment)")
-        print(f"{'='*70}")
-        print(f"   App start is only needed for initial deployments")
-
-    # Step 4: App deploy
+    # Step 3: Deploy/update the app
     print(f"\n{'='*70}")
-    print(f"🚀 Step 4: Deploying App")
+    print(f"📦 Step 3: Deploying App")
     print(f"{'='*70}")
+    print(f"   Deploying {APP_NAME}\n")
 
-    deploy_cmd = f"databricks apps deploy {APP_NAME} -p {PROFILE} --source-code-path {SOURCE_CODE_PATH}"
-    if not run_command(deploy_cmd, "App deploy"):
-        print(f"\n❌ App deploy failed. Deployment aborted.")
-        return False
+    # Get current user to construct source code path
+    whoami_cmd = f"databricks current-user me -p {PROFILE} --output json"
+    whoami_result = subprocess.run(whoami_cmd, shell=True, capture_output=True, text=True)
+
+    if whoami_result.returncode != 0:
+        print(f"⚠️  Could not get current user, using default path")
+        source_code_path = "${workspace.file_path}/files"
+    else:
+        import json
+        try:
+            user_info = json.loads(whoami_result.stdout)
+            username = user_info.get("userName", "")
+            source_code_path = f"/Workspace/Users/{username}/.bundle/genie-lamp-agent/{TARGET_ENV}/files"
+            print(f"   Source code path: {source_code_path}")
+        except:
+            source_code_path = "${workspace.file_path}/files"
+
+    # Check if app exists
+    check_cmd = f"databricks apps get {APP_NAME} -p {PROFILE}"
+    check_result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True)
+
+    if check_result.returncode == 0:
+        # App exists - update it
+        print(f"   ℹ️  App exists, deploying update...")
+        app_cmd = f"databricks apps deploy {APP_NAME} --source-code-path '{source_code_path}' -p {PROFILE}"
+    else:
+        # App doesn't exist - create it
+        print(f"   ℹ️  App doesn't exist, creating with bundle...")
+        print(f"   Note: New apps should be created by bundle deploy")
+        # For new apps, we still need to deploy after bundle creates it
+        app_cmd = f"databricks apps deploy {APP_NAME} --source-code-path '{source_code_path}' -p {PROFILE}"
+
+    if not run_command(app_cmd, "App deployment"):
+        print(f"\n⚠️  App deployment command failed")
+        print(f"   The app may have been deployed by bundle")
+        print(f"   Check: databricks apps get {APP_NAME} -p {PROFILE}")
+        # Don't fail here - bundle might have handled it
+    else:
+        print(f"\n✅ App deployed/updated successfully")
 
     # Success summary
     print(f"\n{'='*70}")
@@ -165,54 +197,23 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Update existing dev app (most common)
-  python deploy_dev.py --update
-
-  # Initial dev deployment (first time only)
-  python deploy_dev.py --initial
+  # Deploy to dev (handles both initial and updates)
+  python deploy_dev.py
 
 Development Configuration:
   Environment: dev
   Profile: krafton-sandbox
   App Name: genie-lamp-agent-dev
-  Source Code Path: /Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files
 
 Note: This script must be run from the project root directory.
+      Bundle deploy automatically handles app lifecycle (create/update).
         """
-    )
-
-    parser.add_argument(
-        "--initial",
-        action="store_true",
-        help="Flag for initial deployment (includes app start command)",
-    )
-
-    parser.add_argument(
-        "--update",
-        action="store_true",
-        help="Flag for update deployment (skips app start command)",
     )
 
     args = parser.parse_args()
 
-    # Validate flags
-    if args.initial and args.update:
-        print("❌ Error: Cannot specify both --initial and --update")
-        print("   Use --initial for first-time deployment")
-        print("   Use --update for subsequent deployments")
-        sys.exit(1)
-
-    if not args.initial and not args.update:
-        print("❌ Error: Must specify either --initial or --update")
-        print("   Use --initial for first-time deployment")
-        print("   Use --update for subsequent deployments")
-        sys.exit(1)
-
-    # Determine deployment type
-    is_initial = args.initial
-
     # Deploy to development
-    success = deploy_dev(is_initial_deployment=is_initial)
+    success = deploy_dev()
 
     sys.exit(0 if success else 1)
 

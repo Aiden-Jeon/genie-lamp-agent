@@ -13,9 +13,17 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
-from pdf2image import convert_from_path
 from PIL import Image
 from contextlib import contextmanager, redirect_stderr
+
+# Conditional import for pdf2image
+try:
+    from pdf2image import convert_from_path
+    from pdf2image.exceptions import PDFInfoNotInstalledError
+    PDF2IMAGE_AVAILABLE = True
+except ImportError:
+    PDF2IMAGE_AVAILABLE = False
+    PDFInfoNotInstalledError = Exception  # Fallback for type hints
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +47,29 @@ def suppress_stderr():
             yield
         finally:
             sys.stderr = old_stderr
+
+
+def is_poppler_available() -> bool:
+    """
+    Check if poppler-utils is available in the system PATH.
+
+    Returns:
+        bool: True if poppler is available, False otherwise
+    """
+    if not PDF2IMAGE_AVAILABLE:
+        return False
+
+    try:
+        # Try to import and check if poppler utilities are accessible
+        from pdf2image.pdf2image import pdfinfo_from_path
+        # Check if pdftoppm (part of poppler-utils) is available
+        # by attempting to get version info
+        import subprocess
+        result = subprocess.run(['pdftoppm', '-v'], capture_output=True, timeout=2)
+        return True
+    except (ImportError, FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+        logger.debug(f"Poppler not available: {e}")
+        return False
 
 
 @dataclass
@@ -76,39 +107,61 @@ class PDFParser:
             page_cache_manager: Optional PageCacheManager for per-page caching
         """
         self.llm_client = llm_client
-        self.use_images = use_images
         self.per_page = per_page
         self.page_cache_manager = page_cache_manager
+
+        # Check if poppler is available when use_images is requested
+        if use_images and not is_poppler_available():
+            logger.warning(
+                "Poppler-utils not available - disabling image-based extraction. "
+                "To enable image extraction, install poppler-utils on your system."
+            )
+            self.use_images = False
+        else:
+            self.use_images = use_images
     
     def extract_raw_content(self, pdf_path: str) -> PDFContent:
         """
         Extract raw content from PDF (text, tables, and optionally images).
-        
+
         Args:
             pdf_path: Path to PDF file
-            
+
         Returns:
             PDFContent with extracted content
         """
         logger.info(f"Extracting content from PDF: {pdf_path}")
-        
+
         text_by_page = []
         tables_by_page = []
         images = []
         metadata = {}
-        
+
         try:
-            # Extract images if enabled
+            # Extract images if enabled and poppler is available
             if self.use_images:
-                logger.info("Converting PDF pages to images...")
-                images = convert_from_path(
-                    pdf_path,
-                    dpi=120,  # Optimal balance: 29% faster than 150 DPI with same quality
-                    fmt='png'
-                )
-                logger.info(f"Converted {len(images)} pages to images")
-                metadata["num_pages"] = len(images)
-                metadata["file_name"] = Path(pdf_path).name
+                if not is_poppler_available():
+                    logger.warning(
+                        "Poppler-utils not available - falling back to text-only extraction. "
+                        "Install poppler-utils for image-based PDF parsing."
+                    )
+                    # Disable image extraction for this instance
+                    self.use_images = False
+                else:
+                    logger.info("Converting PDF pages to images...")
+                    try:
+                        images = convert_from_path(
+                            pdf_path,
+                            dpi=120,  # Optimal balance: 29% faster than 150 DPI with same quality
+                            fmt='png'
+                        )
+                        logger.info(f"Converted {len(images)} pages to images")
+                        metadata["num_pages"] = len(images)
+                        metadata["file_name"] = Path(pdf_path).name
+                    except Exception as e:
+                        logger.error(f"Error extracting PDF content: {e}")
+                        logger.warning("Falling back to text-only extraction")
+                        self.use_images = False
             
             # Also extract text and tables for reference (suppress stderr warnings)
             with suppress_stderr():

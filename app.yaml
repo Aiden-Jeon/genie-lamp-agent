@@ -8,18 +8,11 @@ command:
   - '8000'
 
 env:
-  # Databricks workspace connection (automatically injected by Databricks Apps)
-  - name: DATABRICKS_HOST
-    value: "{{workspace.host}}"
+  # NOTE: DATABRICKS_HOST is automatically provided by Databricks Apps system environment
+  # Do not override it - it will be set correctly by the platform
 
-  - name: DATABRICKS_SERVER_HOSTNAME
-    value: "{{workspace.server_hostname}}"
-
-  # Databricks authentication token (from secrets scope)
-  # Default: dev environment secrets
-  # Override per target in databricks.yml (dev uses -dev suffix, prod uses -prod suffix)
-  - name: DATABRICKS_TOKEN
-    value: "{{secrets/genie-lamp/service-token-dev}}"
+  # NOTE: DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET are automatically provided
+  # for the app's service principal. Use WorkspaceClient for OAuth authentication.
 
   # SQL Warehouse HTTP Path (from secrets scope)
   # Format: /sql/1.0/warehouses/<warehouse-id>

@@ -3,6 +3,7 @@
 import asyncio
 import os
 from typing import Dict, List
+from databricks.sdk import WorkspaceClient
 
 
 
@@ -41,6 +42,47 @@ def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str, job_id
 
     # Get input directory from first file
     input_dir = os.path.dirname(file_paths[0])
+
+    # Get Databricks credentials from environment for LLM clients
+    databricks_host = os.getenv("DATABRICKS_HOST")
+
+    # Use WorkspaceClient OAuth token (app's service principal)
+    # This automatically uses DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET
+    databricks_token = None
+    token_source = "NONE"
+
+    try:
+        # WorkspaceClient automatically handles OAuth M2M authentication
+        w = WorkspaceClient()
+        # Get OAuth token using the token provider
+        # The config.authenticate() method returns a dict with the token
+        auth_result = w.config.authenticate()
+        if auth_result and 'Authorization' in auth_result:
+            # Extract token from "Bearer <token>" format
+            auth_header = auth_result['Authorization']
+            if auth_header.startswith('Bearer '):
+                databricks_token = auth_header[7:]  # Remove "Bearer " prefix
+                token_source = "WORKSPACE_CLIENT_OAUTH"
+                print(f"DEBUG parse_job: Successfully obtained OAuth token from WorkspaceClient")
+            else:
+                print(f"DEBUG parse_job: Unexpected auth header format: {auth_header[:20]}...")
+        else:
+            print(f"DEBUG parse_job: No Authorization header in auth result")
+    except Exception as e:
+        print(f"DEBUG parse_job: Failed to get OAuth token: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Fallback to environment variable if OAuth didn't work
+    if not databricks_token:
+        databricks_token = os.getenv("DATABRICKS_TOKEN")
+        token_source = "ENV_VAR" if databricks_token else "NONE"
+
+    print(f"DEBUG parse_job: DATABRICKS_HOST = {databricks_host}")
+    print(f"DEBUG parse_job: Using token from: {token_source}")
+    print(f"DEBUG parse_job: Token is set: {bool(databricks_token)}")
+    if databricks_token:
+        print(f"DEBUG parse_job: Token prefix: {databricks_token[:10]}...")
 
     # Save current directory
     original_cwd = os.getcwd()
@@ -130,6 +172,8 @@ def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str, job_id
                 input_dir=input_dir,
                 output_path=output_path,
                 use_llm=use_llm,
+                databricks_host=databricks_host,
+                databricks_token=databricks_token,
                 verbose=False,
                 progress_callback=progress_callback,
                 enrichment_progress_callback=enrichment_progress_callback,
@@ -141,6 +185,8 @@ def run_parse_job(file_paths: List[str], use_llm: bool, output_path: str, job_id
                 input_dir=input_dir,
                 output_path=output_path,
                 use_llm=use_llm,
+                databricks_host=databricks_host,
+                databricks_token=databricks_token,
                 verbose=False
             ))
 
@@ -180,7 +226,7 @@ def _update_job_progress(job_id: str, progress_data: dict):
         _global_session_store.update_job(job)
 
 
-def run_generate_job(requirements_path: str, output_path: str, model: str, job_id: str = None) -> Dict:
+def run_generate_job(requirements_path: str, output_path: str, model: str, job_id: str = None) -> Dict:  # noqa: ARG001
     """
     Generate Genie space configuration from requirements.
 
@@ -196,6 +242,46 @@ def run_generate_job(requirements_path: str, output_path: str, model: str, job_i
     # Save current directory
     original_cwd = os.getcwd()
 
+    # Get Databricks credentials from environment for LLM clients
+    databricks_host = os.getenv("DATABRICKS_HOST")
+
+    # Use WorkspaceClient OAuth token (app's service principal)
+    # This automatically uses DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET
+    databricks_token = None
+    token_source = "NONE"
+
+    try:
+        # WorkspaceClient automatically handles OAuth M2M authentication
+        w = WorkspaceClient()
+        # Get OAuth token using the token provider
+        auth_result = w.config.authenticate()
+        if auth_result and 'Authorization' in auth_result:
+            # Extract token from "Bearer <token>" format
+            auth_header = auth_result['Authorization']
+            if auth_header.startswith('Bearer '):
+                databricks_token = auth_header[7:]  # Remove "Bearer " prefix
+                token_source = "WORKSPACE_CLIENT_OAUTH"
+                print(f"DEBUG generate_job: Successfully obtained OAuth token from WorkspaceClient")
+            else:
+                print(f"DEBUG generate_job: Unexpected auth header format: {auth_header[:20]}...")
+        else:
+            print(f"DEBUG generate_job: No Authorization header in auth result")
+    except Exception as e:
+        print(f"DEBUG generate_job: Failed to get OAuth token: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Fallback to environment variable if OAuth didn't work
+    if not databricks_token:
+        databricks_token = os.getenv("GENIE_DATABRICKS_TOKEN") or os.getenv("DATABRICKS_TOKEN")
+        token_source = "ENV_VAR" if databricks_token else "NONE"
+
+    print(f"DEBUG generate_job: DATABRICKS_HOST = {databricks_host}")
+    print(f"DEBUG generate_job: Using token from: {token_source}")
+    print(f"DEBUG generate_job: Token is set: {bool(databricks_token)}")
+    if databricks_token:
+        print(f"DEBUG generate_job: Token prefix: {databricks_token[:10]}...")
+
     try:
         # Change to project root so template paths resolve correctly
         os.chdir(project_root)
@@ -204,6 +290,8 @@ def run_generate_job(requirements_path: str, output_path: str, model: str, job_i
             requirements_path=requirements_path,
             output_path=output_path,
             model=model,
+            databricks_host=databricks_host,
+            databricks_token=databricks_token,
             validate_sql=True,
             verbose=False
         )
@@ -227,7 +315,7 @@ def run_generate_job(requirements_path: str, output_path: str, model: str, job_i
         os.chdir(original_cwd)
 
 
-def run_validate_job(config_path: str, job_id: str = None) -> Dict:
+def run_validate_job(config_path: str, job_id: str = None) -> Dict:  # noqa: ARG001
     """
     Validate Genie space configuration against Unity Catalog.
 
@@ -240,11 +328,56 @@ def run_validate_job(config_path: str, job_id: str = None) -> Dict:
     # Save current directory
     original_cwd = os.getcwd()
 
+    # Get Databricks credentials from environment for validator
+    databricks_host = os.getenv("DATABRICKS_HOST")
+
+    # Use WorkspaceClient OAuth token (app's service principal)
+    # This automatically uses DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET
+    databricks_token = None
+    token_source = "NONE"
+
+    try:
+        # WorkspaceClient automatically handles OAuth M2M authentication
+        w = WorkspaceClient()
+        # Get OAuth token using the token provider
+        auth_result = w.config.authenticate()
+        if auth_result and 'Authorization' in auth_result:
+            # Extract token from "Bearer <token>" format
+            auth_header = auth_result['Authorization']
+            if auth_header.startswith('Bearer '):
+                databricks_token = auth_header[7:]  # Remove "Bearer " prefix
+                token_source = "WORKSPACE_CLIENT_OAUTH"
+                print(f"DEBUG validate_job: Successfully obtained OAuth token from WorkspaceClient")
+            else:
+                print(f"DEBUG validate_job: Unexpected auth header format: {auth_header[:20]}...")
+        else:
+            print(f"DEBUG validate_job: No Authorization header in auth result")
+    except Exception as e:
+        print(f"DEBUG validate_job: Failed to get OAuth token: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Fallback to environment variable if OAuth didn't work
+    if not databricks_token:
+        databricks_token = os.getenv("DATABRICKS_TOKEN")
+        token_source = "ENV_VAR" if databricks_token else "NONE"
+
+    print(f"DEBUG validate_job: DATABRICKS_HOST = {databricks_host}")
+    print(f"DEBUG validate_job: Using token from: {token_source}")
+    print(f"DEBUG validate_job: Token is set: {bool(databricks_token)}")
+    if databricks_token:
+        print(f"DEBUG validate_job: Token prefix: {databricks_token[:10]}...")
+
     try:
         # Change to project root
         os.chdir(project_root)
 
-        report = validate_config(config_path=config_path, verbose=False)
+        report = validate_config(
+            config_path=config_path,
+            databricks_host=databricks_host,
+            databricks_token=databricks_token,
+            verbose=False
+        )
 
         return {
             "has_errors": report.has_errors(),
@@ -267,7 +400,7 @@ def run_validate_job(config_path: str, job_id: str = None) -> Dict:
         os.chdir(original_cwd)
 
 
-def run_deploy_job(config_path: str, parent_path: str = None, job_id: str = None) -> Dict:
+def run_deploy_job(config_path: str, parent_path: str = None, job_id: str = None) -> Dict:  # noqa: ARG001
     """
     Deploy Genie space to Databricks.
 
@@ -281,12 +414,54 @@ def run_deploy_job(config_path: str, parent_path: str = None, job_id: str = None
     # Save current directory
     original_cwd = os.getcwd()
 
+    # Get Databricks credentials from environment for deployment
+    databricks_host = os.getenv("DATABRICKS_HOST")
+
+    # Use WorkspaceClient OAuth token (app's service principal)
+    # This automatically uses DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET
+    databricks_token = None
+    token_source = "NONE"
+
+    try:
+        # WorkspaceClient automatically handles OAuth M2M authentication
+        w = WorkspaceClient()
+        # Get OAuth token using the token provider
+        auth_result = w.config.authenticate()
+        if auth_result and 'Authorization' in auth_result:
+            # Extract token from "Bearer <token>" format
+            auth_header = auth_result['Authorization']
+            if auth_header.startswith('Bearer '):
+                databricks_token = auth_header[7:]  # Remove "Bearer " prefix
+                token_source = "WORKSPACE_CLIENT_OAUTH"
+                print(f"DEBUG deploy_job: Successfully obtained OAuth token from WorkspaceClient")
+            else:
+                print(f"DEBUG deploy_job: Unexpected auth header format: {auth_header[:20]}...")
+        else:
+            print(f"DEBUG deploy_job: No Authorization header in auth result")
+    except Exception as e:
+        print(f"DEBUG deploy_job: Failed to get OAuth token: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Fallback to environment variable if OAuth didn't work
+    if not databricks_token:
+        databricks_token = os.getenv("DATABRICKS_TOKEN")
+        token_source = "ENV_VAR" if databricks_token else "NONE"
+
+    print(f"DEBUG deploy_job: DATABRICKS_HOST = {databricks_host}")
+    print(f"DEBUG deploy_job: Using token from: {token_source}")
+    print(f"DEBUG deploy_job: Token is set: {bool(databricks_token)}")
+    if databricks_token:
+        print(f"DEBUG deploy_job: Token prefix: {databricks_token[:10]}...")
+
     try:
         # Change to project root
         os.chdir(project_root)
 
         result = deploy_space(
             config_path=config_path,
+            databricks_host=databricks_host,
+            databricks_token=databricks_token,
             parent_path=parent_path,
             verbose=False
         )

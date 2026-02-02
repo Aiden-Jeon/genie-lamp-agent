@@ -19,16 +19,15 @@ The Genie Lamp Agent app has been granted permissions via the Databricks UI. **D
 **What NOT to do:**
 - ❌ `databricks apps delete genie-lamp-agent-dev` - NEVER run this
 - ❌ `databricks apps trash genie-lamp-agent-dev` - NEVER run this
-- ❌ Using `--initial` flag on existing app - Use `--update` instead
 
 **Safe operations:**
-- ✅ Deploy/update app code with `--update` flag (this skill)
+- ✅ Deploy/update app code with this skill (bundle deploy)
 - ✅ View app status and logs
 - ✅ Check permissions (read-only)
 
 **See `.claude/rules/app-permissions.md` for complete safety guidelines.**
 
-When deploying, ALWAYS use `--update` for existing apps. This preserves the app and its permissions.
+Bundle deploy automatically handles both initial and update deployments safely.
 
 ## Development Configuration
 
@@ -44,9 +43,9 @@ This skill is specifically configured for **development deployment** with the fo
 The development deployment skill automates the complete deployment workflow:
 
 1. **Build Frontend** - Runs `npm run build` in the frontend directory
-2. **Deploy Bundle** - Executes `databricks bundle deploy -t dev -p krafton-sandbox`
-3. **Start App** (initial only) - Runs `databricks apps start genie-lamp-agent-dev -p krafton-sandbox`
-4. **Deploy App** - Executes `databricks apps deploy` with the development source code path
+2. **Deploy Bundle and App** - Executes `databricks bundle deploy -t dev -p krafton-sandbox`
+
+Note: Databricks Asset Bundle deployment handles the complete app lifecycle (create/update) automatically. No separate app start or deploy commands needed.
 
 ## Prerequisites
 
@@ -74,21 +73,13 @@ Before deploying to development, ensure:
 
 ## Usage
 
-### Update Existing Dev App (Most Common)
+Deploy to development environment:
 
 ```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --update
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py
 ```
 
-This is the most common scenario - deploying code changes to the existing dev app.
-
-### Initial Dev Deployment (First Time Only)
-
-```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --initial
-```
-
-⚠️ Only use `--initial` if the app doesn't exist yet. For all subsequent deployments, use `--update`.
+This single command handles both initial deployments and updates. Bundle deploy automatically detects whether the app exists and takes the appropriate action.
 
 ## Deployment Process
 
@@ -100,30 +91,19 @@ The skill automatically builds the frontend:
 cd frontend && npm run build && cd ..
 ```
 
-This creates an optimized production build in `frontend/.next/`.
+This creates an optimized production build in `frontend/out/`.
 
-#### 2. Bundle Deploy
+#### 2. Bundle Deploy (Handles App Deployment)
 Deploys the bundle to the development environment:
 ```bash
 databricks bundle deploy -t dev -p krafton-sandbox
 ```
 
-This uploads all files to `/Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files`.
-
-#### 3. App Start (Initial Only)
-For first-time deployments, starts the app:
-```bash
-databricks apps start genie-lamp-agent-dev -p krafton-sandbox
-```
-
-Skipped for update deployments.
-
-#### 4. App Deploy
-Deploys the app with the development source code:
-```bash
-databricks apps deploy genie-lamp-agent-dev -p krafton-sandbox \
-  --source-code-path /Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files
-```
+This single command:
+- Uploads all files to `/Workspace/Users/p.jongseob.jeon@partner.krafton.com/.bundle/genie-lamp-agent/dev/files`
+- Creates or updates the app configuration
+- Starts/restarts the app automatically
+- Applies all settings from databricks.yml
 
 ## Common Scenarios
 
@@ -132,10 +112,10 @@ You've made changes to backend code and want to deploy to dev.
 
 **Steps:**
 1. Commit your changes
-2. Run the deployment skill with `--update`
+2. Run the deployment skill
 
 ```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --update
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py
 ```
 
 The frontend build will run (ensuring consistency) but won't change if there are no frontend modifications.
@@ -145,10 +125,10 @@ You've made changes to the frontend and want to deploy to dev.
 
 **Steps:**
 1. Commit your changes
-2. Run the deployment skill with `--update`
+2. Run the deployment skill
 
 ```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --update
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py
 ```
 
 The frontend build will create a new optimized build and deploy it.
@@ -158,10 +138,10 @@ You've updated `databricks.yml`, `app.yaml`, or environment settings.
 
 **Steps:**
 1. Commit your changes
-2. Run the deployment skill with `--update`
+2. Run the deployment skill
 
 ```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --update
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py
 ```
 
 The bundle deploy will pick up the configuration changes.
@@ -171,13 +151,13 @@ You're deploying the app to dev for the first time.
 
 **Steps:**
 1. Ensure all prerequisites are met
-2. Run the deployment skill with `--initial`
+2. Run the deployment skill
 
 ```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --initial
+.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py
 ```
 
-This includes the `apps start` command to initialize the app.
+Bundle deploy automatically handles initial setup.
 
 ## Troubleshooting
 
@@ -225,11 +205,8 @@ cd ..
 - Check that the dev target is configured
 - Ensure permissions are correct for your user workspace
 
-### Error: "App already exists" during initial deployment
-**Solution:** Use `--update` flag instead
-```bash
-.venv/bin/python .claude/skills/deploy-dev/scripts/deploy_dev.py --update
-```
+### Error: "App already exists"
+**Solution:** Bundle deploy handles this automatically - no action needed. If you see this error, it's likely from manual CLI commands, not from this skill.
 
 ### Error: "Source code path not found"
 **Solution:** Verify bundle deployment succeeded
