@@ -53,6 +53,13 @@ sync:
     - ".idea"
     - ".DS_Store"
 
+# Base resources (can be overridden per target)
+resources:
+  apps:
+    genie_lamp_app:
+      name: genie-lamp-agent
+      description: Genie Lamp Agent - LLM-powered Databricks Genie space configuration generator
+
 # Target environments
 targets:
   dev:
