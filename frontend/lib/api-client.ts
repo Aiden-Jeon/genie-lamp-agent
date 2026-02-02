@@ -2,7 +2,7 @@
  * API client for Genie Lamp Agent backend
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 // Types matching backend models
 export interface ValidationFix {

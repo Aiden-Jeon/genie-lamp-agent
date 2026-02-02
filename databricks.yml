@@ -4,6 +4,9 @@ bundle:
   name: genie-lamp-agent
 
 sync:
+  include:
+    - frontend/out
+
   exclude:
     # Virtual environments
     - ".venv"
@@ -16,7 +19,6 @@ sync:
     # Node modules and frontend build
     - "frontend/node_modules"
     - "frontend/.next"
-    - "frontend/out"
 
     # Local storage and runtime data
     - "storage"
@@ -51,20 +53,6 @@ sync:
     - ".idea"
     - ".DS_Store"
 
-resources:
-  apps:
-    genie_lamp_app:
-      name: genie-lamp-agent
-      description: "Generate Databricks Genie Spaces from natural language requirements"
-
-      # Source code path (current directory)
-      source_code_path: .
-
-      # Permissions
-      permissions:
-        - level: CAN_USE
-          group_name: users
-
 # Target environments
 targets:
   dev:
@@ -73,6 +61,10 @@ targets:
     resources:
       apps:
         genie_lamp_app:
+          # Override app name with -dev suffix
+          name: genie-lamp-agent-dev
+          # Use bundle deployment path
+          source_code_path: ${workspace.file_path}/files/
           config:
             env:
               # Override with dev-specific secrets
@@ -84,9 +76,14 @@ targets:
 
   prod:
     mode: production
+    workspace:
+      root_path: /Workspace/Shared/databricks-agent-poc/genie-lamp-app
     resources:
       apps:
         genie_lamp_app:
+          # Keep base name for prod
+          name: genie-lamp-agent
+          source_code_path: /Workspace/Shared/databricks-agent-poc/genie-lamp-app/files/
           config:
             env:
               # Override with prod-specific secrets
