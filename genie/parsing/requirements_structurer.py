@@ -419,27 +419,55 @@ class RequirementsStructurer:
         return questions
     
     def _combine_tables(self, pdf_tables: List[Dict], md_tables: List[Dict]) -> List[TableInfo]:
-        """Combine and deduplicate tables from PDF and markdown"""
+        """Combine and deduplicate tables from PDF and markdown with smart merging"""
         tables_dict = {}
-        
+
         # Add markdown tables first
         for t_dict in md_tables:
             t = TableInfo.from_dict(t_dict)
             tables_dict[t.full_name] = t
-        
+
         # Add PDF tables, merging with existing
         for t_dict in pdf_tables:
             t = TableInfo.from_dict(t_dict)
             if t.full_name in tables_dict:
-                # Merge information
+                # Smart merge: combine information instead of replacing
                 existing = tables_dict[t.full_name]
-                if not existing.description and t.description:
-                    existing.description = t.description
+
+                # Merge descriptions (combine both if different)
+                if t.description and t.description != existing.description:
+                    if existing.description:
+                        # Combine descriptions with separator
+                        existing.description = f"{existing.description}; {t.description}"
+                    else:
+                        existing.description = t.description
+
+                # Merge related KPI
                 if not existing.related_kpi and t.related_kpi:
                     existing.related_kpi = t.related_kpi
+
+                # Merge columns (deduplicate by column name)
+                if t.columns:
+                    existing_col_names = {col.name for col in existing.columns}
+                    for col in t.columns:
+                        if col.name not in existing_col_names:
+                            existing.columns.append(col)
+                            existing_col_names.add(col.name)
+
+                # Merge table remarks
+                if t.table_remarks:
+                    if not existing.table_remarks:
+                        existing.table_remarks = t.table_remarks[:]
+                    else:
+                        # Combine unique remarks
+                        existing_remarks = set(existing.table_remarks)
+                        for remark in t.table_remarks:
+                            if remark not in existing_remarks:
+                                existing.table_remarks.append(remark)
             else:
                 tables_dict[t.full_name] = t
-        
+
+        logger.info(f"Combined tables: {len(md_tables)} markdown + {len(pdf_tables)} PDF -> {len(tables_dict)} unique")
         return list(tables_dict.values())
     
     def _combine_queries(self, pdf_queries: List[Dict], md_queries: List[Dict]) -> List[SQLQuery]:

@@ -733,15 +733,28 @@ async def _extract_pdfs_async_with_progress(
             all_pdf_data["tables"].extend(pdf_content.get("tables", []))
             all_pdf_data["sql_queries"].extend(pdf_content.get("sql_queries", []))
 
-            # Record cache statistics
+            # Record cache statistics with extraction counts
             all_pdf_data["cache_stats"]["files"].append({
                 "name": pdf_file.name,
                 "status": "completed",
                 "pages_total": cache_stats.get("total_pages", 0),
                 "pages_cached": cache_stats.get("cached_pages", 0),
                 "cache_hit_rate": cache_stats.get("cache_hit_rate", 0),
-                "duration_ms": duration_ms
+                "duration_ms": duration_ms,
+                "tables_extracted": len(pdf_content.get("tables", [])),
+                "questions_extracted": len(pdf_content.get("questions", [])),
+                "queries_extracted": len(pdf_content.get("sql_queries", []))
             })
+
+    # Log summary statistics
+    if verbose:
+        total_tables = len(all_pdf_data["tables"])
+        total_questions = len(all_pdf_data["questions"])
+        total_queries = len(all_pdf_data["sql_queries"])
+        print(f"   PDF extraction complete:")
+        print(f"   - Tables: {total_tables}")
+        print(f"   - Questions: {total_questions}")
+        print(f"   - SQL Queries: {total_queries}")
 
     return all_pdf_data
 
@@ -804,5 +817,15 @@ def _extract_markdown(input_dir: str, verbose: bool, progress_callback: Optional
                 print(f"   Error processing {md_file.name}: {e}")
             if progress_callback:
                 progress_callback(md_file.name, 0, 1, False, "failed")
+
+    # Log summary statistics
+    if verbose:
+        total_tables = len(all_md_data["tables"])
+        total_questions = len(all_md_data["questions"])
+        total_queries = len(all_md_data["sql_queries"])
+        print(f"   Markdown extraction complete:")
+        print(f"   - Tables: {total_tables}")
+        print(f"   - Questions: {total_questions}")
+        print(f"   - SQL Queries: {total_queries}")
 
     return all_md_data

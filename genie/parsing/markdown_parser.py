@@ -327,50 +327,91 @@ class MarkdownParser:
         return 'Other'
     
     def _extract_tables(self, content: str) -> List[Dict]:
-        """Extract table information from markdown content"""
+        """Extract table information from markdown content with flexible pattern matching"""
         tables = []
-        
-        # Look for table sections (e.g., "## Daily KPI Summary")
-        table_section_pattern = r"##\s+(.+?)\n\n\*\*Table:\*\*\s+`([^`]+)`"
-        table_matches = re.finditer(table_section_pattern, content, re.MULTILINE)
-        
-        for match in table_matches:
-            section_title = match.group(1).strip()
-            table_name = match.group(2).strip()
-            
-            # Find the section content
-            section_start = match.start()
-            next_section = re.search(r"\n##\s+", content[section_start + 1:])
-            section_end = section_start + next_section.start() if next_section else len(content)
-            section_content = content[section_start:section_end]
-            
-            # Extract related KPI
-            related_kpi_match = re.search(self.RELATED_KPI_PATTERN, section_content)
-            related_kpi = related_kpi_match.group(1).strip() if related_kpi_match else None
-            
-            # Extract key columns from sample query
-            sample_query_match = re.search(self.SAMPLE_QUERY_SECTION_PATTERN, section_content, re.DOTALL)
-            key_columns = []
-            if sample_query_match:
-                query = sample_query_match.group(1)
-                # Extract SELECT columns (simplified)
-                select_pattern = r"SELECT\s+(.*?)\s+FROM"
-                select_match = re.search(select_pattern, query, re.DOTALL | re.IGNORECASE)
-                if select_match:
-                    select_clause = select_match.group(1)
-                    # Extract column names (simplified)
-                    col_pattern = r"([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)|([a-zA-Z0-9_]+)\s+as"
-                    key_columns = [c[0] or c[1] for c in re.findall(col_pattern, select_clause, re.IGNORECASE)]
-            
-            table = {
-                "full_name": table_name,
-                "description": section_title,
-                "key_columns": key_columns[:10],  # Limit to first 10
-                "related_kpi": related_kpi
-            }
-            
-            tables.append(table)
-        
+        tables_by_name = {}  # Track unique tables by full_name
+
+        # Pattern 1: Standard format with level 2 heading and **Table:**
+        # Example: ## Daily KPI Summary\n\n**Table:** `catalog.schema.table`
+        pattern1 = r"##\s+(.+?)\n\n\*\*Table:\*\*\s+`([^`]+)`"
+
+        # Pattern 2: Level 3 heading with **Table:**
+        # Example: ### Table Name\n**Table:** `catalog.schema.table`
+        pattern2 = r"###\s+(.+?)\n+\*\*Table:\*\*\s+`([^`]+)`"
+
+        # Pattern 3: Korean format with level 2/3 heading
+        # Example: ## Table Name\n테이블: catalog.schema.table
+        pattern3 = r"#{2,3}\s+(.+?)\n+(?:테이블|Table):\s*([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)"
+
+        # Pattern 4: Inline table reference without heading
+        # Example: **Table:** `catalog.schema.table`
+        pattern4 = r"\*\*Table:\*\*\s+`([^`]+)`"
+
+        # Pattern 5: Plain text table reference
+        # Example: Table: catalog.schema.table or 테이블: catalog.schema.table
+        pattern5 = r"(?:Table|테이블|table name):\s*([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)"
+
+        # Try all patterns
+        all_patterns = [
+            (pattern1, True),   # Has section title
+            (pattern2, True),   # Has section title
+            (pattern3, True),   # Has section title
+            (pattern4, False),  # No section title
+            (pattern5, False),  # No section title
+        ]
+
+        for pattern, has_title in all_patterns:
+            matches = re.finditer(pattern, content, re.MULTILINE)
+
+            for match in matches:
+                if has_title:
+                    section_title = match.group(1).strip()
+                    table_name = match.group(2).strip()
+                else:
+                    section_title = None
+                    table_name = match.group(1).strip()
+
+                # Skip if already found
+                if table_name in tables_by_name:
+                    continue
+
+                # Find the section content
+                section_start = match.start()
+                next_section = re.search(r"\n#{2,3}\s+", content[section_start + 1:])
+                section_end = section_start + next_section.start() if next_section else len(content)
+                section_content = content[section_start:section_end]
+
+                # Extract related KPI
+                related_kpi_match = re.search(self.RELATED_KPI_PATTERN, section_content)
+                related_kpi = related_kpi_match.group(1).strip() if related_kpi_match else None
+
+                # Extract key columns from sample query
+                sample_query_match = re.search(self.SAMPLE_QUERY_SECTION_PATTERN, section_content, re.DOTALL)
+                key_columns = []
+                if sample_query_match:
+                    query = sample_query_match.group(1)
+                    # Extract SELECT columns (simplified)
+                    select_pattern = r"SELECT\s+(.*?)\s+FROM"
+                    select_match = re.search(select_pattern, query, re.DOTALL | re.IGNORECASE)
+                    if select_match:
+                        select_clause = select_match.group(1)
+                        # Extract column names (simplified)
+                        col_pattern = r"([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)|([a-zA-Z0-9_]+)\s+as"
+                        key_columns = [c[0] or c[1] for c in re.findall(col_pattern, select_clause, re.IGNORECASE)]
+
+                table = {
+                    "full_name": table_name,
+                    "description": section_title or f"Table {table_name}",
+                    "key_columns": key_columns,  # No limit - extract all columns
+                    "related_kpi": related_kpi
+                }
+
+                tables_by_name[table_name] = table
+
+        # Convert dict to list
+        tables = list(tables_by_name.values())
+
+        logger.info(f"Extracted {len(tables)} unique tables from markdown")
         return tables
     
     def _extract_sql_queries(self, content: str) -> List[Dict]:

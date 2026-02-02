@@ -1,6 +1,6 @@
 """
 PDF Parser Module - Image-Based Approach
-Converts PDF pages to images and sends them to multimodal LLM for interpretation.
+Converts PDF pages to images using PyMuPDF (no poppler dependency) and sends them to multimodal LLM for interpretation.
 """
 
 import pdfplumber
@@ -15,15 +15,14 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from PIL import Image
 from contextlib import contextmanager, redirect_stderr
+from io import StringIO
 
-# Conditional import for pdf2image
+# Import PyMuPDF for PDF to image conversion (no poppler dependency)
 try:
-    from pdf2image import convert_from_path
-    from pdf2image.exceptions import PDFInfoNotInstalledError
-    PDF2IMAGE_AVAILABLE = True
+    import fitz  # PyMuPDF
+    PYMUPDF_AVAILABLE = True
 except ImportError:
-    PDF2IMAGE_AVAILABLE = False
-    PDFInfoNotInstalledError = Exception  # Fallback for type hints
+    PYMUPDF_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -39,37 +38,20 @@ logging.getLogger('pdfminer.pdffont').setLevel(logging.ERROR)
 
 @contextmanager
 def suppress_stderr():
-    """Context manager to suppress stderr output (for pdfplumber font warnings)."""
-    with open(os.devnull, 'w') as devnull:
-        old_stderr = sys.stderr
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stderr = old_stderr
+    """Context manager to suppress stderr output (for pdfplumber font warnings).
+    Thread-safe version using StringIO buffer instead of file handle."""
+    with redirect_stderr(StringIO()):
+        yield
 
 
-def is_poppler_available() -> bool:
+def is_pymupdf_available() -> bool:
     """
-    Check if poppler-utils is available in the system PATH.
+    Check if PyMuPDF is available.
 
     Returns:
-        bool: True if poppler is available, False otherwise
+        bool: True if PyMuPDF is available, False otherwise
     """
-    if not PDF2IMAGE_AVAILABLE:
-        return False
-
-    try:
-        # Try to import and check if poppler utilities are accessible
-        from pdf2image.pdf2image import pdfinfo_from_path
-        # Check if pdftoppm (part of poppler-utils) is available
-        # by attempting to get version info
-        import subprocess
-        result = subprocess.run(['pdftoppm', '-v'], capture_output=True, timeout=2)
-        return True
-    except (ImportError, FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
-        logger.debug(f"Poppler not available: {e}")
-        return False
+    return PYMUPDF_AVAILABLE
 
 
 @dataclass
@@ -110,11 +92,11 @@ class PDFParser:
         self.per_page = per_page
         self.page_cache_manager = page_cache_manager
 
-        # Check if poppler is available when use_images is requested
-        if use_images and not is_poppler_available():
+        # Check if PyMuPDF is available when use_images is requested
+        if use_images and not is_pymupdf_available():
             logger.warning(
-                "Poppler-utils not available - disabling image-based extraction. "
-                "To enable image extraction, install poppler-utils on your system."
+                "PyMuPDF not available - disabling image-based extraction. "
+                "To enable image extraction, install PyMuPDF: pip install PyMuPDF"
             )
             self.use_images = False
         else:
@@ -138,23 +120,34 @@ class PDFParser:
         metadata = {}
 
         try:
-            # Extract images if enabled and poppler is available
+            # Extract images if enabled and PyMuPDF is available
             if self.use_images:
-                if not is_poppler_available():
+                if not is_pymupdf_available():
                     logger.warning(
-                        "Poppler-utils not available - falling back to text-only extraction. "
-                        "Install poppler-utils for image-based PDF parsing."
+                        "PyMuPDF not available - falling back to text-only extraction. "
+                        "Install PyMuPDF for image-based PDF parsing: pip install PyMuPDF"
                     )
                     # Disable image extraction for this instance
                     self.use_images = False
                 else:
-                    logger.info("Converting PDF pages to images...")
+                    logger.info("Converting PDF pages to images using PyMuPDF...")
                     try:
-                        images = convert_from_path(
-                            pdf_path,
-                            dpi=120,  # Optimal balance: 29% faster than 150 DPI with same quality
-                            fmt='png'
-                        )
+                        # Open PDF with PyMuPDF
+                        doc = fitz.open(pdf_path)
+
+                        # Convert each page to an image
+                        for page_num in range(len(doc)):
+                            page = doc[page_num]
+                            # Render page to pixmap at 120 DPI
+                            # matrix = fitz.Matrix(120/72, 120/72) is the DPI scaling
+                            pix = page.get_pixmap(matrix=fitz.Matrix(120/72, 120/72))
+
+                            # Convert pixmap to PIL Image
+                            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                            images.append(img)
+
+                        doc.close()
+
                         logger.info(f"Converted {len(images)} pages to images")
                         metadata["num_pages"] = len(images)
                         metadata["file_name"] = Path(pdf_path).name
@@ -250,18 +243,30 @@ class PDFParser:
                 temperature=0.1,
                 max_tokens=16000
             )
-            
+
             # Parse response
             structured_data = self._parse_llm_response(response)
-            
+
             # Validate structure
             self._validate_structure(structured_data)
-            
+
+            # Log extraction statistics
+            llm_table_count = len(structured_data.get('tables', []))
             logger.info(f"LLM interpretation complete: {len(structured_data.get('questions', []))} questions, "
-                       f"{len(structured_data.get('tables', []))} tables")
-            
+                       f"{llm_table_count} tables")
+
+            # Compare with pdfplumber tables (validation check)
+            if raw_content.tables_by_page:
+                pdfplumber_table_count = sum(len(page_tables) for page_tables in raw_content.tables_by_page)
+                if pdfplumber_table_count > 0:
+                    logger.info(f"Table extraction comparison: pdfplumber found {pdfplumber_table_count} tables, "
+                               f"LLM extracted {llm_table_count} table definitions")
+                    if llm_table_count < pdfplumber_table_count:
+                        logger.warning(f"LLM may have missed tables: {pdfplumber_table_count - llm_table_count} "
+                                      f"more tables detected by pdfplumber")
+
             return structured_data
-        
+
         except Exception as e:
             logger.error(f"Error during LLM interpretation: {e}")
             raise
@@ -276,6 +281,14 @@ EXTRACT:
 3. SQL Queries: question_id, query (EXACT formatting), description, aggregation_patterns, filtering_rules, join_specs
 4. Joins: left_table, right_table, join_type, join_condition, is_optional
 5. Metadata: document_title, domain
+
+CRITICAL - TABLE EXTRACTION RULES:
+- Extract ALL tables mentioned in the document - be exhaustive and complete
+- Do not skip or omit any table, even if it seems minor or is only referenced briefly
+- If a table is mentioned multiple times, capture all unique column information from all mentions
+- Extract complete column schemas - do not truncate or limit the number of columns
+- If unsure whether something is a table, include it - better to over-extract than miss tables
+- At the end of extraction, count the total tables found and include this in metadata
 
 KEY INSTRUCTIONS:
 - Preserve exact SQL formatting and indentation
@@ -343,11 +356,21 @@ Return your response as valid JSON only, with no additional text."""
     
     def _get_user_prompt(self, text: str, tables_json: str) -> str:
         """Get user prompt for LLM interpretation"""
+        # Increased limits to reduce risk of truncation (20k->50k, 5k->20k)
+        text_limit = 50000
+        tables_limit = 20000
+
+        # Log if truncation occurs
+        if len(text) > text_limit:
+            logger.warning(f"Text content truncated: {len(text)} chars -> {text_limit} chars")
+        if len(tables_json) > tables_limit:
+            logger.warning(f"Tables JSON truncated: {len(tables_json)} chars -> {tables_limit} chars")
+
         return f"""PDF Content:
-{text[:20000]}  
+{text[:text_limit]}
 
 Extracted Tables:
-{tables_json[:5000]}  
+{tables_json[:tables_limit]}  
 
 Extract and structure this information as JSON:
 {{
@@ -658,18 +681,30 @@ Important:
                 temperature=0.1,
                 max_tokens=16000
             )
-            
+
             # Parse response
             structured_data = self._parse_llm_response(response)
-            
+
             # Validate structure
             self._validate_structure(structured_data)
-            
+
+            # Log extraction statistics
+            llm_table_count = len(structured_data.get('tables', []))
             logger.info(f"LLM interpretation complete: {len(structured_data.get('questions', []))} questions, "
-                       f"{len(structured_data.get('tables', []))} tables")
-            
+                       f"{llm_table_count} tables")
+
+            # Compare with pdfplumber tables (validation check)
+            if raw_content.tables_by_page:
+                pdfplumber_table_count = sum(len(page_tables) for page_tables in raw_content.tables_by_page)
+                if pdfplumber_table_count > 0:
+                    logger.info(f"Table extraction comparison: pdfplumber found {pdfplumber_table_count} tables, "
+                               f"LLM extracted {llm_table_count} table definitions")
+                    if llm_table_count < pdfplumber_table_count:
+                        logger.warning(f"LLM may have missed tables: {pdfplumber_table_count - llm_table_count} "
+                                      f"more tables detected by pdfplumber")
+
             return structured_data
-        
+
         except Exception as e:
             logger.error(f"Error during LLM interpretation: {e}")
             raise
